@@ -30,7 +30,7 @@ switch(GIT_BRANCH) {
       PLATFORM_CHOICES_PACKAGE = ['linux-64']
     } else {
       PLATFORM_CHOICES_PACKAGE = ['none', 'all', 'linux-64', 'win-64', 'osx-64']
-    } 
+    }
     break
 }
 
