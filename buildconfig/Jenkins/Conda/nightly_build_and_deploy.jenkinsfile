@@ -12,6 +12,7 @@ GIT_BRANCH = git_branch_name()
 // environment variable set in the Jenkins system configuration global properties.
 PUBLISH_PACKAGES_DEFAULT = (GIT_BRANCH == "${BRANCH_TO_PUBLISH}")
 PR_RUN = params.get('PR_RUN', false)
+println "${PR_RUN}"
 
 switch(GIT_BRANCH) {
   case ['main', 'release-next']:
