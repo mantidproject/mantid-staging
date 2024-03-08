@@ -194,4 +194,4 @@ number of workspace dimensions calculated during the run. It uses ``MDEventWorks
 ``IMDWorkspace`` interface to the ``MDEventWorkspace`` is not efficient. You do not usually need to modify this class unless
 you are modifying ``MDEventWorkspace`` code.
 
-Add text for testing
+Add text for testing - and again

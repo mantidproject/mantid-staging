@@ -184,4 +184,3 @@ automatic checking is available within the python scripts, the level of
 instability in the timings meant that it always produced way too many
 false positives to be useful.
 
-Add a line to test
