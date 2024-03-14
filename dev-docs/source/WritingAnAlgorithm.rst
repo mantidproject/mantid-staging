@@ -306,4 +306,6 @@ Exceptions
 ----------
 
 It is fine to throw exceptions in your algorithms in the event of an unrecoverable failure.
-These will be caught in the base Algorithm class, which will report the failure of the algorithm..
+These will be caught in the base Algorithm class, which will report the failure of the algorithm.
+
+Trying to test again
