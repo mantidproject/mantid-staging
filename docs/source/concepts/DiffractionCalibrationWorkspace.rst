@@ -26,7 +26,7 @@ The order of the rows and columns will not matter to algorithms that
 use the workspace. Algorithms that create the :ref:`TableWorkspace
 <Table Workspaces>` will use this column order with the rows sorted by
 ``detid`` (smallest first). Any missing column, other than ``detid``,
-will be assumed to be all zeros.
+will be assumed to be all zeros..
 
 Diffraction Calibration File
 ============================
