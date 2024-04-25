@@ -19,6 +19,8 @@ Abins2D is a plugin for Mantid which allows scientists to generate theoretical i
 
 Add another test line here.
 
+Add another test line here too.
+
 The intensity is calculated in the "almost-isotropic" incoherent powder-averaging approximation, as used in the 1-D :ref:`Abins <algm-Abins>` algorithm.
 Different 2-D INS instruments may be selected, along with instrument parameters (incident energy, chopper settings) that determine the accessible :math:`(|\mathbf{q}|,\omega)` region and energy resolution.
 More information about the implemented working equations can be found :ref:`here <DynamicalStructureFactorFromAbInitio>`.
