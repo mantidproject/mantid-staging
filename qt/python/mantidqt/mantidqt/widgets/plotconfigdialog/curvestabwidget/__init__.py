@@ -7,7 +7,7 @@
 #  This file is part of the mantid workbench.
 
 from matplotlib import rcParams
-from matplotlib.axes import ErrorbarContainer
+from matplotlib.container import ErrorbarContainer
 from matplotlib.lines import Line2D
 from numpy import isclose
 from qtpy.QtCore import Qt
@@ -125,7 +125,7 @@ class CurveProperties(dict):
     def __eq__(self, other):
         for prop, value in sorted(self.items()):
             other_value = other[prop]
-            if type(value) is float:
+            if isinstance(value, float):
                 if not isclose(value, other_value, atol=1e-5):
                     return False
             else:

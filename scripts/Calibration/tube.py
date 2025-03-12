@@ -71,9 +71,7 @@ Other Useful Methods
 
 .. autofunction:: tube.readCalibrationFile
 
-""".format(
-    CALIBRATE_SIGNATURE
-)
+""".format(CALIBRATE_SIGNATURE)
 
 
 def calibrate(ws, tubeSet, knownPositions, funcForm, **kwargs):
@@ -920,8 +918,9 @@ class _CalibrationParameterHelper(object):
                     raise 3
             except:
                 raise RuntimeError(
-                    "Invalid type for {0}."
-                    "The expected type was ITableWorkspace with 2 columns(Detector ID and Detector Positions)".format(self.CALIBTABLE)
+                    "Invalid type for {0}. The expected type was ITableWorkspace with 2 columns(Detector ID and Detector Positions)".format(
+                        self.CALIBTABLE
+                    )
                 )
             else:
                 return calib_table

@@ -8,7 +8,29 @@
 System Test for ISIS Reflectometry reduction
 Adapted from scripts provided by Max Skoda.
 """
-from ISISReflectometryWorkflowBase import *
+
+from ISISReflectometryWorkflowBase import (
+    ISISReflectometryWorkflowBase,
+    removeWorkspaces,
+    setupInstrument,
+    stitchTransmissionWorkspaces,
+    stitchedWorkspaceName,
+)
+from mantid.api import mtd
+from mantid.kernel import logger
+from mantid.simpleapi import (
+    AppendSpectra,
+    CloneWorkspace,
+    DeleteWorkspace,
+    FilterByTime,
+    Fit,
+    NRCalculateSlitResolution,
+    SaveNexus,
+    Scale,
+    Stitch1DMany,
+    Rebin,
+    ReflectometryISISLoadAndProcess,
+)
 import systemtesting
 
 
@@ -86,12 +108,11 @@ class INTERReductionTest(systemtesting.MantidSystemTest, ISISReflectometryWorkfl
         testFittingOfReducedData(44990, 44991, self.expected_fit_params, self.expected_fit_covariance)
         self.finaliseResults()
 
-    @staticmethod
-    def regenerateReferenceFileByReducing():
+    def regenerateReferenceFileByReducing(self):
         setupInstrument()
         test = INTERReductionTest()
         test.runTest()
-        SaveNexus(InputWorkspace=INTERReductionTest.reference_workspace_name, Filename=INTERReductionTest.reference_file)
+        SaveNexus(InputWorkspace=self.reference_workspace_name, Filename=self.reference_file)
 
 
 def eventRef(run_number, angle, start=0, stop=0, DB="TRANS"):
@@ -245,7 +266,7 @@ def compareFitResults(results_dict, reference_dict, tolerance):
                     "reference '{2}' by more than required tolerance '{3}'".format(index, value, expected, tolerance)
                 )
                 logger.error("These were the values found:         {0}".format(values_fitted))
-                raise RuntimeError("Some results were not as accurate as expected. Please check the log " "messages for details")
+                raise RuntimeError("Some results were not as accurate as expected. Please check the log messages for details")
 
 
 def sliceAndReduceRun(run_number):

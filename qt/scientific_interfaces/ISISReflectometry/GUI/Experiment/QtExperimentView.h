@@ -19,7 +19,7 @@ namespace MantidQt {
 namespace CustomInterfaces {
 namespace ISISReflectometry {
 
-/** ExperiementView : Provides an interface for the "Experiement" tab in the
+/** ExperimentView : Provides an interface for the "Experiment" tab in the
 ISIS Reflectometry interface.
 */
 class MANTIDQT_ISISREFLECTOMETRY_DLL QtExperimentView : public QWidget, public IExperimentView {
@@ -182,7 +182,7 @@ private:
   void setText(QLineEdit &lineEdit, int value);
   void setText(QLineEdit &lineEdit, double value);
   void setText(QLineEdit &lineEdit, std::string const &value);
-  void setText(QLineEdit &lineEdit, boost::optional<int> value);
+  void setText(QLineEdit &lineEdit, std::optional<int> value);
   void setText(QLineEdit &lineEdit, boost::optional<double> value);
   void setText(QLineEdit &lineEdit, boost::optional<std::string> const &value);
   std::string textFromCell(QTableWidgetItem const *maybeNullItem) const;

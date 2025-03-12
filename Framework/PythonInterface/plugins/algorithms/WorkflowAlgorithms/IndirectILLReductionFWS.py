@@ -5,11 +5,30 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import numpy as np
+import os
 import time
 from mantid import mtd
 from mantid.kernel import StringListValidator, Direction, FloatBoundedValidator
-from mantid.api import PythonAlgorithm, MultipleFileProperty, FileProperty, FileAction, WorkspaceGroupProperty, Progress
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory, PythonAlgorithm, MultipleFileProperty, FileProperty, FileAction, WorkspaceGroupProperty, Progress
+from mantid.simpleapi import (
+    AddSampleLog,
+    AddSampleLogMultiple,
+    ConjoinXRuns,
+    ConvertToPointData,
+    DeleteWorkspace,
+    Divide,
+    GroupWorkspaces,
+    IndirectILLEnergyTransfer,
+    Integration,
+    Minus,
+    Plus,
+    Rebin,
+    RenameWorkspace,
+    Scale,
+    SelectNexusFilesByMetadata,
+    SortXAxis,
+    SplineInterpolation,
+)
 
 
 class IndirectILLReductionFWS(PythonAlgorithm):
@@ -165,12 +184,12 @@ class IndirectILLReductionFWS(PythonAlgorithm):
         issues = dict()
 
         if self.getPropertyValue("CalibrationBackgroundRun") and not self.getPropertyValue("CalibrationRun"):
-            issues["CalibrationRun"] = "Calibration runs are required, " "if background for calibration is given."
+            issues["CalibrationRun"] = "Calibration runs are required, if background for calibration is given."
 
         if not self.getProperty("ManualInelasticPeakChannels").isDefault:
             peaks = self.getProperty("ManualInelasticPeakChannels").value
             if len(peaks) != 2:
-                issues["ManualInelasticPeakChannels"] = "Invalid value for peak channels, " "provide two comma separated positive integers."
+                issues["ManualInelasticPeakChannels"] = "Invalid value for peak channels, provide two comma separated positive integers."
             elif peaks[0] >= peaks[1]:
                 issues["ManualInelasticPeakChannels"] = "First peak channel must be less than the second"
             elif peaks[0] <= 0:
@@ -218,9 +237,7 @@ class IndirectILLReductionFWS(PythonAlgorithm):
         self._red_ws += suffix
 
         # Nexus metadata criteria for FWS type of data (both EFWS and IFWS)
-        self._criteria = (
-            "($/entry0/instrument/Doppler/maximum_delta_energy$ == 0. or " "$/entry0/instrument/Doppler/velocity_profile$ == 1)"
-        )
+        self._criteria = "($/entry0/instrument/Doppler/maximum_delta_energy$ == 0. or $/entry0/instrument/Doppler/velocity_profile$ == 1)"
 
         # force sort x-axis, if interpolation is requested
         if (
@@ -320,8 +337,7 @@ class IndirectILLReductionFWS(PythonAlgorithm):
                 Scale(InputWorkspace=right, OutputWorkspace=right, Factor=right_factor)
             else:
                 self.log().notice(
-                    "Zero monitor integral has been found in one (or both) wings;"
-                    " left: {0}, right: {1}".format(left_monitor, right_monitor)
+                    "Zero monitor integral has been found in one (or both) wings; left: {0}, right: {1}".format(left_monitor, right_monitor)
                 )
 
             Plus(LHSWorkspace=left, RHSWorkspace=right, OutputWorkspace=left_right_sum)

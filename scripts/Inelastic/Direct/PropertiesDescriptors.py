@@ -6,20 +6,20 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=too-many-lines
 # pylint: disable=invalid-name
-""" File contains collection of Descriptors used to define complex
-    properties in NonIDF_Properties and PropertyManager classes
+"""File contains collection of Descriptors used to define complex
+properties in NonIDF_Properties and PropertyManager classes
 """
+
 import os
 import numpy as np
 import math
 import re
-from collections import Iterable
-import mantid.simpleapi as mantid
-from mantid import api
+from collections.abc import Iterable, Callable
+from mantid.api import mtd, FileFinder, Workspace
+from mantid.simpleapi import DeleteWorkspace, GetAllEi, GetEi
 
 import Direct.ReductionHelpers as prop_helpers
-from Direct.AbsorptionShapes import *
-import collections
+from Direct.AbsorptionShapes import anAbsorptionShape
 
 
 # -----------------------------------------------------------------------------------------
@@ -192,7 +192,7 @@ class IncidentEnergy(PropDescriptor):
                 if value.lower() == "auto":
                     self._use_autoEi = True
                     currentRun = instance.sample_run
-                    if isinstance(currentRun, api.Workspace):
+                    if isinstance(currentRun, Workspace):
                         currentRun = currentRun.getRunNumber()
                     if currentRun != self._autoEiRunNumber or currentRun is None:
                         self._autoEiRunNumber = currentRun
@@ -285,11 +285,7 @@ class IncidentEnergy(PropDescriptor):
 
     #
 
-    # Python 3 compatibility
     def __next__(self):
-        return self.next()
-
-    def next(self):
         if isinstance(self._incident_energy, list):
             self._cur_iter_en += 1
             if self._cur_iter_en >= len(self._incident_energy):
@@ -551,7 +547,7 @@ class SaveFileName(PropDescriptor):
     def __set__(self, instance, value):
         if value is None:
             self._file_name = None
-        elif isinstance(value, collections.Callable):
+        elif isinstance(value, Callable):
             self._custom_print = value
         else:
             self._file_name = str(value)
@@ -643,8 +639,9 @@ class mon2NormalizationEnergyRange(PropDescriptor):
             self.__set__(instance, val)
         else:
             raise KeyError(
-                "mon2_norm_energy_range needs to be initialized by two values.\n"
-                "Trying to assign value {0} of unknown type {1}".format(val, type(val))
+                "mon2_norm_energy_range needs to be initialized by two values.\nTrying to assign value {0} of unknown type {1}".format(
+                    val, type(val)
+                )
             )
 
     #
@@ -679,7 +676,7 @@ class mon2NormalizationEnergyRange(PropDescriptor):
             return (
                 False,
                 2,
-                "mon2_normalization_energy_range can be initialized by list of two values only." " Got {0} values".format(len(range)),
+                "mon2_normalization_energy_range can be initialized by list of two values only. Got {0} values".format(len(range)),
             )
 
         result = (True, 0, "")
@@ -762,17 +759,17 @@ class DetCalFile(PropDescriptor):
     def __set__(self, instance, val):
         """set detector calibration file using various formats"""
 
-        if val is None or isinstance(val, api.Workspace):
+        if val is None or isinstance(val, Workspace):
             # nothing provided or workspace provided or filename probably provided
-            if str(val) in mantid.mtd:
+            if str(val) in mtd:
                 # workspace name provided
-                val = mantid.mtd[str(val)]
+                val = mtd[str(val)]
             self._det_cal_file = val
             self._calibrated_by_run = False
             return
         if isinstance(val, str):
-            if val in mantid.mtd:
-                val = mantid.mtd[val]
+            if val in mtd:
+                val = mtd[val]
                 self._det_cal_file = val
                 self._calibrated_by_run = False
                 return
@@ -818,7 +815,7 @@ class DetCalFile(PropDescriptor):
             # nothing to look for
             return (True, "No Detector calibration file defined")
 
-        if isinstance(self._det_cal_file, api.Workspace):
+        if isinstance(self._det_cal_file, Workspace):
             # nothing to do.  Workspace used for calibration
             return (True, "Workspace {0} used for detectors calibration".format(self._det_cal_file.name()))
 
@@ -835,7 +832,7 @@ class DetCalFile(PropDescriptor):
             zero_padding = fac.instrument(inst_short_name).zeroPadding(dcf_val)
             file_hint = inst_short_name + str(dcf_val).zfill(zero_padding)
             try:
-                file_name = mantid.FileFinder.findRuns(file_hint)[0]
+                file_name = FileFinder.findRuns(file_hint)[0]
             # pylint: disable=bare-except
             except:
                 return (False, "Can not find run file corresponding to run N: {0}".format(file_hint))
@@ -846,7 +843,7 @@ class DetCalFile(PropDescriptor):
         file_name = prop_helpers.findFile(self._det_cal_file)
         if len(file_name) == 0:  # it still can be a run number as string
             try:
-                file_name = mantid.FileFinder.findRuns(self._det_cal_file)[0]
+                file_name = FileFinder.findRuns(self._det_cal_file)[0]
             # pylint: disable=bare-except
             except:
                 return (False, "Can not find file or run file corresponding to name : {0}".format(self._det_cal_file))
@@ -1094,7 +1091,7 @@ class MonovanIntegrationRange(prop_helpers.ComplexProperty):
             return (
                 False,
                 1,
-                "monovan integration is suspiciously wide: [{0}:{1}]. " "This may be incorrect".format(the_range[0], the_range[1]),
+                "monovan integration is suspiciously wide: [{0}:{1}]. This may be incorrect".format(the_range[0], the_range[1]),
             )
         return True, 0, ""
 
@@ -1635,19 +1632,20 @@ class RotationAngle(PropDescriptor):
         if instance is None:
             return self
 
-        if self._own_psi_value:
+        if self._own_psi_value is None or np.isnan(self._own_psi_value):
+            return self.read_psi_from_workspace(self._log_ws_name)
+        else:
             return self._own_psi_value
-        return self.read_psi_from_workspace(self._log_ws_name)
 
     def __set__(self, instance, value):
         if isinstance(value, str):
-            if value in mantid.mtd:  ## its workspace
+            if value in mtd:  ## its workspace
                 self._log_ws_name = value
                 self._own_psi_value = None
             else:  # it is string representation of psi.  Should be
                 # convertible to number.
                 self._own_psi_value = float(value)
-        elif isinstance(value, api.Workspace):
+        elif isinstance(value, Workspace):
             self._log_ws_name = value.name()
             self._own_psi_value = None
         elif value is None:  # clear all
@@ -1661,12 +1659,12 @@ class RotationAngle(PropDescriptor):
         """
         working_ws = external_ws
         if working_ws is None:
-            working_ws = mantid.mtd[self._log_ws_name]
+            working_ws = mtd[self._log_ws_name]
         if working_ws is None:
             raise RuntimeError("No workspace provided. Can not read logs to identify psi")
         else:
             if isinstance(external_ws, str):
-                working_ws = mantid.mtd[external_ws]
+                working_ws = mtd[external_ws]
 
         value = None
         # pylint: disable=protected-access
@@ -1687,10 +1685,10 @@ class RotationAngle(PropDescriptor):
         # pylint: disable=protected-access
         offset = self._mot_offset._offset
         if offset is None:
-            return np.NaN
+            return np.nan
         log_val = self._read_ws_logs(workspace)
         if log_val is None:
-            return np.NaN
+            return np.nan
         else:
             return offset + log_val
 

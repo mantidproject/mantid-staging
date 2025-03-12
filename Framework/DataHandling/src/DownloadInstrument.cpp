@@ -9,9 +9,6 @@
 #include "MantidKernel/ConfigService.h"
 #include "MantidKernel/GitHubApiHelper.h"
 
-// boost
-#include <boost/algorithm/string/predicate.hpp>
-
 // Poco
 #include <Poco/DateTimeFormat.h>
 #include <Poco/DateTimeFormatter.h>
@@ -121,13 +118,14 @@ void DownloadInstrument::exec() {
 
   for (auto &itMap : fileMap) {
     // download a file
-    if (boost::algorithm::ends_with(itMap.second, "Facilities.xml")) {
+    if (itMap.second.ends_with("Facilities.xml")) {
       g_log.notice("A new Facilities.xml file has been downloaded, this will "
                    "take effect next time Mantid is started.");
     } else {
       g_log.information() << "Downloading \"" << itMap.second << "\" from \"" << itMap.first << "\"\n";
     }
     doDownloadFile(itMap.first, itMap.second);
+    interruption_point();
   }
 
   setProperty("FileDownloadCount", static_cast<int>(fileMap.size()));
@@ -218,17 +216,17 @@ DownloadInstrument::StringToStringMap DownloadInstrument::processRepository() {
   std::unordered_set<std::string> repoFilenames;
 
   for (auto &serverElement : serverContents) {
-    std::string name = serverElement.get("name", "").asString();
-    repoFilenames.insert(name);
-    Poco::Path filePath(localPath, name);
+    std::string elementName = serverElement.get("name", "").asString();
+    repoFilenames.insert(elementName);
+    Poco::Path filePath(localPath, elementName);
     if (filePath.getExtension() != "xml")
       continue;
     std::string sha = serverElement.get("sha", "").asString();
     std::string downloadUrl = getDownloadUrl(serverElement);
 
     // Find shas
-    std::string localSha = getValueOrDefault(localShas, name, "");
-    std::string installSha = getValueOrDefault(installShas, name, "");
+    std::string localSha = getValueOrDefault(localShas, elementName, "");
+    std::string installSha = getValueOrDefault(installShas, elementName, "");
     // Different sha1 on github cf local and global
     // this will also catch when file is only present on github (as local sha
     // will be "")

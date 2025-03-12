@@ -5,9 +5,8 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,too-few-public-methods
-from mantid.kernel import *
-from mantid.simpleapi import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import Direction
 from mantid.geometry import SpaceGroupFactory, CrystalStructure, UnitCell
 
 import re
@@ -76,7 +75,12 @@ class SpaceGroupBuilder(object):
             raise RuntimeError("No space group symbol in CIF.")
 
         cleanSpaceGroupSymbol = self._getCleanSpaceGroupSymbol(rawSpaceGroupSymbol[0])
-
+        if not SpaceGroupFactory.isSubscribedSymbol(cleanSpaceGroupSymbol):
+            # try adding rotoinversion (i.e. prefix '-' to first digit,  sometimes omitted but is implicit)
+            match = re.search(r"\d", cleanSpaceGroupSymbol)
+            if match:
+                idigit = match.start()
+                cleanSpaceGroupSymbol = cleanSpaceGroupSymbol[:idigit] + "-" + cleanSpaceGroupSymbol[idigit:]
         # If the symbol is not registered, throw as well.
         return SpaceGroupFactory.createSpaceGroup(cleanSpaceGroupSymbol).getHMSymbol()
 
@@ -132,7 +136,7 @@ class UnitCellBuilder(object):
         )
 
         if unitCellValueMap["_cell_length_a"] is None:
-            raise RuntimeError("The a-parameter of the unit cell is not specified in the supplied CIF.\n" "Key to look for: _cell_length_a")
+            raise RuntimeError("The a-parameter of the unit cell is not specified in the supplied CIF.\nKey to look for: _cell_length_a")
 
         replacementMap = {
             "_cell_length_b": str(unitCellValueMap["_cell_length_a"]),
@@ -198,9 +202,7 @@ class AtomListBuilder(object):
 
         for field in coordinateFields:
             if field not in cifData.keys():
-                raise RuntimeError(
-                    "Mandatory field {0} not found in CIF-file." "Please check the atomic position definitions.".format(field)
-                )
+                raise RuntimeError("Mandatory field {0} not found in CIF-file.Please check the atomic position definitions.".format(field))
 
         # Return a dict like { 'label1': 'x y z', 'label2': 'x y z' }
         return dict(
@@ -225,7 +227,7 @@ class AtomListBuilder(object):
         rawAtomSymbols = [cifData[x] for x in ["_atom_site_type_symbol", "_atom_site_label"] if x in cifData.keys()]
 
         if len(rawAtomSymbols) == 0:
-            raise RuntimeError("Cannot determine atom types, both _atom_site_type_symbol and _atom_site_label are " "missing.")
+            raise RuntimeError("Cannot determine atom types, both _atom_site_type_symbol and _atom_site_label are missing.")
 
         # Return a dict like { 'label1': 'Element1', ... } extracted from either _atom_site_type_symbol or _atom_site_label
         return dict([(label, self._getCleanAtomSymbol(x)) for label, x in zip(labels, rawAtomSymbols[0])])
@@ -236,7 +238,6 @@ class AtomListBuilder(object):
         return re.sub(nonCharacterRe, "", atomSymbol)
 
     def _getIsotropicUs(self, cifData, labels, unitCell):
-
         keyUIso = "_atom_site_u_iso_or_equiv"
         keyBIso = "_atom_site_b_iso_or_equiv"
 
@@ -424,9 +425,7 @@ class LoadCIF(PythonAlgorithm):
         try:
             self._loadFromCif()
         except ImportError:
-            raise RuntimeError(
-                "This algorithm requires an additional Python package: PyCifRW" " (https://pypi.python.org/pypi/PyCifRW/4.1)"
-            )
+            raise RuntimeError("This algorithm requires an additional Python package: PyCifRW (https://pypi.python.org/pypi/PyCifRW/4.1)")
 
     def _loadFromCif(self):
         from CifFile import ReadCif
@@ -484,19 +483,10 @@ class LoadCIF(PythonAlgorithm):
             if key in cif_data.keys():
                 return
 
-        raise RuntimeError(f"Could not find any UB Matrix keys. Missing one of the following: " f"{UBMatrixBuilder.ub_matrix_keys}")
+        raise RuntimeError(f"Could not find any UB Matrix keys. Missing one of the following: {UBMatrixBuilder.ub_matrix_keys}")
 
     def _getFileUrl(self):
-        # ReadCif requires a URL, windows path specs seem to confuse urllib,
-        # so the pathname is converted to a URL before passing it to ReadCif.
-        # pylint: disable=no-name-in-module
-        try:
-            from urllib import pathname2url
-        except ImportError:
-            from urllib.request import pathname2url
-
-        cifFileName = self.getProperty("InputFile").value
-        return pathname2url(cifFileName)
+        return self.getProperty("InputFile").value
 
     def _setCrystalStructureFromCifFile(self, workspace, cif_data):
         crystalStructure = self._getCrystalStructureFromCifFile(cif_data)
@@ -514,9 +504,7 @@ class LoadCIF(PythonAlgorithm):
     {1}
   Atoms:
     {2}
-""".format(
-                builder.unitCell, builder.spaceGroup, "\n    ".join(builder.atoms.split(";"))
-            )
+""".format(builder.unitCell, builder.spaceGroup, "\n    ".join(builder.atoms.split(";")))
         )
 
         return crystalStructure

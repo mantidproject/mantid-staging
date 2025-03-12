@@ -7,6 +7,7 @@
 
 import DirectILL_common as common
 from mantid.api import (
+    mtd,
     AlgorithmFactory,
     DataProcessorAlgorithm,
     FileAction,
@@ -26,7 +27,42 @@ from mantid.kernel import (
     RebinParamsValidator,
     StringListValidator,
 )
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    ApplyPaalmanPingsCorrection,
+    ConvertUnits,
+    CorrectKiKf,
+    CreateSingleValuedWorkspace,
+    DeleteWorkspace,
+    DeleteWorkspaces,
+    DetectorEfficiencyCorUser,
+    DirectILLCollectData,
+    DirectILLDiagnostics,
+    DirectILLReduction,
+    DirectILLIntegrateVanadium,
+    Divide,
+    GroupDetectors,
+    GroupWorkspaces,
+    Load,
+    LoadEmptyInstrument,
+    LoadMask,
+    LoadNexus,
+    MaskAngle,
+    MaskBinsIf,
+    MaskBTP,
+    MaskDetectors,
+    MergeRuns,
+    Minus,
+    PaalmanPingsAbsorptionCorrection,
+    PaalmanPingsMonteCarloAbsorption,
+    Rebin,
+    RebinToWorkspace,
+    RenameWorkspace,
+    SaveMask,
+    SaveNexus,
+    SaveNXSPE,
+    Scale,
+    SetSample,
+)
 
 from os import path
 
@@ -62,7 +98,6 @@ def get_vanadium_corrections(vanadium_ws):
 
 
 class DirectILLAutoProcess(DataProcessorAlgorithm):
-
     instrument = None
     sample = None
     process = None
@@ -102,7 +137,7 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
     def validateInputs(self):
         issues = dict()
 
-        run_no_err = "Wrong number of {0} runs: {1}. Provide one or as many as " "sample runs: {2}."
+        run_no_err = "Wrong number of {0} runs: {1}. Provide one or as many as sample runs: {2}."
         runs_sample = len(self.getPropertyValue("Runs"))
         if not self.getProperty("EmptyContainerWorkspace").isDefault:
             runs_container = mtd[self.getPropertyValue("EmptyContainerWorkspace")].getNumberOfEntries()
@@ -144,7 +179,7 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
             try:
                 Load(Filename=flat_bkg_ws, OutputWorkspace=flat_bkg_ws)
             except ValueError:
-                issues["FlatBackgroundSource"] = "Desired flat background workspace:" " {} cannot be found.".format(flat_bkg_ws)
+                issues["FlatBackgroundSource"] = "Desired flat background workspace: {} cannot be found.".format(flat_bkg_ws)
 
         if self.getPropertyValue("AbsorptionCorrection") != "None":
             if self.getProperty("SampleMaterial").isDefault:
@@ -192,7 +227,6 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
         self.temperatures = set()
 
     def PyInit(self):
-
         positiveFloat = FloatBoundedValidator(0.0, exclusive=False)
         validRebinParams = RebinParamsValidator(AllowEmpty=True)
         orderedPairsValidator = FloatArrayOrderedPairsValidator()
@@ -281,10 +315,10 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
         self.declareProperty(IntArrayProperty(name="MaskedTubes", values=[], direction=Direction.Input), doc="List of tubes to be masked.")
 
         self.declareProperty(
-            "MaskThresholdMin", 0.0, doc="Threshold level below which bins will be masked" " to remove empty / background pixels."
+            "MaskThresholdMin", 0.0, doc="Threshold level below which bins will be masked to remove empty / background pixels."
         )
 
-        self.declareProperty("MaskThresholdMax", 0.0, doc="Threshold level above which bins will be masked" " to remove noisy pixels.")
+        self.declareProperty("MaskThresholdMax", 0.0, doc="Threshold level above which bins will be masked to remove noisy pixels.")
 
         self.declareProperty(
             FloatArrayProperty(name="MaskedAngles", values=[], validator=orderedPairsValidator),
@@ -493,8 +527,9 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
         instrument = mtd[ws].getInstrument().getName()
         if self.instrument and instrument != self.instrument:
             self.log().error(
-                "Sample data: {} comes from different instruments that the rest of the data:"
-                " {} and {}".format(sample, instrument, self.instrument)
+                "Sample data: {} comes from different instruments that the rest of the data: {} and {}".format(
+                    sample, instrument, self.instrument
+                )
             )
         else:
             self.instrument = instrument
@@ -591,7 +626,7 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
             existing_masks.append(tube_mask_ws)
 
         mask_angles = self.getProperty("MaskedAngles").value
-        if mask_angles != list():
+        if mask_angles.any():
             masked_angles_ws = "{}_masked_angles".format(self.instrument)
             LoadEmptyInstrument(InstrumentName=self.instrument, OutputWorkspace=masked_angles_ws)
             MaskAngle(Workspace=masked_angles_ws, MinAngle=mask_angles[0], MaxAngle=mask_angles[1])
@@ -752,7 +787,7 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
                 OutputWorkspace=processed_sample,
                 OutputSofThetaEnergyWorkspace=processed_sample_tw,
                 AbsoluteUnitsNormalisation=self.getProperty(common.PROP_ABSOLUTE_UNITS).value,
-                **optional_parameters
+                **optional_parameters,
             )
         if len(to_remove) > 0 and self.clear_cache:
             self._clean_up(to_remove)
@@ -797,7 +832,7 @@ class DirectILLAutoProcess(DataProcessorAlgorithm):
             OutputWorkspace=sofqw_output,
             OutputSofThetaEnergyWorkspace=softw_output,
             DiagnosticsWorkspace=vanadium_diagnostics,
-            **optional_parameters
+            **optional_parameters,
         )
 
         if len(to_remove) > 0 and self.clear_cache:

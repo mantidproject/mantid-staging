@@ -4,7 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Defines the main State object."""
+"""Defines the main State object."""
+
 import copy
 import json
 
@@ -108,5 +109,5 @@ def get_all_states_builder(data_info):
         return AllStatesBuilder()
     else:
         raise NotImplementedError(
-            "SANSStateBuilder: Could not find any valid state builder for the " "specified SANSStateData object {0}".format(str(data_info))
+            "SANSStateBuilder: Could not find any valid state builder for the specified SANSStateData object {0}".format(str(data_info))
         )

@@ -71,7 +71,7 @@ QString MantidColorMap::defaultColorMap() { return defaultCMapName(); }
  * match the existing interface in Plotting.
  * @param name The name of a colormap
  * @return The same name passed to the function if it exists
- * @throws std::runtime_error if the colomap does not exist
+ * @throws std::invalid_argument if the colomap does not exist
  */
 QString MantidColorMap::exists(const QString &name) {
   getCMap(name); // throws if it does not exist
@@ -146,7 +146,7 @@ void MantidColorMap::setNthPower(double gamma) {
  * @param value The value to be transformed
  * @return An instance QRgb describing the color
  */
-QRgb MantidColorMap::rgb(double vmin, double vmax, double value) const {
+QRgb MantidColorMap::rgb(double vmin, double vmax, double value) {
   m_mappable.setClim(vmin, vmax);
   return m_mappable.toRGBA(value);
 }
@@ -159,7 +159,7 @@ QRgb MantidColorMap::rgb(double vmin, double vmax, double value) const {
  * @param values The values to be transformed
  * @return An array of QRgb describing the colors
  */
-std::vector<QRgb> MantidColorMap::rgb(double vmin, double vmax, const std::vector<double> &values) const {
+std::vector<QRgb> MantidColorMap::rgb(double vmin, double vmax, const std::vector<double> &values) {
   m_mappable.setClim(vmin, vmax);
   return m_mappable.toRGBA(values);
 }

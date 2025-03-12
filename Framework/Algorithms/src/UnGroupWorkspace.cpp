@@ -5,7 +5,6 @@
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
 #include "MantidAlgorithms/UnGroupWorkspace.h"
-#include "MantidAPI/AnalysisDataService.h"
 #include "MantidAPI/WorkspaceGroup.h"
 #include "MantidKernel/ListValidator.h"
 
@@ -23,12 +22,12 @@ void UnGroupWorkspace::init() {
   auto workspaceList = data_store.getObjectNames();
   std::unordered_set<std::string> groupWorkspaceList;
   // Not iterate over, removing all those which are not group workspaces
-  for (const auto &name : workspaceList) {
-    WorkspaceGroup_const_sptr group = std::dynamic_pointer_cast<const WorkspaceGroup>(data_store.retrieve(name));
+  for (const auto &wsName : workspaceList) {
+    WorkspaceGroup_const_sptr group = std::dynamic_pointer_cast<const WorkspaceGroup>(data_store.retrieve(wsName));
     // RNT: VC returns bad pointer after erase
     // if ( !group ) workspaceList.erase(it);
     if (group) {
-      groupWorkspaceList.insert(name);
+      groupWorkspaceList.insert(wsName);
     }
   }
   // Declare a text property with the list of group workspaces as its allowed
@@ -53,6 +52,8 @@ void UnGroupWorkspace::exec() {
   if (!wsGrpSptr) {
     throw std::runtime_error("Selected Workspace is not a WorkspaceGroup");
   }
+  // add algorithm history to the workspaces being released from the group
+  fillHistory(wsGrpSptr->getAllItems());
   // Notify observers that a WorkspaceGroup is about to be unrolled
   data_store.notificationCenter.postNotification(new Mantid::API::WorkspaceUnGroupingNotification(inputws, wsSptr));
   // Now remove the WorkspaceGroup from the ADS

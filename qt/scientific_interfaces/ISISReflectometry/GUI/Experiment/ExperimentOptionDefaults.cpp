@@ -19,7 +19,7 @@ namespace MantidQt::CustomInterfaces::ISISReflectometry {
 namespace {
 Mantid::Kernel::Logger g_log("Reflectometry GUI");
 
-std::string stringValueOrEmpty(boost::optional<double> value) { return value ? std::to_string(*value) : ""; }
+std::string stringValueOrEmpty(std::optional<double> value) { return value ? std::to_string(value.value()) : ""; }
 
 std::map<std::string, std::string> getStitchParams(OptionDefaults const &stitchDefaults) {
   std::map<std::string, std::string> initialStitchParameters;
@@ -111,7 +111,7 @@ Experiment getExperimentDefaults(Mantid::Geometry::Instrument_const_sptr instrum
 
   return Experiment(analysisMode, reductionType, summationType, includePartialBins, debug, backgroundSubtraction,
                     polarizationCorrections, std::move(floodCorrections), std::move(transmissionStitchOptions),
-                    std::move(stitchParameters), lookupTableValidationResult.assertValid());
+                    stitchParameters, lookupTableValidationResult.assertValid());
 }
 } // unnamed namespace
 

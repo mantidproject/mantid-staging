@@ -5,8 +5,16 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, ITableWorkspaceProperty, MatrixWorkspaceProperty
+from mantid.kernel import (
+    logger,
+    Direction,
+    FloatArrayLengthValidator,
+    FloatArrayProperty,
+    IntBoundedValidator,
+    StringListValidator,
+    StringMandatoryValidator,
+)
 
 from vesuvio.base import VesuvioBase, TableWorkspaceDictionaryFacade
 from vesuvio.fitting import parse_fit_options
@@ -45,12 +53,12 @@ class VesuvioTOFFit(VesuvioBase):
         # ----- Optional ------
         self.declareProperty("WorkspaceIndex", 0, IntBoundedValidator(lower=0), doc="Workspace index for fit. [Default=0]")
         self.declareProperty(
-            "Background", "", doc="Function used to fit the background. " "The format is function=FunctionName,param1=val1,param2=val2"
+            "Background", "", doc="Function used to fit the background. The format is function=FunctionName,param1=val1,param2=val2"
         )
         self.declareProperty(
             "IntensityConstraints",
             "",
-            doc="A semi-colon separated list of intensity constraints defined " "as lists e.g [0,1,0,-4];[1,0,-2,0]",
+            doc="A semi-colon separated list of intensity constraints defined as lists e.g [0,1,0,-4];[1,0,-2,0]",
         )
 
         self.declareProperty("Ties", "", doc="A string representing the ties to be applied to the fit")
@@ -143,7 +151,6 @@ class VesuvioTOFFit(VesuvioBase):
 
     # pylint: disable=too-many-arguments
     def _do_fit(self, function_str, data_ws, index, constraints, ties, max_iter):
-
         # The tof data is required to be in seconds for the fitting
         # in order to re-use the standard Mantid Polynomial function. This polynomial simply
         # accepts the data "as is" in the workspace so if it is in microseconds then the

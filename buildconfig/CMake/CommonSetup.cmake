@@ -64,7 +64,6 @@ if(BUILD_MANTIDFRAMEWORK OR BUILD_MANTIDQT)
   # ####################################################################################################################
   # Look for dependencies Do NOT add include_directories commands here. They will affect every target.
   # ####################################################################################################################
-  set(BOOST_VERSION_REQUIRED 1.65.0)
   set(Boost_NO_BOOST_CMAKE TRUE)
   # Unless specified see if the boost169 package is installed
   if(EXISTS /usr/lib64/boost169 AND NOT (BOOST_LIBRARYDIR OR BOOST_INCLUDEDIR))
@@ -72,15 +71,18 @@ if(BUILD_MANTIDFRAMEWORK OR BUILD_MANTIDQT)
     set(BOOST_INCLUDEDIR /usr/include/boost169)
     set(BOOST_LIBRARYDIR /usr/lib64/boost169)
   endif()
-  find_package(Boost ${BOOST_VERSION_REQUIRED} REQUIRED COMPONENTS date_time regex serialization filesystem system)
+
+  set(Boost_VERBOSE "ON")
+  find_package(Boost CONFIG REQUIRED COMPONENTS date_time regex serialization filesystem system)
   add_definitions(-DBOOST_ALL_DYN_LINK -DBOOST_ALL_NO_LIB -DBOOST_BIND_GLOBAL_PLACEHOLDERS)
   # Need this defined globally for our log time values
   add_definitions(-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
   # Silence issues with deprecated allocator methods in boost regex
   add_definitions(-D_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING)
+  # The new interface is not available in Clang yet so we haven't migrated
+  add_definitions(-D_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING)
 
-  find_package(Poco 1.4.6 REQUIRED)
-  add_definitions(-DPOCO_ENABLE_CPP11)
+  find_package(Poco REQUIRED)
   find_package(TBB REQUIRED)
   find_package(OpenSSL REQUIRED)
 endif()
@@ -88,7 +90,7 @@ endif()
 # if we are building the framework we will need these libraries.
 if(BUILD_MANTIDFRAMEWORK)
   find_package(GSL REQUIRED)
-  find_package(Nexus 4.3.1 REQUIRED)
+  find_package(HDF4 REQUIRED)
   find_package(MuParser REQUIRED)
   find_package(JsonCPP 0.7.0 REQUIRED)
   find_package(Eigen3 3.4 REQUIRED)
@@ -100,14 +102,11 @@ if(BUILD_MANTIDFRAMEWORK)
 
   find_package(
     HDF5 MODULE
-    COMPONENTS C CXX HL
+    COMPONENTS C CXX
     REQUIRED
   )
   set(HDF5_LIBRARIES hdf5::hdf5_cpp hdf5::hdf5)
-  set(HDF5_HL_LIBRARIES hdf5::hdf5_hl)
 endif()
-
-include(Span)
 
 if(ENABLE_WORKBENCH)
   include(PyUnitTest)
@@ -125,10 +124,11 @@ if(OpenMP_CXX_FOUND)
 endif()
 
 # ######################################################################################################################
-# Set the c++ standard to 17 - cmake should do the right thing with msvc
+# Set the c++ standard to 20 - cmake should do the right thing with msvc
 # ######################################################################################################################
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ######################################################################################################################
 # Setup ccache
@@ -150,14 +150,11 @@ endif()
 include(ClangTidy)
 
 # ######################################################################################################################
-# Setup cppcheck
+# Setup cppcheck - temporarily exclude from Windows because 2.16 isn't available yet
 # ######################################################################################################################
-include(CppCheckSetup)
-
-# ######################################################################################################################
-# Setup pylint
-# ######################################################################################################################
-include(PylintSetup)
+if(NOT WIN32)
+  include(CppCheckSetup)
+endif()
 
 # ######################################################################################################################
 # Set up the unit tests target
@@ -166,7 +163,10 @@ include(PylintSetup)
 # ######################################################################################################################
 # External Data for testing
 # ######################################################################################################################
-if(CXXTEST_FOUND OR PYUNITTEST_FOUND)
+if(ENABLE_DOCS
+   OR CXXTEST_FOUND
+   OR PYUNITTEST_FOUND
+)
   include(SetupDataTargets)
 endif()
 
@@ -223,13 +223,6 @@ if(ENABLE_PRECOMMIT)
     if(NOT PRE_COMMIT_RESULT EQUAL "0")
       message(FATAL_ERROR "Pre-commit install failed with ${PRE_COMMIT_RESULT}")
     endif()
-    # Create pre-commit script wrapper to use mantid third party python for pre-commit
-    file(TO_CMAKE_PATH $ENV{CONDA_PREFIX} CONDA_SHELL_PATH)
-    file(RENAME "${PROJECT_SOURCE_DIR}/.git/hooks/pre-commit" "${PROJECT_SOURCE_DIR}/.git/hooks/pre-commit-script.py")
-    file(
-      WRITE "${PROJECT_SOURCE_DIR}/.git/hooks/pre-commit"
-      "#!/usr/bin/env sh\n${CONDA_SHELL_PATH}/Scripts/wrappers/conda/python.bat ${PROJECT_SOURCE_DIR}/.git/hooks/pre-commit-script.py"
-    )
   else() # linux and osx
     execute_process(
       COMMAND bash -c "${PRE_COMMIT_EXE} install"

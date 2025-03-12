@@ -12,7 +12,6 @@
 #include "Reduction/ParseReflectometryStrings.h"
 #include "Reduction/PreviewRow.h"
 #include "Reduction/RowExceptions.h"
-#include "Reduction/ValidateLookupRow.h"
 
 namespace MantidQt::CustomInterfaces::ISISReflectometry {
 // unnamed namespace
@@ -105,11 +104,24 @@ void ExperimentPresenter::notifyInstrumentChanged(std::string const &instrumentN
   restoreDefaults();
 }
 
+namespace {
+bool hasUpdatedSettings(boost::optional<LookupRow> const lookupRow, PreviewRow const &previewRow) {
+  return lookupRow->roiDetectorIDs() != previewRow.getSelectedBanks() ||
+         lookupRow->processingInstructions() != previewRow.getProcessingInstructions(ROIType::Signal) ||
+         lookupRow->backgroundProcessingInstructions() != previewRow.getProcessingInstructions(ROIType::Background) ||
+         lookupRow->transmissionProcessingInstructions() != previewRow.getProcessingInstructions(ROIType::Transmission);
+}
+} // namespace
+
 void ExperimentPresenter::notifyPreviewApplyRequested(PreviewRow const &previewRow) {
   if (!hasValidSettings()) {
     throw InvalidTableException("The Experiment Settings table contains invalid settings.");
   }
   if (auto const foundRow = m_model.findLookupRow(previewRow, m_thetaTolerance)) {
+    if (!hasUpdatedSettings(foundRow, previewRow)) {
+      return;
+    }
+
     auto lookupRowCopy = *foundRow;
 
     lookupRowCopy.setRoiDetectorIDs(previewRow.getSelectedBanks());
@@ -120,6 +132,7 @@ void ExperimentPresenter::notifyPreviewApplyRequested(PreviewRow const &previewR
 
     m_model.updateLookupRow(std::move(lookupRowCopy), m_thetaTolerance);
     updateViewFromModel();
+    m_mainPresenter->notifySettingsChanged();
   } else {
     throw RowNotFoundException("There is no row with angle matching '" + std::to_string(previewRow.theta()) +
                                "' in the Lookup Table.");
@@ -277,7 +290,7 @@ void ExperimentPresenter::disableFloodCorrectionInputs() {
   m_view->disableFloodCorrectionInputs();
 }
 
-boost::optional<RangeInLambda> ExperimentPresenter::transmissionRunRangeFromView() {
+std::optional<RangeInLambda> ExperimentPresenter::transmissionRunRangeFromView() {
   auto const range = RangeInLambda(m_view->getTransmissionStartOverlap(), m_view->getTransmissionEndOverlap());
   auto const bothOrNoneMustBeSet = false;
 
@@ -287,7 +300,7 @@ boost::optional<RangeInLambda> ExperimentPresenter::transmissionRunRangeFromView
     m_view->showTransmissionRangeInvalid();
 
   if (range.unset() || !range.isValid(bothOrNoneMustBeSet))
-    return boost::none;
+    return std::nullopt;
   else
     return range;
 }
@@ -303,7 +316,7 @@ std::string ExperimentPresenter::transmissionStitchParamsFromView() {
   // If set, the params should be a list containing an odd number of double
   // values (as per the Params property of Rebin)
   auto maybeParamsList = parseList(stitchParams, parseDouble);
-  if (maybeParamsList.is_initialized() && maybeParamsList->size() % 2 != 0) {
+  if (maybeParamsList.has_value() && maybeParamsList->size() % 2 != 0) {
     m_view->showTransmissionStitchParamsValid();
     return stitchParams;
   }
@@ -429,7 +442,7 @@ void ExperimentPresenter::updateViewFromModel() {
     m_view->setPolarizationEfficienciesWorkspace(m_model.polarizationCorrections().workspace().get());
   m_view->setFloodCorrectionType(floodCorrectionTypeToString(m_model.floodCorrections().correctionType()));
   if (m_model.floodCorrections().workspace())
-    m_view->setFloodWorkspace(m_model.floodCorrections().workspace().get());
+    m_view->setFloodWorkspace(m_model.floodCorrections().workspace().value());
   else
     m_view->setFloodWorkspace("");
   m_view->setFloodFilePath("");

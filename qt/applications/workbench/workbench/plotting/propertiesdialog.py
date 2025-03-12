@@ -199,9 +199,7 @@ class AxisEditor(PropertiesEditorBase):
         self.lim_setter(self.limit_min, self.limit_max)
         self._set_tick_format()
         which = "both" if hasattr(axes, "show_minor_gridlines") and axes.show_minor_gridlines else "major"
-        # visible will always be True if you pass axis or which argument into axes.grid due to matplotlib
-        if self.ui.gridBox.isChecked():
-            axes.grid(visible=True, axis=self.axis_id, which=which)
+        axes.grid(visible=self.ui.gridBox.isChecked(), axis=self.axis_id, which=which)
 
     def error_occurred(self, exc):
         # revert
@@ -299,7 +297,9 @@ class ColorbarAxisEditor(AxisEditor):
         self._memento = memento
         if len(self.images) > 0:
             memento.min, memento.max = self.images[0].get_clim()
-        memento.log = isinstance(self.images[0].norm, LogNorm)
+            memento.log = isinstance(self.images[0].norm, LogNorm)
+        else:
+            memento.log = False
         memento.grid = False
 
         self._fill(memento)

@@ -28,6 +28,7 @@ class RebinRaggedTest(unittest.TestCase):
             XMin=[0.67, 1.20, 2.42, 3.70, 4.12, 0.39],
             Delta=0.02,  # original data bin size
             XMax=[10.20, 20.8, np_nan, math_nan, np_nan, 9.35],
+            Version=1,
         )
 
         self.assertTrue(alg_test.isExecuted())
@@ -47,6 +48,7 @@ class RebinRaggedTest(unittest.TestCase):
             OutputWorkspace="NOM_91796_banks",
             Delta=0.04,  # double original data bin size
             XMax=[10.20, 20.8, np_inf, math_nan, np_nan, 9.35],
+            Version=1,
         )
 
         self.assertTrue(alg_test.isExecuted())
@@ -69,7 +71,7 @@ class RebinRaggedTest(unittest.TestCase):
 
         ws = api.CreateSampleWorkspace(OutputWorkspace="RebinRagged_hist", WorkspaceType="Histogram")
 
-        rebinned = api.RebinRagged(ws, XMin=xmins, XMax=xmaxs, Delta=deltas)
+        rebinned = api.RebinRagged(ws, XMin=xmins, XMax=xmaxs, Delta=deltas, Version=1)
 
         self.assertEqual(rebinned.getNumberHistograms(), 200)
         for i in range(rebinned.getNumberHistograms()):
@@ -101,9 +103,8 @@ class RebinRaggedTest(unittest.TestCase):
         deltas[13] = 600.0
 
         ws = api.CreateSampleWorkspace(OutputWorkspace="RebinRagged_events", WorkspaceType="Event")
-        orig_y = ws.readY(0)
 
-        rebinned = api.RebinRagged(ws, XMin=xmins, XMax=xmaxs, Delta=deltas)
+        rebinned = api.RebinRagged(ws, XMin=xmins, XMax=xmaxs, Delta=deltas, Version=1)
 
         self.assertEqual(rebinned.getNumberHistograms(), 200)
         for i in range(rebinned.getNumberHistograms()):
@@ -124,6 +125,73 @@ class RebinRaggedTest(unittest.TestCase):
             else:
                 # parameters are set so all y-values are 0.6
                 np.testing.assert_almost_equal(14, y, err_msg=label)
+
+    def test_FullBinsOnly(self):
+        xExpected = [0.5, 2.5, 4.5, 6.5]
+        yExpected = [10, 24, 38]
+
+        def Create1DWorkspace(size):
+            xData = []
+            yData = []
+            j = 0.5
+            for i in range(0, size + 1):
+                xData.append(j)
+                yData.append((i + 1) * 2)
+                j = 0.75 + j
+            yData.pop()
+            ws = api.CreateWorkspace(xData, yData)
+            return ws
+
+        inputWs = Create1DWorkspace(10)
+
+        api.RebinRagged(InputWorkspace=inputWs, OutputWorkspace="NotFullBinsOnly", Delta=2.0, PreserveEvents=True, FullBinsOnly=False)
+        fullBinsOnlyWs = api.RebinRagged(
+            InputWorkspace=inputWs, OutputWorkspace="FullBinsOnly", Delta=2.0, PreserveEvents=True, FullBinsOnly=True
+        )
+
+        fullBinsXValues = AnalysisDataService.retrieve("FullBinsOnly").readX(0)
+        fullBinsYValues = AnalysisDataService.retrieve("FullBinsOnly").readY(0)
+
+        notFullBinsXValues = AnalysisDataService.retrieve("NotFullBinsOnly").readX(0)
+
+        assert not fullBinsOnlyWs.isRaggedWorkspace()
+
+        assert len(fullBinsXValues) == len(xExpected)
+        assert len(notFullBinsXValues) != len(fullBinsXValues)
+
+        for i in range(len(fullBinsXValues)):
+            np.testing.assert_almost_equal(fullBinsXValues[i], xExpected[i])
+
+        for i in range(len(fullBinsYValues)):
+            np.testing.assert_almost_equal(fullBinsYValues[i], yExpected[i])
+
+        api.DeleteWorkspace("NotFullBinsOnly")
+        api.DeleteWorkspace("FullBinsOnly")
+        api.DeleteWorkspace(inputWs)
+
+    def test_hist_workspace_fullBinsOnly(self):
+        # numpy 1.7 (on rhel7) doesn't have np.full
+        xmins = np.full((200,), 50.0)
+        xmins[11] = 3000.0
+        xmaxs = np.full((200,), 650.0)
+        xmaxs[12] = 5000.0
+        deltas = np.full(200, -2.0)
+        deltas[13] = 100.0
+
+        inputWs = api.CreateSampleWorkspace(OutputWorkspace="RebinRagged_hist", WorkspaceType="Histogram", BinWidth=75, XMin=50)
+
+        notFullBinsOnlyWs = api.RebinRagged(
+            InputWorkspace=inputWs, OutputWorkspace="NotFullBinsOnly", XMin=xmins, XMax=xmaxs, Delta=deltas, FullBinsOnly=False
+        )
+        fullBinsOnlyWs = api.RebinRagged(
+            InputWorkspace=inputWs, OutputWorkspace="FullBinsOnly", XMin=xmins, XMax=xmaxs, Delta=deltas, FullBinsOnly=True
+        )
+
+        assert len(fullBinsOnlyWs.readX(0)) != len(notFullBinsOnlyWs.readX(0))
+        assert fullBinsOnlyWs.isRaggedWorkspace()
+        api.DeleteWorkspace("NotFullBinsOnly")
+        api.DeleteWorkspace("FullBinsOnly")
+        api.DeleteWorkspace(inputWs)
 
 
 if __name__ == "__main__":

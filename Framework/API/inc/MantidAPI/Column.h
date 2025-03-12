@@ -34,7 +34,7 @@ namespace API {
 */
 class MANTID_API_DLL Column {
 public:
-  Column() : m_type("int"), m_plotType(-1000), m_isReadOnly(false){};
+  Column() : m_type("int"), m_plotType(-1000), m_isReadOnly(false) {};
 
   /// Virtual destructor
   virtual ~Column() = default;
@@ -157,9 +157,13 @@ public:
     return vec;
   }
 
-  virtual bool equals(const Column &, double) const { throw std::runtime_error("equals not implemented"); };
+  virtual bool equals(const Column &, double, bool const = false) const {
+    throw std::runtime_error("equals not implemented");
+  };
 
-  virtual bool equalsRelErr(const Column &, double) const { throw std::runtime_error("equals not implemented"); };
+  virtual bool equalsRelErr(const Column &, double, bool const = false) const {
+    throw std::runtime_error("equals not implemented");
+  };
 
 protected:
   /// Sets the new column size.

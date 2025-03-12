@@ -22,12 +22,12 @@ class JobRunnerSubscriber;
 class EXPORT_OPT_MANTIDQT_COMMON QtJobRunner : public QObject, public IJobRunner {
   Q_OBJECT
 public:
-  QtJobRunner();
+  QtJobRunner(bool const stopOnFailure = false);
   void subscribe(JobRunnerSubscriber *notifyee) override;
   void clearAlgorithmQueue() override;
   void setAlgorithmQueue(std::deque<MantidQt::API::IConfiguredAlgorithm_sptr> algorithms) override;
   void executeAlgorithmQueue() override;
-  void executeAlgorithm(MantidQt::API::IConfiguredAlgorithm_sptr &algorithm) override;
+  void executeAlgorithm(MantidQt::API::IConfiguredAlgorithm_sptr algorithm) override;
   void cancelAlgorithmQueue() override;
 
 private slots:

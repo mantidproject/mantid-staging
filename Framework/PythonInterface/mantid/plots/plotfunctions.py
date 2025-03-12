@@ -22,53 +22,13 @@ from mantid.api import AnalysisDataService, MatrixWorkspace, WorkspaceGroup
 from mantid.api import IMDHistoWorkspace
 from mantid.kernel import ConfigService
 from mantid.plots import datafunctions, MantidAxes
-from mantid.plots.utility import MantidAxType
+from mantid.plots.utility import MantidAxType, MARKER_MAP, get_plot_specific_properties
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
 PROJECTION = "mantid"
 
-MARKER_MAP = {
-    "square": "s",
-    "plus (filled)": "P",
-    "point": ".",
-    "tickdown": 3,
-    "triangle_right": ">",
-    "tickup": 2,
-    "hline": "_",
-    "vline": "|",
-    "pentagon": "p",
-    "tri_left": "3",
-    "caretdown": 7,
-    "caretright (centered at base)": 9,
-    "tickright": 1,
-    "caretright": 5,
-    "caretleft": 4,
-    "tickleft": 0,
-    "tri_up": "2",
-    "circle": "o",
-    "pixel": ",",
-    "caretleft (centered at base)": 8,
-    "diamond": "D",
-    "star": "*",
-    "hexagon1": "h",
-    "octagon": "8",
-    "hexagon2": "H",
-    "tri_right": "4",
-    "x (filled)": "X",
-    "thin_diamond": "d",
-    "tri_down": "1",
-    "triangle_left": "<",
-    "plus": "+",
-    "triangle_down": "v",
-    "triangle_up": "^",
-    "x": "x",
-    "caretup": 6,
-    "caretup (centered at base)": 10,
-    "caretdown (centered at base)": 11,
-    "None": "None",
-}
 
 # -----------------------------------------------------------------------------
 # Decorators
@@ -228,8 +188,6 @@ def plot(
         legend = ax.get_legend()
         if legend is not None:
             legend.set_visible(show_legend)
-            # Stop legend interfering with the tight layout
-            legend.set_in_layout(False)
 
     # Can't have a waterfall plot with only one line.
     if len(nums) * len(workspaces) == 1 and waterfall:
@@ -290,7 +248,7 @@ def _update_show_figure(fig):
     except AttributeError:
         pass
 
-    fig.canvas.draw()
+    fig.canvas.draw_idle()
     # This displays the figure, but only works if a manager is attached to the figure.
     # The try catch is in case a figure manager is not present
     try:
@@ -356,7 +314,7 @@ def raise_if_not_sequence(value, seq_name, element_type=None):
     """
     accepted_types = (list, tuple, range)
     if type(value) not in accepted_types:
-        raise ValueError("{} should be a list or tuple, " "instead found '{}'".format(seq_name, value.__class__.__name__))
+        raise ValueError("{} should be a list or tuple, instead found '{}'".format(seq_name, value.__class__.__name__))
     if element_type is not None:
 
         def raise_if_not_type(x):
@@ -485,10 +443,10 @@ def _unpack_grouped_workspaces(mixed_list: List):
 def _validate_plot_inputs(workspaces, spectrum_nums, wksp_indices, tiled=False, overplot=False):
     """Raises a ValueError if any arguments have the incorrect types"""
     if spectrum_nums is not None and wksp_indices is not None:
-        raise ValueError("Both spectrum_nums and wksp_indices supplied. " "Please supply only 1.")
+        raise ValueError("Both spectrum_nums and wksp_indices supplied. Please supply only 1.")
 
     if tiled and overplot:
-        raise ValueError("Both tiled and overplot flags set to true. " "Please set only one to true.")
+        raise ValueError("Both tiled and overplot flags set to true. Please set only one to true.")
 
     raise_if_not_sequence(workspaces, "workspaces", MatrixWorkspace)
 
@@ -556,7 +514,7 @@ def _do_single_plot_mdhisto_workspace(ax, workspaces, errors=False):
                 num_dim += 1
         if num_dim != 1:
             raise RuntimeError(
-                f"Workspace {str(ws)} is an IMDHistoWorkspace with number of non-integral dimension " f"equal to {num_dim} but not 1."
+                f"Workspace {str(ws)} is an IMDHistoWorkspace with number of non-integral dimension equal to {num_dim} but not 1."
             )
 
         # Plot
@@ -567,24 +525,46 @@ def _do_single_plot_mdhisto_workspace(ax, workspaces, errors=False):
     ax.make_legend()
 
 
-def _do_single_plot(ax, workspaces, errors, set_title, nums, kw, plot_kwargs, log_name=None, log_values=None):
-    # do the plotting
-    plot_fn = ax.errorbar if errors else ax.plot
+def _set_axes_limits_from_properties(ax):
+    """
+    Set xlim and ylim using the x_min x_max y_min y_max properties
+    :param ax:
+    """
+    x_min_str = ConfigService.getString("plots.x_min")
+    x_max_str = ConfigService.getString("plots.x_max")
+    y_min_str = ConfigService.getString("plots.y_min")
+    y_max_str = ConfigService.getString("plots.y_max")
+    xlim = (float(x_min_str) if x_min_str else None, float(x_max_str) if x_max_str else None)
+    ylim = (float(y_min_str) if y_min_str else None, float(y_max_str) if y_max_str else None)
 
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+
+def _do_single_plot(ax, workspaces, errors, set_title, nums, kw, plot_kwargs, log_name=None, log_values=None):
     counter = 0
     for ws in workspaces:
         for num in nums:
+            plot_fn = ax.errorbar if errors else ax.plot
+            if isinstance(ws, MatrixWorkspace):
+                plot_type = ws.getPlotType()
+                _plot_kwargs = get_plot_specific_properties(ws, plot_type, plot_kwargs)
+                if "errorbar" in plot_type or errors:
+                    plot_fn = ax.errorbar
+
             if log_values:
                 label = log_values[counter]
                 if len(nums) > 1:
                     label = f"spec {num}: {label}"
 
-                plot_kwargs["label"] = label
+                _plot_kwargs["label"] = label
 
                 counter += 1
 
-            plot_kwargs[kw] = num
-            plot_fn(ws, **plot_kwargs)
+            _plot_kwargs[kw] = num
+            plot_fn(ws, **_plot_kwargs)
+
+    _set_axes_limits_from_properties(ax)
     ax.make_legend()
     if set_title:
         workspace_names = [ws.name() for ws in workspaces]

@@ -5,6 +5,9 @@ set(TEST_PY_FILES
     ApplyPaalmanPingsCorrectionTest.py
     BayesQuasiTest.py
     BayesStretchTest.py
+    BayesQuasi2Test.py
+    BayesStretch2Test.py
+    QuickBayesHelperTest.py
     CalculateMonteCarloAbsorptionTest.py
     CorelliPowderCalibrationCreateTest.py
     DetectorFloodWeightingTest.py
@@ -45,7 +48,6 @@ set(TEST_PY_FILES
     IqtFitSequentialTest.py
     ISISIndirectDiffractionReductionTest.py
     ISISIndirectEnergyTransferTest.py
-    ISISIndirectEnergyTransferWrapperTest.py
     LagrangeILLReductionTest.py
     LoadWANDTest.py
     MatchAndMergeWorkspacesTest.py
@@ -65,6 +67,7 @@ set(TEST_PY_FILES
     ReflectometryISISSumBanksTest.py
     ReflectometryILLSumForegroundTest.py
     ReflectometryISISCalibrationTest.py
+    ReflectometryISISCreateTransmissionTest.py
     ReflectometryISISLoadAndProcessTest.py
     ReflectometryISISPreprocessTest.py
     ResNorm2Test.py
@@ -92,6 +95,8 @@ set(TEST_PY_FILES
     TransformToIqtTest.py
     VesuvioDiffractionReductionTest.py
     WANDPowderReductionTest.py
+    InterpolateBackgroundTest.py
+    HFIRGoniometerIndependentBackgroundTest.py
 )
 check_tests_valid(${CMAKE_CURRENT_SOURCE_DIR} ${TEST_PY_FILES})
 

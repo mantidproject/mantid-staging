@@ -118,6 +118,7 @@ class PythonFileInterpreter(QWidget):
     sig_progress = Signal(int)
     sig_exec_error = Signal(object)
     sig_exec_success = Signal(object)
+    sig_focus_in = Signal(str)
 
     def __init__(self, font=None, content=None, filename=None, parent=None, completion_enabled=True):
         """
@@ -149,6 +150,7 @@ class PythonFileInterpreter(QWidget):
 
         self.editor.modificationChanged.connect(self.sig_editor_modified)
         self.editor.fileNameChanged.connect(self.sig_filename_modified)
+        self.editor.editorFocusIn.connect(self.sig_focus_in)
 
         self.setAttribute(Qt.WA_DeleteOnClose, True)
 
@@ -184,6 +186,10 @@ class PythonFileInterpreter(QWidget):
         if self.find_replace_dialog:
             self.find_replace_dialog.close()
         super(PythonFileInterpreter, self).closeEvent(event)
+
+    def close(self):
+        self.abort()
+        super(PythonFileInterpreter, self).close()
 
     def show_find_replace_dialog(self):
         if self.find_replace_dialog is None:
@@ -260,6 +266,13 @@ class PythonFileInterpreter(QWidget):
 
     def toggle_comment(self):
         self.code_commenter.toggle_comment()
+
+    def replace_all_text_no_modified_flag(self, new_content):
+        self.editor.setText(new_content)
+        self.editor.setModified(False)
+
+    def mark_as_modified(self):
+        self.editor.markFileAsModified()
 
     def _setup_editor(self, default_content, filename):
         editor = self.editor
@@ -366,19 +379,19 @@ class PythonFileInterpreterPresenter(QObject):
     def _on_exec_error(self, task_error):
         exc_type, exc_value, exc_stack = task_error.exc_type, task_error.exc_value, task_error.stack
         exc_stack = traceback.extract_tb(exc_stack)[self.MAX_STACKTRACE_LENGTH :]
+
+        lineno = -1  # Default lineno in case of failure to retrieve it
+
         if hasattr(exc_value, "lineno"):
-            lineno = exc_value.lineno + self._code_start_offset
-        elif exc_stack is not None:
+            if exc_value.lineno is not None:
+                lineno = exc_value.lineno + self._code_start_offset
+        elif exc_stack:
             try:
-                lineno = exc_stack[0].lineno + self._code_start_offset
-            except (AttributeError, IndexError):
-                # Python 2 fallback
-                try:
-                    lineno = exc_stack[-1][1] + self._code_start_offset
-                except IndexError:
-                    lineno = -1
-        else:
-            lineno = -1
+                if exc_stack[0].lineno is not None:
+                    lineno = exc_stack[0].lineno + self._code_start_offset
+            except IndexError:
+                pass
+
         sys.stderr.write(self._error_formatter.format(exc_type, exc_value, exc_stack) + os.linesep)
         self.view.editor.updateProgressMarker(lineno, True)
         self._finish(success=False, task_result=task_error)

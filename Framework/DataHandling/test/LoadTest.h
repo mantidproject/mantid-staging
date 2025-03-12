@@ -15,8 +15,6 @@
 #include "MantidKernel/ConfigService.h"
 #include <cxxtest/TestSuite.h>
 
-#include <boost/algorithm/string/predicate.hpp> //for ends_with
-
 using namespace Mantid::API;
 using namespace Mantid::DataObjects;
 using namespace Mantid::DataHandling;
@@ -185,11 +183,9 @@ public:
 
     // Check it has found the correct two
     const std::string first = foundFiles[0][0];
-    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first,
-               boost::algorithm::ends_with(first, "MUSR00015189.nxs"));
+    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first, first.ends_with("MUSR00015189.nxs"));
     const std::string second = foundFiles[1][0];
-    TSM_ASSERT(std::string("Incorrect second file has been found") + second,
-               boost::algorithm::ends_with(second, "MUSR00015191.nxs"));
+    TSM_ASSERT(std::string("Incorrect second file has been found") + second, second.ends_with("MUSR00015191.nxs"));
 
     // A more through test of the loading and value checking is done in the
     // LoadTest.py system test
@@ -210,11 +206,9 @@ public:
 
     // Check it has found the correct two
     const std::string first = foundFiles[0][0];
-    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first,
-               boost::algorithm::ends_with(first, "MUSR00015189.nxs"));
+    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first, first.ends_with("MUSR00015189.nxs"));
     const std::string last = foundFiles[0][3];
-    TSM_ASSERT(std::string("Incorrect last file has been found") + last,
-               boost::algorithm::ends_with(last, "MUSR00015192.nxs"));
+    TSM_ASSERT(std::string("Incorrect last file has been found") + last, last.ends_with("MUSR00015192.nxs"));
 
     // A more through test of the loading and value checking is done in the
     // LoadTest.py system test
@@ -236,11 +230,9 @@ public:
 
     // Check it has found the correct two
     const std::string first = foundFiles[0][0];
-    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first,
-               boost::algorithm::ends_with(first, "LOQ48127.raw"));
+    TSM_ASSERT(std::string("Incorrect first file has been found: ") + first, first.ends_with("LOQ48127.raw"));
     const std::string second = foundFiles[1][0];
-    TSM_ASSERT(std::string("Incorrect second file has been found") + second,
-               boost::algorithm::ends_with(second, "CSP79590.raw"));
+    TSM_ASSERT(std::string("Incorrect second file has been found") + second, second.ends_with("CSP79590.raw"));
   }
 
   /*
@@ -256,7 +248,7 @@ public:
     loader.initialize();
     loader.setPropertyValue("Filename", "084446+084447.nxs");
 
-    std::string outputWS = "LoadTest_out";
+    std::string outputWS = AnalysisDataService::Instance().uniqueName(5, "LoadTest_");
     loader.setPropertyValue("OutputWorkspace", outputWS);
     TS_ASSERT_THROWS_NOTHING(loader.execute());
 
@@ -279,7 +271,7 @@ public:
     loader.initialize();
     loader.setPropertyValue("Filename", "084446-084447");
 
-    std::string outputWS = "LoadTest_out";
+    std::string outputWS = AnalysisDataService::Instance().uniqueName(5, "LoadTest_");
     loader.setPropertyValue("OutputWorkspace", outputWS);
     TS_ASSERT_THROWS_NOTHING(loader.execute());
 
@@ -310,6 +302,33 @@ public:
     loader.initialize();
     loader.setPropertyValue("Filename", "argus0026287.nxs");
     TS_ASSERT_EQUALS(loader.getPropertyValue("LoaderName"), "LoadMuonNexus");
+  }
+
+  void test_must_set_loadername() {
+    std::string const outputWS = AnalysisDataService::Instance().uniqueName(5, "LoadTest_");
+    std::string const incorrectLoader = "NotALoader";
+    int const incorrectVersion = -2;
+
+    Load loader;
+    // run Load with the LoaderName set to something
+    // verify that at the end, it is correctly set back according to the output
+    loader.initialize();
+    TS_ASSERT_THROWS_NOTHING(loader.setProperty("OutputWorkspace", outputWS))
+    TS_ASSERT_THROWS_NOTHING(loader.setPropertyValue("Filename", "CNCS_7860_event.nxs"));
+    // the loader namer will be set: grab it an ensure it is not the bad cvalue
+    std::string const correctLoader = loader.getPropertyValue("LoaderName");
+    int const correctVersion = loader.getProperty("LoaderVersion");
+    TS_ASSERT_DIFFERS(correctLoader, incorrectLoader);
+    TS_ASSERT_DIFFERS(correctVersion, incorrectVersion);
+    // now SET the loader to a bad value, and execute
+    TS_ASSERT_THROWS_NOTHING(loader.setPropertyValue("LoaderName", incorrectLoader));
+    TS_ASSERT_THROWS_NOTHING(loader.setProperty("LoaderVersion", incorrectVersion));
+    TS_ASSERT_EQUALS(loader.getPropertyValue("LoaderName"), incorrectLoader);
+    TS_ASSERT_EQUALS((int)loader.getProperty("LoaderVersion"), incorrectVersion);
+    TS_ASSERT_THROWS_NOTHING(loader.execute());
+    // make sure the loader name has been correctly set
+    TS_ASSERT_EQUALS(loader.getPropertyValue("LoaderName"), correctLoader);
+    TS_ASSERT_EQUALS((int)loader.getProperty("LoaderVersion"), correctVersion);
   }
 };
 

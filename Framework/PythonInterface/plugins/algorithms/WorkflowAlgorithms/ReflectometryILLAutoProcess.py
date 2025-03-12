@@ -225,9 +225,9 @@ class ReflectometryILLAutoProcess(DataProcessorAlgorithm):
         if not self.getProperty(PropertyNames.MANUAL_SCALE_FACTORS).isDefault:
             manual_scale_factors = self.getProperty(PropertyNames.MANUAL_SCALE_FACTORS).value
             if len(manual_scale_factors) != dimensionality - 1:
-                issues[
-                    PropertyNames.MANUAL_SCALE_FACTORS
-                ] = "Provide N-1 manual scale factors, where N is the number of different angle configurations"
+                issues[PropertyNames.MANUAL_SCALE_FACTORS] = (
+                    "Provide N-1 manual scale factors, where N is the number of different angle configurations"
+                )
         angle_options = self.getProperty(PropertyNames.ANGLE_OPTION).value
         for angle_option in angle_options:
             if angle_option not in [PropertyNames.DAN, PropertyNames.SAN, PropertyNames.UAN]:
@@ -392,12 +392,12 @@ class ReflectometryILLAutoProcess(DataProcessorAlgorithm):
         self.setPropertyGroup(PropertyNames.LOW_FRG_HALF_WIDTH_DIRECT, pre_process_direct)
         self.declareProperty(
             IntArrayProperty(PropertyNames.LOW_BKG_OFFSET_DIRECT, values=[5], validator=non_negative_ints),
-            doc="Distance of flat background region towards smaller detector angles from the " "foreground centre, in pixels",
+            doc="Distance of flat background region towards smaller detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.LOW_BKG_OFFSET_DIRECT, pre_process_direct)
         self.declareProperty(
             IntArrayProperty(PropertyNames.LOW_BKG_WIDTH_DIRECT, values=[5], validator=non_negative_ints),
-            doc="Width of flat background region towards smaller detector angles from the " "foreground centre, in pixels",
+            doc="Width of flat background region towards smaller detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.LOW_BKG_WIDTH_DIRECT, pre_process_direct)
         self.declareProperty(
@@ -407,12 +407,12 @@ class ReflectometryILLAutoProcess(DataProcessorAlgorithm):
         self.setPropertyGroup(PropertyNames.HIGH_FRG_HALF_WIDTH_DIRECT, pre_process_direct)
         self.declareProperty(
             IntArrayProperty(PropertyNames.HIGH_BKG_OFFSET_DIRECT, values=[5], validator=non_negative_ints),
-            doc="Distance of flat background region towards larger detector angles from the " "foreground centre, in pixels",
+            doc="Distance of flat background region towards larger detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.HIGH_BKG_OFFSET_DIRECT, pre_process_direct)
         self.declareProperty(
             IntArrayProperty(PropertyNames.HIGH_BKG_WIDTH_DIRECT, values=[5], validator=non_negative_ints),
-            doc="Width of flat background region towards larger detector angles from the " "foreground centre, in pixels",
+            doc="Width of flat background region towards larger detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.HIGH_BKG_WIDTH_DIRECT, pre_process_direct)
         self.declareProperty(
@@ -440,12 +440,12 @@ class ReflectometryILLAutoProcess(DataProcessorAlgorithm):
         self.setPropertyGroup(PropertyNames.LOW_FRG_HALF_WIDTH, pre_process_reflected)
         self.declareProperty(
             IntArrayProperty(PropertyNames.LOW_BKG_OFFSET, values=[5], validator=non_negative_ints),
-            doc="Distance of flat background region towards smaller detector angles from the " "foreground centre, in pixels.",
+            doc="Distance of flat background region towards smaller detector angles from the foreground centre, in pixels.",
         )
         self.setPropertyGroup(PropertyNames.LOW_BKG_OFFSET, pre_process_reflected)
         self.declareProperty(
             IntArrayProperty(PropertyNames.LOW_BKG_WIDTH, values=[5], validator=non_negative_ints),
-            doc="Width of flat background region towards smaller detector angles from the " "foreground centre, in pixels",
+            doc="Width of flat background region towards smaller detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.LOW_BKG_WIDTH, pre_process_reflected)
         self.declareProperty(
@@ -455,12 +455,12 @@ class ReflectometryILLAutoProcess(DataProcessorAlgorithm):
         self.setPropertyGroup(PropertyNames.HIGH_FRG_HALF_WIDTH, pre_process_reflected)
         self.declareProperty(
             IntArrayProperty(PropertyNames.HIGH_BKG_OFFSET, values=[5], validator=non_negative_ints),
-            doc="Distance of flat background region towards larger detector angles from the " "foreground centre, in pixels",
+            doc="Distance of flat background region towards larger detector angles from the foreground centre, in pixels",
         )
         self.setPropertyGroup(PropertyNames.HIGH_BKG_OFFSET, pre_process_reflected)
         self.declareProperty(
             IntArrayProperty(PropertyNames.HIGH_BKG_WIDTH, values=[5], validator=non_negative_ints),
-            doc="Width of flat background region towards larger detector angles from the " "foreground centre, in pixels.",
+            doc="Width of flat background region towards larger detector angles from the foreground centre, in pixels.",
         )
         self.setPropertyGroup(PropertyNames.HIGH_BKG_WIDTH, pre_process_reflected)
         self.declareProperty(

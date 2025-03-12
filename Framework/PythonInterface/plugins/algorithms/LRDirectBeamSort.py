@@ -5,9 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.api import *
-from mantid.simpleapi import *
-from mantid.kernel import *
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
+from mantid.kernel import logger, Direction, IntArrayProperty, StringArrayProperty
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, FitPeaks, LoadEventNexus, LRScalingFactors
 import functools
 import numpy as np
 from typing import List, Tuple
@@ -208,7 +208,6 @@ class LRDirectBeamSort(PythonAlgorithm):
             bck_ranges = []
 
             for run in g:
-
                 peak, low_res = self._find_peak(run)  # , use_low_res_cut)
 
                 att = run.getRun().getProperty("vAtt").value[0] - 1
@@ -316,7 +315,7 @@ class LRDirectBeamSort(PythonAlgorithm):
             InputWorkspace=ws_name,
             OutputWorkspace=peak_ws_name,
             PeakCenters=f"{max_index}",
-            FitWindowBoundaryList=f"{crop},{signal.shape[0]-crop}",
+            FitWindowBoundaryList=f"{crop},{signal.shape[0] - crop}",
             HighBackground=False,
             ConstrainPeakPositions=False,
             FittedPeaksWorkspace=model_ws_name,

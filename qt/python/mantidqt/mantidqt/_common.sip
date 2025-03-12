@@ -25,6 +25,7 @@ MSVC_DIAG_OFF(4290)
 GNU_DIAG_OFF("pedantic")
 GNU_DIAG_OFF("suggest-override")
 GNU_DIAG_OFF("missing-field-initializers")
+GNU_DIAG_OFF("maybe-uninitialized")
 
 // Allows suppression of namespaces within the module
 using namespace MantidQt::MantidWidgets;
@@ -205,6 +206,7 @@ signals:
   void textZoomedIn();
   void textZoomedOut();
   void progressMade(const int);
+  void editorFocusIn(const QString &filename);
 
 private:
   ScriptEditor(const ScriptEditor&);
@@ -339,18 +341,18 @@ class InterfaceManager {
 using namespace MantidQt::API;
 %End
 public:
-  InterfaceManager();
+  InterfaceManager() throw(std::exception);
   AlgorithmDialog *createDialogFromName(
       const QString &algorithmName, const int version = -1,
       QWidget *parent = nullptr, bool forScript = false,
       const QHash<QString, QString> &presetValues = QHash<QString, QString>(),
       const QString &optionalMsg = QString(),
       const QStringList &enabled = QStringList(),
-      const QStringList &disabled = QStringList());
+      const QStringList &disabled = QStringList()) throw(std::exception);
 
   UserSubWindow *createSubWindow(
       const QString &interface_name,
-      QWidget *parent = nullptr);
+      QWidget *parent = nullptr) throw(std::exception);
   QStringList getUserSubWindowKeys() const;
 
   void showHelpPage(const QString &url=QString());
@@ -467,6 +469,8 @@ class InstrumentSelector : QWidget {
 public:
   InstrumentSelector(QWidget *parent /TransferThis/ = nullptr);
   void setTechniques(const QStringList &techniques);
+  void setFacility(const QString &facilityName);
+  QString getFacility();
   void setCurrentIndex(int);
   void setCurrentText(QString);
   QString currentText();
@@ -769,7 +773,7 @@ public:
     void editAtRowAbove();
     void removeRowAt(const MantidQt::MantidWidgets::Batch::RowLocation &location);
     void removeRows(std::vector<MantidQt::MantidWidgets::Batch::RowLocation> rowsToRemove);
-    void removeAllRows();
+    void removeAllRows() throw(std::exception);
     void replaceRows(std::vector<MantidQt::MantidWidgets::Batch::RowLocation> replacementPoints,
                      std::vector<std::vector<Row>> replacementLocations);
     void appendSubtreesAt(const MantidQt::MantidWidgets::Batch::RowLocation& parent,
@@ -901,65 +905,35 @@ public:
     FunctionBrowser(QWidget *parent = nullptr, bool multi = false);
     FunctionTreeView *view() const;
     void setStretchLastColumn(bool stretch);
-    void setFunction(const QString &funStr);
-    QString getFunctionString();
-    QString getFitFunctionString() const;
-    void setParameter(const QString &funStr, double value);
-    double getParameter(const QString &funStr);
+    void setFunction(const std::string &funStr);
+    std::string getFunctionString();
+    std::string getFitFunctionString() const;
+    void setParameter(const std::string &funStr, double value);
+    double getParameter(const std::string &funStr);
     int getNumberOfDatasets() const;
     void setNumberOfDatasets(int n);
-    void setCurrentDataset(int i);
+    void setCurrentDataset(int i) throw(std::exception);
     int getCurrentDataset() const;
-    void setDatasets(const QStringList &datasetNames);
-    void addDatasets(const QStringList &names);
+    void setDatasets(const std::vector<std::string> &datasetNames);
+    void addDatasets(const std::vector<std::string> &names);
     void removeDatasets(QList<int> indices);
-    QStringList getDatasetNames() const;
+    std::vector<std::string> getDatasetNames() const;
     void setErrorsEnabled(bool enabled);
     void hideGlobalCheckbox();
     void showGlobalCheckbox();
 
-    QStringList getGlobalParameters() const;
-    void setGlobalParameters(const QStringList &globals);
+    std::vector<std::string> getGlobalParameters() const;
+    void setGlobalParameters(const std::vector<std::string> &globals);
     void clear();
-    void updateParameters(SIP_PYOBJECT);
+    void updateParameters(SIP_PYOBJECT) throw(std::exception);
     %MethodCode
-    try{
       auto function = boost::python::extract<const Mantid::API::IFunction_sptr &>(a0)();
       sipCpp->updateParameters(*function);
-      }
-      catch (std::invalid_argument &sipExceptionRef)
-      {
-         const char *detail = sipExceptionRef.what();
-         SIP_BLOCK_THREADS
-         PyErr_SetString(PyExc_ValueError, detail);
-         SIP_UNBLOCK_THREADS
-         return NULL;
-      }
-      catch (...)
-      {
-         sipRaiseUnknownException();
-         return NULL;
-      }
     %End
-    void updateMultiDatasetParameters(SIP_PYOBJECT);
+    void updateMultiDatasetParameters(SIP_PYOBJECT) throw(std::exception);
     %MethodCode
-    try{
       auto function = boost::python::extract<const Mantid::API::IFunction_sptr &>(a0)();
       sipCpp->updateMultiDatasetParameters(*function);
-      }
-      catch (std::invalid_argument &sipExceptionRef)
-      {
-         const char *detail = sipExceptionRef.what();
-         SIP_BLOCK_THREADS
-         PyErr_SetString(PyExc_ValueError, detail);
-         SIP_UNBLOCK_THREADS
-         return NULL;
-      }
-      catch (...)
-      {
-         sipRaiseUnknownException();
-         return NULL;
-      }
     %End
     SIP_PYOBJECT getFunction();
     %MethodCode
@@ -969,14 +943,14 @@ public:
     %MethodCode
       sipRes = boost::python::to_python_value<const Mantid::API::IFunction_sptr &>()(sipCpp->getGlobalFunction());
     %End
-    SIP_PYOBJECT getFunctionByIndex(const QString &index);
+    SIP_PYOBJECT getFunctionByIndex(const std::string &index);
     %MethodCode
       sipRes = boost::python::to_python_value<const Mantid::API::IFunction_sptr &>()(sipCpp->getFunctionByIndex(*a0));
     %End
 signals:
     void functionStructureChanged();
-    void parameterChanged(const QString &funcIndex, const QString &paramName);
-    void attributeChanged(const QString &attributeName);
+    void parameterChanged(const std::string &funcIndex, const std::string &parameterName);
+    void attributeChanged(const std::string &attributeName);
 };
 
 // ---------------------------------
@@ -991,11 +965,11 @@ public:
     int getNumberOfQtProperties() const;
     int getNumberOfTieProperties() const;
     int getNumberOfConstraintProperties() const;
-    QRect getVisualRectFunctionProperty(const QString &index) const;
-    QRect getVisualRectParameterProperty(const QString &index) const;
+    QRect getVisualRectFunctionProperty(const std::string &index) const;
+    QRect getVisualRectParameterProperty(const std::string &index) const;
     QTreeWidget *treeWidget() const;
-    QWidget *getParamWidget(const QString &paramName) const;
-    double getParameter(const QString &paramName) const;
+    QWidget *getParamWidget(const std::string &parameterName) const;
+    double getParameter(const std::string &parameterName) const;
 };
 
 // ---------------------------------
@@ -1057,35 +1031,13 @@ class ImageInfoWidget : public QTableWidget {
 %End
 public:
     ImageInfoWidget(QWidget *parent = nullptr);
-    void cursorAt(const double x, const double y, const double signal, const QMap<QString, QString>& extraValues);
+    void cursorAt(const double x, const double y, const double signal, const QMap<QString, QString>& extraValues) throw(std::exception);
+    void setShowSignal(const bool showSignal);
+    void setWorkspace(SIP_PYOBJECT) throw(std::exception);
     %MethodCode
-    try {
-      sipCpp->cursorAt(a0, a1, a2, *a3);
-    } catch(const std::exception & exc) {
-      SIP_BLOCK_THREADS
-      PyErr_SetString(PyExc_RuntimeError, exc.what());
-      SIP_UNBLOCK_THREADS
-      return NULL;
-    } catch(...) {
-      sipRaiseUnknownException();
-      return NULL;
-    }
-    %End
-    void setWorkspace(SIP_PYOBJECT);
-    %MethodCode
-    try {
       using boost::python::extract;
       using Mantid::PythonInterface::ExtractSharedPtr;
       sipCpp->setWorkspace(ExtractSharedPtr<Mantid::API::Workspace>(a0)());
-    } catch(const std::exception & exc) {
-      SIP_BLOCK_THREADS
-      PyErr_SetString(PyExc_RuntimeError, exc.what());
-      SIP_UNBLOCK_THREADS
-      return NULL;
-    } catch(...) {
-      sipRaiseUnknownException();
-      return NULL;
-    }
     %End
 };
 
@@ -1098,35 +1050,12 @@ class ImageInfoWidgetMini : public QLabel {
 %End
 public:
     ImageInfoWidgetMini(QWidget *parent = nullptr);
-    void cursorAt(const double x, const double y, const double signal, const QMap<QString, QString>& extraValues);
+    void cursorAt(const double x, const double y, const double signal, const QMap<QString, QString>& extraValues) throw(std::exception);
+    void setWorkspace(SIP_PYOBJECT) throw(std::exception);
     %MethodCode
-    try {
-      sipCpp->cursorAt(a0, a1, a2, *a3);
-    } catch(const std::exception & exc) {
-      SIP_BLOCK_THREADS
-      PyErr_SetString(PyExc_RuntimeError, exc.what());
-      SIP_UNBLOCK_THREADS
-      return NULL;
-    } catch(...) {
-      sipRaiseUnknownException();
-      return NULL;
-    }
-    %End
-    void setWorkspace(SIP_PYOBJECT);
-    %MethodCode
-    try {
       using boost::python::extract;
       using Mantid::PythonInterface::ExtractSharedPtr;
       sipCpp->setWorkspace(ExtractSharedPtr<Mantid::API::Workspace>(a0)());
-    } catch(const std::exception & exc) {
-      SIP_BLOCK_THREADS
-      PyErr_SetString(PyExc_RuntimeError, exc.what());
-      SIP_UNBLOCK_THREADS
-      return NULL;
-    } catch(...) {
-      sipRaiseUnknownException();
-      return NULL;
-    }
     %End
 };
 
@@ -1230,20 +1159,10 @@ public:
     void clear();
     void setWidgetTitleRuns(const std::string &title);
     bool isEmpty() const ;
-    void addInfo(SIP_PYOBJECT);
+    void addInfo(SIP_PYOBJECT) throw(std::exception);
     %MethodCode
-    try {
       using boost::python::extract;
       using Mantid::PythonInterface::ExtractSharedPtr;
       sipCpp->addInfo(ExtractSharedPtr<Mantid::API::Workspace>(a0)());
-    } catch(const std::exception & exc) {
-      SIP_BLOCK_THREADS
-      PyErr_SetString(PyExc_RuntimeError, exc.what());
-      SIP_UNBLOCK_THREADS
-      return NULL;
-    } catch(...) {
-      sipRaiseUnknownException();
-      return NULL;
-    }
     %End
 };

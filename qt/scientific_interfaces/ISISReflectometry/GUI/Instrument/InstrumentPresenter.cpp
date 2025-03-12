@@ -15,9 +15,9 @@ namespace MantidQt::CustomInterfaces::ISISReflectometry {
 namespace {
 Mantid::Kernel::Logger g_log("Reflectometry GUI");
 
-boost::optional<RangeInLambda> rangeOrNone(const RangeInLambda &range, const bool bothOrNoneMustBeSet) {
+std::optional<RangeInLambda> rangeOrNone(const RangeInLambda &range, const bool bothOrNoneMustBeSet) {
   if (range.unset() || !range.isValid(bothOrNoneMustBeSet))
-    return boost::none;
+    return std::nullopt;
   else
     return range;
 }
@@ -119,12 +119,12 @@ void InstrumentPresenter::notifyInstrumentChanged(std::string const &instrumentN
 }
 
 void InstrumentPresenter::restoreDefaults() {
-  auto const instrument = m_mainPresenter->instrument();
+  auto const instr = m_mainPresenter->instrument();
   try {
-    m_model = m_instrumentDefaults->get(instrument);
+    m_model = m_instrumentDefaults->get(instr);
   } catch (std::invalid_argument &ex) {
     std::ostringstream msg;
-    msg << "Error setting default Instrument Settings: " << ex.what() << ". Please check the " << instrument->getName()
+    msg << "Error setting default Instrument Settings: " << ex.what() << ". Please check the " << instr->getName()
         << " parameters file.";
     g_log.error(msg.str());
     m_model = Instrument();
@@ -132,7 +132,7 @@ void InstrumentPresenter::restoreDefaults() {
   updateViewFromModel();
 }
 
-boost::optional<RangeInLambda> InstrumentPresenter::wavelengthRangeFromView() {
+std::optional<RangeInLambda> InstrumentPresenter::wavelengthRangeFromView() {
   auto range = RangeInLambda(m_view->getLambdaMin(), m_view->getLambdaMax());
   bool const bothOrNoneMustBeSet = false;
 
@@ -144,7 +144,7 @@ boost::optional<RangeInLambda> InstrumentPresenter::wavelengthRangeFromView() {
   return rangeOrNone(range, bothOrNoneMustBeSet);
 }
 
-boost::optional<RangeInLambda> InstrumentPresenter::monitorBackgroundRangeFromView() {
+std::optional<RangeInLambda> InstrumentPresenter::monitorBackgroundRangeFromView() {
   auto range = RangeInLambda(m_view->getMonitorBackgroundMin(), m_view->getMonitorBackgroundMax());
   bool const bothOrNoneMustBeSet = true;
 
@@ -156,7 +156,7 @@ boost::optional<RangeInLambda> InstrumentPresenter::monitorBackgroundRangeFromVi
   return rangeOrNone(range, bothOrNoneMustBeSet);
 }
 
-boost::optional<RangeInLambda> InstrumentPresenter::monitorIntegralRangeFromView() {
+std::optional<RangeInLambda> InstrumentPresenter::monitorIntegralRangeFromView() {
   auto range = RangeInLambda(m_view->getMonitorIntegralMin(), m_view->getMonitorIntegralMax());
   bool const bothOrNoneMustBeSet = false;
 

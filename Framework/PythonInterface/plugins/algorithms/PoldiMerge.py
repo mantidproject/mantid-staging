@@ -5,9 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.kernel import StringArrayProperty, Direction
-from mantid.simpleapi import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, AnalysisDataService, MatrixWorkspace, PythonAlgorithm, WorkspaceGroup, WorkspaceProperty
+from mantid.kernel import Direction, StringArrayProperty
+from mantid.simpleapi import MergeRuns
 
 import numpy as np
 
@@ -38,7 +38,7 @@ class PoldiMerge(PythonAlgorithm):
         self.declareProperty(
             "CheckInstruments",
             True,
-            "If checked, only workspaces with equal" "instrument parameters are merged." "Do not disable without a very good reason.",
+            "If checked, only workspaces with equal instrument parameters are merged.Do not disable without a very good reason.",
         )
 
     def PyExec(self):

@@ -255,7 +255,7 @@ void AlgorithmPropertiesWidget::initLayout() {
 
       // Only show the "Replace Workspace" button if the algorithm has an input
       // workspace.
-      if (hasInputWS)
+      if (hasInputWS && !prop->disableReplaceWSButton())
         widget->addReplaceWSButton();
 
       ++row;
@@ -273,10 +273,10 @@ void AlgorithmPropertiesWidget::propertyChanged(const QString &changedPropName) 
   this->hideOrDisableProperties(changedPropName);
 }
 
-bool isCalledInputWorkspace(PropertyWidget *const candidate) {
+bool isCalledInputWorkspaceOrLHSWorkspace(PropertyWidget *const candidate) {
   Mantid::Kernel::Property const *const property = candidate->getProperty();
   const std::string &propertyName = property->name();
-  return propertyName == "InputWorkspace";
+  return propertyName == "InputWorkspace" || propertyName == "LHSWorkspace";
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -286,21 +286,20 @@ bool isCalledInputWorkspace(PropertyWidget *const candidate) {
  */
 void AlgorithmPropertiesWidget::replaceWSClicked(const QString &propName) {
   if (m_propWidgets.contains(propName)) {
-    using CollectionOfPropertyWidget = std::vector<PropertyWidget *>;
-    CollectionOfPropertyWidget candidateReplacementSources;
     PropertyWidget *propWidget = m_propWidgets[propName];
     if (propWidget) {
+      using CollectionOfPropertyWidget = std::vector<PropertyWidget *>;
+      CollectionOfPropertyWidget candidateReplacementSources;
       // Find the name to put in the spot
-      QString wsName("");
       for (auto it = m_propWidgets.begin(); it != m_propWidgets.end(); it++) {
         // Only look at workspace properties
         PropertyWidget *otherWidget = it.value();
         Property *prop = it.value()->getProperty();
-        IWorkspaceProperty *wsProp = dynamic_cast<IWorkspaceProperty *>(prop);
+        const IWorkspaceProperty *wsProp = dynamic_cast<IWorkspaceProperty *>(prop);
         if (otherWidget && wsProp) {
           if (prop->direction() == Direction::Input) {
             // Input workspace property. Get the text typed in.
-            wsName = otherWidget->getValue();
+            QString wsName = otherWidget->getValue();
             if (!wsName.isEmpty()) {
               // Add the candidate to the list of candidates.
               candidateReplacementSources.emplace_back(otherWidget);
@@ -312,10 +311,10 @@ void AlgorithmPropertiesWidget::replaceWSClicked(const QString &propName) {
       // Choose from candidates, only do this if there are candidates to select
       // from.
       if (candidateReplacementSources.size() > 0) {
-        CollectionOfPropertyWidget::iterator selectedIt = std::find_if(
-            candidateReplacementSources.begin(), candidateReplacementSources.end(), isCalledInputWorkspace);
+        const auto selectedIt = std::find_if(candidateReplacementSources.cbegin(), candidateReplacementSources.cend(),
+                                             isCalledInputWorkspaceOrLHSWorkspace);
         if (selectedIt != candidateReplacementSources.end()) {
-          // Use the InputWorkspace property called "InputWorkspace" as the
+          // Use the InputWorkspace property called "InputWorkspace" or "LHSWorkspace" as the
           // source for the OutputWorkspace.
           propWidget->setValue((*selectedIt)->getValue());
         } else {
@@ -401,7 +400,7 @@ void AlgorithmPropertiesWidget::hideOrDisableProperties(const QString &changedPr
   // set Visible and Enabled as appropriate
   for (auto &widget : m_propWidgets) {
     Mantid::Kernel::Property *prop = widget->getProperty();
-    IPropertySettings *settings = prop->getSettings();
+    const IPropertySettings *settings = prop->getSettings();
     const auto &propName = QString::fromStdString(prop->name());
 
     // Set the enabled and visible flags based on what the validators say.

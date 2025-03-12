@@ -4,15 +4,27 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
-from mantid.simpleapi import *
-from mantid import config
+from mantid import FileFinder
+from mantid.api import mtd, AlgorithmFactory, DataProcessorAlgorithm, FileAction, FileProperty, Progress, PropertyMode, WorkspaceProperty
+from mantid.kernel import (
+    config,
+    logger,
+    Direction,
+    FloatArrayLengthValidator,
+    FloatArrayProperty,
+    IntArrayMandatoryValidator,
+    IntArrayProperty,
+    Property,
+    StringArrayProperty,
+    StringListValidator,
+)
+from mantid.simpleapi import Fit, LoadLog, Rebin, SofQWMoments
 
 import os
 import numpy as np
+import re
 
-from IndirectCommon import formatRuns
+from IndirectCommon import format_runs
 
 
 class SofQWMomentsScan(DataProcessorAlgorithm):
@@ -119,13 +131,12 @@ class SofQWMomentsScan(DataProcessorAlgorithm):
         self.declareProperty(name="MomentWorkspace", defaultValue="Moment", doc="The output Moment workspace.")
 
     def PyExec(self):
-
         self._setup()
         progress = Progress(self, 0.0, 0.05, 3)
 
         progress.report("Energy transfer")
-        scan_alg = self.createChildAlgorithm("ISISIndirectEnergyTransferWrapper", 0.05, 0.95)
-        scan_alg.setProperty("InputFiles", formatRuns(self._data_files, self._instrument_name))
+        scan_alg = self.createChildAlgorithm("ISISIndirectEnergyTransfer", 0.05, 0.95)
+        scan_alg.setProperty("InputFiles", format_runs(self._data_files, self._instrument_name))
         scan_alg.setProperty("SumFiles", self._sum_files)
         scan_alg.setProperty("LoadLogFiles", self._load_logs)
         scan_alg.setProperty("CalibrationWorkspace", self._calibration_ws)
@@ -141,7 +152,7 @@ class SofQWMomentsScan(DataProcessorAlgorithm):
         scan_alg.setProperty("FoldMultipleFrames", self._fold_multiple_frames)
         scan_alg.setProperty("GroupingMethod", self._grouping_method)
         scan_alg.setProperty("GroupingWorkspace", self._grouping_ws)
-        scan_alg.setProperty("MapFile", self._grouping_map_file)
+        scan_alg.setProperty("GroupingFile", self._grouping_map_file)
         scan_alg.setProperty("UnitX", self._output_x_units)
         scan_alg.setProperty("OutputWorkspace", self._red_ws)
         scan_alg.execute()

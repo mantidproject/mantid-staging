@@ -6,12 +6,22 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=too-many-lines, invalid-name, bare-except, too-many-instance-attributes
 import math
+import os
 import re
+import sys
 
-from mantid.simpleapi import *
-from mantid.api import WorkspaceGroup, Workspace
-from mantid.kernel import Logger
-from mantid.kernel import V3D
+from mantid.api import mtd, AnalysisDataService, Workspace, WorkspaceGroup
+from mantid.kernel import config, logger, ConfigService, Logger, V3D
+from mantid.simpleapi import (
+    CopyInstrumentParameters,
+    CropWorkspace,
+    LoadEmptyInstrument,
+    LoadInstrument,
+    MoveInstrumentComponent,
+    RotateInstrumentComponent,
+    SetInstrumentParameter,
+)
+
 import SANSUtility as su
 from math import copysign
 
@@ -867,7 +877,7 @@ class ISISInstrument(BaseInstrument):
             value = ws_instrument.getNumberParameter(param_name)
         else:
             raise RuntimeError(
-                "ISISInstrument: An Instrument Parameter File value of unknown type" "is trying to be copied. Cannot handle this currently."
+                "ISISInstrument: An Instrument Parameter File value of unknown type is trying to be copied. Cannot handle this currently."
             )
         SetInstrumentParameter(
             Workspace=calibration_workspace,
@@ -1340,7 +1350,7 @@ class SANS2D(ISISInstrument):
             # return the log value if it stored as a single number
             return float(log_data.getLogData(log_name).value)
         except TypeError:
-            # Python 2.4 doesn't have datetime.strptime...
+
             def format_date(date_string, format, date_str_len):
                 if len(date_string) > date_str_len:
                     date_string = date_string[:date_str_len]
@@ -1574,7 +1584,7 @@ class LARMOR(ISISInstrument):
             # return the log value if it stored as a single number
             return float(log_data.getLogData(log_name).value)
         except TypeError:
-            # Python 2.4 doesn't have datetime.strptime...
+
             def format_date(date_string, format, date_str_len):
                 if len(date_string) > date_str_len:
                     date_string = date_string[:date_str_len]

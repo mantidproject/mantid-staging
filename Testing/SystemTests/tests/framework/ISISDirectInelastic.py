@@ -6,7 +6,9 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init
 import systemtesting
-from mantid.simpleapi import *
+from mantid.api import FileFinder
+from mantid.kernel import config
+from mantid.simpleapi import RenameWorkspace
 from mantid.api import Workspace
 import os
 import shutil
@@ -41,7 +43,7 @@ class ISISDirectInelasticReduction(systemtesting.MantidSystemTest, metaclass=ABC
     @abstractmethod
     def get_reference_file(self):
         """Returns the name of the reference file to compare against"""
-        raise NotImplementedError("Implement get_reference_file to return " "the name of the file to compare against.")
+        raise NotImplementedError("Implement get_reference_file to return the name of the file to compare against.")
 
     @abstractmethod
     def get_result_workspace(self):
@@ -345,7 +347,6 @@ class MARIReductionMonSeparate(ISISDirectInelasticReduction):
 
 class MARIReductionSum(ISISDirectInelasticReduction):
     def __init__(self):
-
         ISISDirectInelasticReduction.__init__(self)
         from ISIS_MariReduction import MARIReductionSum
 
@@ -372,7 +373,6 @@ class MARIReductionSum(ISISDirectInelasticReduction):
 
 class MARIReductionWaitAndSum(ISISDirectInelasticReduction):
     def __init__(self):
-
         ISISDirectInelasticReduction.__init__(self)
         from ISIS_MariReduction import MARIReductionSum
 

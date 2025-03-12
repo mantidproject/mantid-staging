@@ -1,45 +1,97 @@
+cdt_name:
+  - cos7
 c_compiler:
   - gcc                      # [linux]
   - clang                    # [osx]
   - vs2019                   # [win]
 c_compiler_version:            # [unix]
-  - 15                         # [osx]
-  - 10                         # [linux]
+  - 18                         # [osx]
+  - 13                         # [linux]
 cxx_compiler:
   - gxx                      # [linux]
   - clangxx                  # [osx]
   - vs2019                   # [win]
 cxx_compiler_version:          # [unix]
-  - 15                         # [osx]
-  - 10                         # [linux]
+  - 18                         # [osx]
+  - 13                         # [linux]
 llvm_openmp:                   # [osx]
-  - 15                         # [osx]
+  - 18                         # [osx]
 
 python:
-  - 3.8
+  - 3.10
 
-boost:
-  - 1.77
+libboost_devel:
+  - 1.84 # Aim to follow conda-forge
 
+libboost_python_devel:
+  - 1.84 # Aim to follow conda-forge
+
+cmake:
+  - '>=3.21.0'
+
+# 1.10.0 Produces a warning in Framework/Geometry/src/Crystal/HKLFilter.cpp
+doxygen:
+  - 1.9.*
+
+eigen:
+  - 3.4.*
+
+hdf4:
+  - 4.2.*
+
+hdf5: # this is to move to libcurl>=8.4
+  - '>1.14.0,<1.15'
+
+graphviz:
+  - '>=2.47.0'
+
+# this must match the version in the developer dependencies
+jemalloc:
+  - 5.2.0
+
+jsoncpp:
+  - '>=1.9.4,<2'
+
+libglu:
+  - '>=9.0'
+
+# Not a primary dependency, but pinning to avoid a couple of unit test failures
+mkl:
+  - 2024.1.0
+
+muparser:
+  - '>=2.3.2'
+
+# We follow conda-forge and build with the lowest supported version of numpy for forward compatibility.
 numpy:
-  - 1.21.*
+  - 2.0.*
 
 matplotlib:
-  - 3.6.*
+  - 3.9.*
 
-# 1.12.2 introduced an unguarded #define NOMINMAX which causes a compiler warning. It's resolved on their devel branch so should be fine after 1.12.4
+mslice:
+  - '2.10.1'
+
+ninja:
+  - '>=1.10.2'
+
+# Use novtk version, otherwise a lot of extra packages are installed, including qt6-main, which can cause issues when launching on Windows
+occt:
+  - '=*=novtk*'
+
+# Fix the version to avoid updates being pulled in automatically, which might change the Reflectometry ORSO file content or layout and cause tests to fail.
+orsopy:
+  - 1.2.1
+
+# An API change to HTTPSClientSession was introduced in 1.14.0
 poco:
-  - 1.12.1|>=1.12.5
+  - '>=1.14'
 
-# Force to 4.4.1 as later versions cause issues with loading CIF files
-pycifrw:
-  - 4.4.1
-
-setuptools:
-  - 49.6
+psutil:
+  - '>=5.8.0'
 
 sphinx:
-  - 5.1.1
+  - '>=4.5.*'
 
 sphinx_bootstrap_theme:
   - 0.8.1
@@ -47,46 +99,61 @@ sphinx_bootstrap_theme:
 scipy:
   - '>=1.10.0'
 
+pip:
+  - '>=21.0.1'
+
 pyqt:
-  - 5.15
+  - '>=5.15,<6'
+
+python_dateutil:
+  - '>=2.8.1'
+
+pyyaml:
+  - '>=5.4.1'
 
 # Pins qt to a specific version to avoid gui rendering problems in certain versions
 qt_main:
   - 5.15.8
 
-# 5.4.2 crashes the jupyter console. The bug was fixed in 5.4.3.
+# 5.4.2 crashes the jupyter console. 5.5.0 raises a TypeError when using tab completion.
 qtconsole:
-  - '!=5.4.2'
+  - '>5.5.0'
 
 qscintilla2:
   - 2.13
 
+# 2.4.2 fails workbench.test_mainwindow.test_mainwindow which uses isinstance()
+qtpy:
+  - '>=2.4,!=2.4.2'
+
 tbb:
   - 2021
 
-hdf5:
-  - 1.12.*
+texlive_core:
+  - '>=20180414'
 
+toml:
+  - '>=0.10.2'
+# Keep gsl a specific version to reduce changes in our fitting
 gsl:
   - 2.7
 
-# v0.3.23 causes a hang on osx for some systemtests
+# v0.3.23 causes a hang on osx for some systemtests, v0.3.24 causes a unit test failure that needs investigation, v0.3.25 causes a system test failure on linux, v0.3.28 causes unit test failures on osx and system test failures on linux.
 libopenblas:
-  - '!=0.3.23'
-
-# 8.2 causing segfaults in jupyter unit tests and doc builds.
-readline:
-  - <8.2
+  - '!=0.3.23,!=0.3.24,!=0.3.25, !=0.3.28'
 
 euphonic:
-  - 0.6.*
+  - '>=1.2.1,<2.0'
 
-importlib_resources:
-  - 5.12.0
-
-# 2.2.0 causes resolution issues in the mantidqt host environment on linux
 librdkafka:
-  - <=2.1.1
+  - '>=1.6.0'
+
+# 6.8.0 causes issues in mantidqt CMake when cross compiling.
+sip:
+  - <=6.7.11
+
+versioningit:
+  - '>=2.1'
 
 pin_run_as_build:
     boost:

@@ -6,7 +6,8 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 
-""" Handles calibration of SANS workspaces."""
+"""Handles calibration of SANS workspaces."""
+
 from os.path import basename, splitext, isfile
 from mantid.api import AnalysisDataService
 
@@ -245,7 +246,7 @@ def apply_missing_parameters(calibration_workspace, workspace, missing_parameter
             alg.setProperty("Value", str(value[0]))
     except KeyError:
         raise RuntimeError(
-            "SANSCalibration: An Instrument Parameter File value of unknown type" "was going to be copied. Cannot handle this currently."
+            "SANSCalibration: An Instrument Parameter File value of unknown type was going to be copied. Cannot handle this currently."
         )
 
 

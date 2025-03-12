@@ -4,8 +4,16 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from SANSILLCommon import *
+from SANSILLCommon import (
+    AcqMode,
+    add_correction_numors,
+    create_name,
+    needs_loading,
+    needs_processing,
+)
 from mantid.api import (
+    mtd,
+    AlgorithmFactory,
     DataProcessorAlgorithm,
     WorkspaceGroupProperty,
     MultipleFileProperty,
@@ -24,7 +32,20 @@ from mantid.kernel import (
     IntBoundedValidator,
     StringListValidator,
 )
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    CalculateDynamicRange,
+    CalculateEfficiency,
+    ConvertToPointData,
+    GroupWorkspaces,
+    LoadNexusProcessed,
+    MaskDetectorsIf,
+    RenameWorkspace,
+    SANSILLIntegration,
+    SANSILLReduction,
+    Stitch,
+    Transpose,
+    UnGroupWorkspace,
+)
 
 
 N_DISTANCES = 5  # maximum number of distinct distance configurations
@@ -64,10 +85,10 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         # ================================INPUT RUNS================================#
 
         for d in range(N_DISTANCES):
-            p_name = f"SampleRunsD{d+1}"
+            p_name = f"SampleRunsD{d + 1}"
             self.declareProperty(
                 MultipleFileProperty(name=p_name, action=FileAction.OptionalLoad, extensions=["nxs"], allow_empty=True),
-                doc=f"Sample run(s) at the distance #{d+1}.",
+                doc=f"Sample run(s) at the distance #{d + 1}.",
             )
             self.setPropertyGroup(p_name, "Numors")
 
@@ -84,7 +105,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
 
         self.declareProperty(
             MultipleFileProperty(name="FluxRuns", action=FileAction.OptionalLoad, extensions=["nxs"]),
-            doc="Empty beam run(s) for flux calculation only; " "if left blank the flux will be calculated from EmptyBeamRuns.",
+            doc="Empty beam run(s) for flux calculation only; if left blank the flux will be calculated from EmptyBeamRuns.",
         )
         self.setPropertyGroup("FluxRuns", "Numors")
 
@@ -96,11 +117,11 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
 
         # ================================TR INPUT RUNS================================#
 
-        for l in range(N_LAMBDAS):
-            p_name = f"SampleTrRunsW{l+1}"
+        for i in range(N_LAMBDAS):
+            p_name = f"SampleTrRunsW{i + 1}"
             self.declareProperty(
                 MultipleFileProperty(name=p_name, action=FileAction.OptionalLoad, extensions=["nxs"], allow_empty=True),
-                doc=f"Sample transmission run(s) at the wavelength #{l+1}.",
+                doc=f"Sample transmission run(s) at the wavelength #{i + 1}.",
             )
             self.setPropertyGroup(p_name, "Transmission Numors")
 
@@ -308,7 +329,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         """Makes sure all the sample inputs have matching extents"""
         issues = dict()
         for d in range(self.rank):
-            prop = f"SampleRunsD{d+1}"
+            prop = f"SampleRunsD{d + 1}"
             n_items = self.getPropertyValue(prop).count(",") + 1
             if n_items != self.n_samples:
                 issues[prop] = f"{prop} has {n_items} elements instead of {self.n_samples}"
@@ -317,8 +338,8 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
     def _check_tr_runs_dimensions(self):
         """Makes sure all the sample transmission inputs have matching extents"""
         issues = dict()
-        for l in range(self.lambda_rank):
-            prop = f"SampleTrRunsW{l+1}"
+        for i in range(self.lambda_rank):
+            prop = f"SampleTrRunsW{i + 1}"
             n_items = self.getPropertyValue(prop).count(",") + 1
             if n_items > 1 and n_items != self.n_samples:
                 issues[prop] = f"{prop} has {n_items} elements instead of {self.n_samples}"
@@ -373,9 +394,9 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         if read_from == "User":
             n_thick = len(thicknesses)
             if n_thick > 1 and n_thick != self.n_samples:
-                issues[
-                    "SampleThickness"
-                ] = f"SampleThickness has {n_thick} elements which does not match the number of samples {self.n_samples}."
+                issues["SampleThickness"] = (
+                    f"SampleThickness has {n_thick} elements which does not match the number of samples {self.n_samples}."
+                )
         return issues
 
     def _check_sample_names_dimensions(self):
@@ -437,9 +458,11 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         issues = dict()
         is_empty = False
         for d in range(N_DISTANCES):
-            prop = f"SampleRunsD{d+1}"
+            prop = f"SampleRunsD{d + 1}"
             if is_empty and self.getPropertyValue(prop):
-                issues[prop] = f"Samples have to be filled from D1 onwards: found {d+1} non-empty, while another distance before was empty."
+                issues[prop] = (
+                    f"Samples have to be filled from D1 onwards: found {d + 1} non-empty, while another distance before was empty."
+                )
             if not self.getPropertyValue(prop):
                 is_empty = True
         return issues
@@ -519,7 +542,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         """Sets the actual rank of the reduction"""
         self.rank = 0
         for d in range(N_DISTANCES):
-            if self.getPropertyValue(f"SampleRunsD{d+1}"):
+            if self.getPropertyValue(f"SampleRunsD{d + 1}"):
                 self.rank += 1
         if self.rank == 0:
             raise RuntimeError("No sample runs are provided, at least one distance must not be empty.")
@@ -529,16 +552,16 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
     def _set_lambda_rank(self):
         """Sets the actual lambda rank"""
         self.lambda_rank = 0
-        for l in range(N_LAMBDAS):
-            if self.getPropertyValue(f"SampleTrRunsW{l+1}"):
+        for i in range(N_LAMBDAS):
+            if self.getPropertyValue(f"SampleTrRunsW{i + 1}"):
                 self.lambda_rank += 1
         self.log().notice(f"Set the lambda rank of reduction to {self.lambda_rank}")
 
     def _set_n_samples(self):
         """Sets the number of samples based on the inputs of the sample runs in the first non-empty distance"""
         for d in range(N_DISTANCES):
-            if self.getPropertyValue(f"SampleRunsD{d+1}"):
-                self.n_samples = self.getPropertyValue(f"SampleRunsD{d+1}").count(",") + 1
+            if self.getPropertyValue(f"SampleRunsD{d + 1}"):
+                self.n_samples = self.getPropertyValue(f"SampleRunsD{d + 1}").count(",") + 1
                 self.log().notice(f"Set number of samples to {self.n_samples}")
                 break
 
@@ -563,22 +586,22 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         else:
             return radii[d]
 
-    def get_tr_beam_radius(self, l):
+    def get_tr_beam_radius(self, i):
         """Returns transmission beam radius at the given wavelength"""
         radii = self.getProperty("TrBeamRadius").value
         if len(radii) == 1:
             return radii[0]
         else:
-            return radii[l]
+            return radii[i]
 
     # ================================PROCESSING ALL===============================#
 
     def process_all_transmissions(self):
         """Calculates all the transmissions"""
         all_outputs = []
-        for l in range(self.lambda_rank):
-            transmissions = self.process_all_transmissions_at_lambda(l)
-            self.progress.report((l + 1) * self.n_samples, f"Calculated transmissions for wavelength index {l+1}")
+        for i in range(self.lambda_rank):
+            transmissions = self.process_all_transmissions_at_lambda(i)
+            self.progress.report((i + 1) * self.n_samples, f"Calculated transmissions for wavelength index {i + 1}")
             all_outputs.append(transmissions)
         return all_outputs
 
@@ -588,7 +611,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         for d in range(self.rank):
             outputs = dict()
             sample_ws = self.process_all_samples_at_distance(d, transmissions)
-            self.progress.report((d + 1) * self.n_samples, f"Reduced sample data at distance index {d+1}")
+            self.progress.report((d + 1) * self.n_samples, f"Reduced sample data at distance index {d + 1}")
             outputs["RealSpace"] = sample_ws[0]
             if len(sample_ws) > 1:
                 # if there is a 2nd output, it must be sensitivity
@@ -604,14 +627,14 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
             all_outputs.append(outputs)
         return all_outputs
 
-    def process_all_transmissions_at_lambda(self, l):
+    def process_all_transmissions_at_lambda(self, i):
         """
         Calculates transmissions at the given lambda index
         """
-        tr_dark_current_ws = self.process_tr_dark_current(l)
-        [tr_empty_beam_ws, tr_empty_beam_flux] = self.process_tr_empty_beam(l, tr_dark_current_ws)
-        tr_empty_can_ws = self.process_empty_can_tr(l, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux)
-        tr_sample_ws = self.process_sample_tr(l, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux)
+        tr_dark_current_ws = self.process_tr_dark_current(i)
+        [tr_empty_beam_ws, tr_empty_beam_flux] = self.process_tr_empty_beam(i, tr_dark_current_ws)
+        tr_empty_can_ws = self.process_empty_can_tr(i, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux)
+        tr_sample_ws = self.process_sample_tr(i, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux)
         results = dict()
         if tr_sample_ws:
             results["SampleTransmission"] = tr_sample_ws
@@ -684,11 +707,11 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
 
     # ================================PROCESS REDUCTIONS================================#
 
-    def process_tr_dark_current(self, l):
+    def process_tr_dark_current(self, i):
         """Processes the dark current at the tranmission configuration"""
         runs = self.getPropertyValue("TrDarkCurrentRuns")
         if runs:
-            tr_dark_current = runs.split(",")[l]
+            tr_dark_current = runs.split(",")[i]
             [process_tr_dark_current, tr_dark_current_ws] = needs_processing(tr_dark_current, "DarkCurrent")
             if process_tr_dark_current:
                 SANSILLReduction(
@@ -701,11 +724,11 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         else:
             return ""
 
-    def process_tr_empty_beam(self, l, tr_dark_current_ws):
+    def process_tr_empty_beam(self, i, tr_dark_current_ws):
         """Processes the empty beam at the tranmission configuration"""
         runs = self.getPropertyValue("TrEmptyBeamRuns")
         if runs:
-            tr_empty_beam = runs.split(",")[l]
+            tr_empty_beam = runs.split(",")[i]
             [process_tr_empty_beam, tr_empty_beam_ws] = needs_processing(tr_empty_beam, "EmptyBeam")
             tr_empty_beam_flux = tr_empty_beam_ws + "Flux"
             if process_tr_empty_beam:
@@ -714,7 +737,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
                     ProcessAs="EmptyBeam",
                     DarkCurrentWorkspace=tr_dark_current_ws,
                     NormaliseBy=self.getProperty("NormaliseBy").value,
-                    TransmissionBeamRadius=self.get_tr_beam_radius(l),
+                    TransmissionBeamRadius=self.get_tr_beam_radius(i),
                     OutputWorkspace=tr_empty_beam_ws,
                     OutputFluxWorkspace=tr_empty_beam_flux,
                 )
@@ -722,11 +745,11 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
         else:
             return ["", ""]
 
-    def process_empty_can_tr(self, l, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux):
+    def process_empty_can_tr(self, i, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux):
         """Processes the empty container transmission at the given wavelength"""
         runs = self.getPropertyValue("ContainerTrRuns")
         if runs:
-            tr_empty_can = runs.split(",")[l]
+            tr_empty_can = runs.split(",")[i]
             [process_tr_empty_can, tr_empty_can_ws] = needs_processing(tr_empty_can, "Transmission")
             if process_tr_empty_can:
                 SANSILLReduction(
@@ -736,16 +759,16 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
                     EmptyBeamWorkspace=tr_empty_beam_ws,
                     FluxWorkspace=tr_empty_beam_flux,
                     NormaliseBy=self.getProperty("NormaliseBy").value,
-                    TransmissionBeamRadius=self.get_tr_beam_radius(l),
+                    TransmissionBeamRadius=self.get_tr_beam_radius(i),
                     OutputWorkspace=tr_empty_can_ws,
                 )
             return tr_empty_can_ws
         else:
             return ""
 
-    def process_sample_tr(self, l, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux):
+    def process_sample_tr(self, i, tr_dark_current_ws, tr_empty_beam_ws, tr_empty_beam_flux):
         """Processes the sample transmissions at the given wavelength"""
-        tr_sample = self.getPropertyValue(f"SampleTrRunsW{l+1}")
+        tr_sample = self.getPropertyValue(f"SampleTrRunsW{i + 1}")
         if tr_sample:
             [_, tr_sample_ws] = needs_processing(tr_sample, "Transmission")
             SANSILLReduction(
@@ -755,10 +778,10 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
                 EmptyBeamWorkspace=tr_empty_beam_ws,
                 FluxWorkspace=tr_empty_beam_flux,
                 NormaliseBy=self.getProperty("NormaliseBy").value,
-                TransmissionBeamRadius=self.get_tr_beam_radius(l),
+                TransmissionBeamRadius=self.get_tr_beam_radius(i),
                 OutputWorkspace=tr_sample_ws,
-                startProgress=l * self.n_samples / self.n_reports,
-                endProgress=(l + 1) * self.n_samples / self.n_reports,
+                startProgress=i * self.n_samples / self.n_reports,
+                endProgress=(i + 1) * self.n_samples / self.n_reports,
             )
             return tr_sample_ws
         else:
@@ -850,7 +873,7 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
 
     def process_sample(self, d, dark_current_ws, empty_beam_ws, empty_can_ws, flux_ws, transmissions):
         """Processes all the samples at the given distance"""
-        runs = self.getPropertyValue(f"SampleRunsD{d+1}")
+        runs = self.getPropertyValue(f"SampleRunsD{d + 1}")
         if runs:
             [edge_mask_ws, beam_stop_mask_ws] = self.load_masks(d)
             flat_field_ws = self.load_flat_field(d)
@@ -1052,8 +1075,8 @@ class SANSILLMultiProcess(DataProcessorAlgorithm):
                 stitch_scale_factors = out + "_stitch_scale_factors_wedge_" + str(w + 1)
                 stitched_wedge = self.do_stitch(to_stitch_w, stitched_wedge_ws, stitch_scale_factors)
                 if stitched_wedge:
-                    results[f"Stitched_Wedge{w+1}"] = stitched_wedge[0]
-                    results[f"StitchScaleFactors_Wedge{w+1}"] = stitched_wedge[1]
+                    results[f"Stitched_Wedge{w + 1}"] = stitched_wedge[0]
+                    results[f"StitchScaleFactors_Wedge{w + 1}"] = stitched_wedge[1]
         return results
 
     def do_stitch(self, inputs, output, output_scale_factors):

@@ -367,7 +367,7 @@ class Background(object):
         if index < len(self.functions):
             self.functions[index].update(func)
         else:
-            raise ValueError(f"Invalid index ({index}) provided: Background is made of {len(self.functions)} " f"Function(s).")
+            raise ValueError(f"Invalid index ({index}) provided: Background is made of {len(self.functions)} Function(s).")
 
 
 class ResolutionModel:
@@ -436,14 +436,14 @@ class ResolutionModel:
 
     def _checkModel(self, model):
         if not isinstance(model, tuple):
-            raise RuntimeError("Resolution model must be a tuple of two arrays of floats.\n" "Found instead:\n\n%s" % str(model))
+            raise RuntimeError("Resolution model must be a tuple of two arrays of floats.\nFound instead:\n\n%s" % str(model))
         if len(model) != 2:
-            raise RuntimeError("Resolution model tuple must have exactly two elements.\n" "Found instead %d" % len(model))
+            raise RuntimeError("Resolution model tuple must have exactly two elements.\nFound instead %d" % len(model))
         self._checkArray(model[0])
         self._checkArray(model[1])
         if len(model[0]) != len(model[1]):
             raise RuntimeError(
-                "Resolution model expects two arrays of equal sizes.\n" "Found sizes %d and %d" % (len(model[0]), len(model[1]))
+                "Resolution model expects two arrays of equal sizes.\nFound sizes %d and %d" % (len(model[0]), len(model[1]))
             )
 
     def _checkArray(self, array):
@@ -464,7 +464,7 @@ class ResolutionModel:
 
     def _makeModel(self, model, xstart, xend, accuracy):
         if xstart is None or xend is None:
-            raise RuntimeError("The x-range must be provided to ResolutionModel via " "xstart and xend parameters.")
+            raise RuntimeError("The x-range must be provided to ResolutionModel via xstart and xend parameters.")
         import numpy as np
 
         if accuracy is None:
@@ -702,7 +702,7 @@ class PhysicalProperties(object):
                 out += ",Temperature=%s" % (self._physpropTemperature)
             else:  # either susceptibility or M(T)
                 out += ",inverse=%s" % (1 if self._suscInverseFlag else 0)
-                out += (",Hmag=%s" % (self._hmag)) if self._typeid == self.MAGNETISATION else ""
+                out += (",Hmag=%s" % (self._hmag)) if self._typeid == self.MAGNETICMOMENT else ""
                 if self._typeid == self.SUSCEPTIBILITY and self._lambda != 0:
                     out += ",Lambda=%s" % (self._lambda)
                 if self._typeid == self.SUSCEPTIBILITY and self._chi0 != 0:

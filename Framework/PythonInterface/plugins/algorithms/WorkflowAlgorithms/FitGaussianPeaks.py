@@ -65,7 +65,7 @@ class FitGaussianPeaks(DataProcessorAlgorithm):
         self.declareProperty(
             "FitWindowSize",
             5,
-            doc="Number of data point used to fit peaks, minimum allowed value is 5, " "value must be an odd number ",
+            doc="Number of data point used to fit peaks, minimum allowed value is 5, value must be an odd number ",
             validator=IntBoundedValidator(lower=5),
         )
         self.declareProperty(
@@ -82,7 +82,7 @@ class FitGaussianPeaks(DataProcessorAlgorithm):
         )
         self.declareProperty(
             ITableWorkspaceProperty(name="RefitPeakProperties", defaultValue="refit_peak_table", direction=Direction.Output),
-            "Table containing the properties of the peaks that had to be fitted twice as the first" "time the error was unreasonably large",
+            "Table containing the properties of the peaks that had to be fitted twice as the first time the error was unreasonably large",
         )
         self.declareProperty(
             ITableWorkspaceProperty(name="FitCost", defaultValue="fit_cost", direction=Direction.Output),
@@ -261,7 +261,7 @@ class FitGaussianPeaks(DataProcessorAlgorithm):
         y_fit = y_fit[np.nonzero(y_data)]
         y_data = y_data[np.nonzero(y_data)]
         if len(y_fit) < 1:
-            return -np.Inf
+            return -np.inf
         y_log = np.log(np.abs(y_fit))
         return np.sum(-y_fit + y_data * y_log)
 

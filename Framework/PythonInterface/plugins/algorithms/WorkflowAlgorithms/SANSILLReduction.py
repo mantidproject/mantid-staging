@@ -5,6 +5,8 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 from mantid.api import (
+    mtd,
+    AlgorithmFactory,
     DataProcessorAlgorithm,
     MatrixWorkspaceProperty,
     MultipleFileProperty,
@@ -14,8 +16,57 @@ from mantid.api import (
     WorkspaceProperty,
     FileAction,
 )
-from mantid.kernel import Direction, EnabledWhenProperty, FloatBoundedValidator, LogicOperator, PropertyCriterion, StringListValidator
-from mantid.simpleapi import *
+from mantid.kernel import (
+    config,
+    logger,
+    Direction,
+    EnabledWhenProperty,
+    FloatBoundedValidator,
+    LogicOperator,
+    PropertyCriterion,
+    StringListValidator,
+)
+from mantid.simpleapi import (
+    AddSampleLog,
+    ApplyTransmissionCorrection,
+    CalculateDynamicRange,
+    CalculateEfficiency,
+    CalculateFlux,
+    CalculateTransmission,
+    CloneWorkspace,
+    ConvertSpectrumAxis,
+    ConvertToHistogram,
+    CreateWorkspace,
+    CropToComponent,
+    CropWorkspace,
+    DeadTimeCorrection,
+    DeleteWorkspace,
+    DeleteWorkspaces,
+    Divide,
+    ExtractSpectra,
+    FindDetectorsInShape,
+    FindCenterOfMassPosition,
+    Fit,
+    GroupDetectors,
+    GroupWorkspaces,
+    LoadAndMerge,
+    MaskAngle,
+    MaskDetectors,
+    MaskDetectorsIf,
+    MergeRuns,
+    Minus,
+    MoveInstrumentComponent,
+    NormaliseByThickness,
+    ParallaxCorrection,
+    Rebin,
+    RebinToWorkspace,
+    RenameWorkspace,
+    ReplaceSpecialValues,
+    RotateInstrumentComponent,
+    Scale,
+    SolidAngle,
+    Transpose,
+)
 import SANSILLCommon as common
 from math import fabs
 import numpy as np
@@ -160,7 +211,7 @@ class SANSILLReduction(DataProcessorAlgorithm):
             "SampleThickness",
             0.1,
             validator=FloatBoundedValidator(lower=-1),
-            doc="Sample thickness [cm] (if -1, the value is " "taken from the nexus file).",
+            doc="Sample thickness [cm] (if -1, the value is taken from the nexus file).",
         )
 
         self.setPropertySettings("SampleThickness", sample)
@@ -241,7 +292,7 @@ class SANSILLReduction(DataProcessorAlgorithm):
         self.declareProperty("CacheSolidAngle", False, doc="Whether or not to cache the solid angle workspace.")
 
         self.declareProperty(
-            "WaterCrossSection", 1.0, doc="Provide water cross-section; " "used only if the absolute scale is done by dividing to water."
+            "WaterCrossSection", 1.0, doc="Provide water cross-section; used only if the absolute scale is done by dividing to water."
         )
 
         self.declareProperty(
@@ -789,11 +840,11 @@ class SANSILLReduction(DataProcessorAlgorithm):
             try:
                 run = mtd[ws].getRun()
                 thickness = run.getLogData("sample.thickness").value
-                self.log().information("Sample thickness read from the sample " "logs: {0} cm.".format(thickness))
+                self.log().information("Sample thickness read from the sample logs: {0} cm.".format(thickness))
             except:
                 thickness = self.getProperty("SampleThickness").getDefault
                 thickness = float(thickness)
-                self.log().warning("Sample thickness not found in the sample " "logs. Using the default value: {:.2f}".format(thickness))
+                self.log().warning("Sample thickness not found in the sample logs. Using the default value: {:.2f}".format(thickness))
             finally:
                 self.setProperty("SampleThickness", thickness)
         NormaliseByThickness(InputWorkspace=ws, OutputWorkspace=ws, SampleThickness=thickness)

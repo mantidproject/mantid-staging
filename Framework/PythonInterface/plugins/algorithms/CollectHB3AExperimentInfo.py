@@ -7,8 +7,7 @@
 # pylint: disable=no-init,invalid-name,too-many-instance-attributes
 import mantid
 import mantid.simpleapi as api
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
 import os
 
 
@@ -84,7 +83,7 @@ class CollectHB3AExperimentInfo(PythonAlgorithm):
         self.declareProperty(
             "GenerateVirtualInstrument",
             True,
-            "If True, then the geometry of all the detectors will be written " "to DetectorTableWorkspace",
+            "If True, then the geometry of all the detectors will be written to DetectorTableWorkspace",
         )
 
         default_num_dets = 256 * 256
@@ -353,7 +352,7 @@ class CollectHB3AExperimentInfo(PythonAlgorithm):
 
         numrows = spicetablews.rowCount()
         for irow in range(numrows):
-            pt = spicetablews.cell(irow, iColPt)
+            pt = spicetablews.cell(irow, 1)
             ptlist.append(pt)
 
         return ptlist

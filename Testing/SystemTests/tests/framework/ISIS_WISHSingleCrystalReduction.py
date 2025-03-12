@@ -37,6 +37,7 @@ from mantid.simpleapi import (
     BinMD,
     ConvertMDHistoToMatrixWorkspace,
     ExtractSpectra,
+    SortPeaksWorkspace,
 )
 from Diffraction.wish.wishSX import WishSX
 from mantid import config
@@ -201,13 +202,42 @@ class WISHProcessVanadiumForNormalisationTest(MantidSystemTest):
         ADS.clear()
 
     def runTest(self):
-        wish = WishSX(vanadium_runno=19612, ext=".nxs")  # load .nxs that only includes spectra nums 1-19461
+        wish = WishSX(vanadium_runno=19612, file_ext=".nxs")  # load .nxs that only includes spectra nums 1-19461
         wish.process_vanadium()
         # select subset of spectra for comparision
         ExtractSpectra(InputWorkspace="WISH00019612", OutputWorkspace="WISH00019612_spec", WorkspaceIndexList="500,2500,10000")
 
     def validate(self):
         return "WISH00019612_spec", "WISH00019612_processed_van_spectra.nxs"
+
+
+class WISHFindPeaksAndIntegrateUsingClassMethodsTest(MantidSystemTest):
+    """
+    This tests the processing of the vanadium run used to correct for detector efficiency
+    """
+
+    def cleanup(self):
+        ADS.clear()
+
+    def runTest(self):
+        ws = load_data_and_normalise("WISH00038237.raw", spectrumMax=38661)  # bank 1 & 2
+        # find peaks
+        peaks = WishSX.find_sx_peaks(ws, nstd=8)
+        WishSX.remove_peaks_on_detector_edge(peaks, nedge=16, ntubes=2)
+        # convert data to Q for integration
+        WishSX.mask_detector_edges(ws, nedge=16, ntubes=2)
+        wsMD = WishSX.convert_ws_to_MD(ws, frame="Q (lab frame)")
+        # integrate - needs instance
+        intPeaksMDArgs = {"ellipsoid": True, "fixQAxis": True, "fixMajorAxisLength": True, "useCentroid": True, "IntegrateIfOnEdge": True}
+        self.peaks_int = WishSX().integrate_peaks_MD_optimal_radius(wsMD, peaks, peaks + "_int", ws=ws, **intPeaksMDArgs)
+        self.peaks_int = SortPeaksWorkspace(
+            InputWorkspace=self.peaks_int, OutputWorkspace=self.peaks_int.name(), ColumnNameToSortBy="DetID", SortAscending=False
+        )
+
+    def validate(self):
+        self.assertEqual(self.peaks_int.getNumberPeaks(), 3)
+        pk = self.peaks_int.getPeak(0)
+        self.assertAlmostEqual(pk.getIntensity() / pk.getSigmaIntensity(), 8.3611, delta=1e-4)
 
 
 class WISHNormaliseDataAndCreateMDWorkspaceTest(MantidSystemTest):

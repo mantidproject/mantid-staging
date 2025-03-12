@@ -9,8 +9,9 @@
 #include "DllOption.h"
 #include "ui_DataSelector.h"
 
-#include "MantidQtWidgets/Common/AlgorithmRunner.h"
+#include "MantidAPI/AlgorithmRuntimeProps.h"
 #include "MantidQtWidgets/Common/MantidWidget.h"
+#include "MantidQtWidgets/Common/QtAlgorithmRunner.h"
 
 #include <QWidget>
 
@@ -60,7 +61,6 @@ class EXPORT_OPT_MANTIDQT_COMMON DataSelector : public API::MantidWidget {
 
   // These are global properties of data selector
   Q_PROPERTY(bool optional READ isOptional WRITE isOptional)
-  Q_PROPERTY(bool autoLoad READ willAutoLoad WRITE setAutoLoad)
   Q_PROPERTY(QString loadLabelText READ getLoadBtnText WRITE setLoadBtnText)
 
 public:
@@ -72,7 +72,7 @@ public:
   /// Get the workspace name from the list of files
   QString getWsNameFromFiles() const;
   /// Get the currently available file or workspace name
-  virtual QString getCurrentDataName() const;
+  virtual QString getCurrentDataName(bool const autoLoad = true) const;
   /// Sets which selector (file or workspace) is visible
   void setSelectorIndex(int index);
   /// Sets if the option to choose selector is visible
@@ -84,7 +84,7 @@ public:
   /// Get whether the workspace selector is currently being shown
   bool isWorkspaceSelectorVisible() const;
   /// Checks if widget is in a valid state
-  virtual bool isValid();
+  virtual bool isValid(bool const autoLoad = true);
   /// Get file problem, empty string means no error.
   QString getProblem() const;
   /// Read settings from the given group
@@ -95,10 +95,6 @@ public:
   bool isOptional() const;
   /// Sets if optional
   void isOptional(bool /*optional*/);
-  /// Gets will auto load
-  bool willAutoLoad() const;
-  /// Sets will auto load
-  void setAutoLoad(bool /*load*/);
   /// Check if the widget will show the load button
   bool willShowLoad();
   /// Set if the load button should be shown
@@ -107,6 +103,10 @@ public:
   QString getLoadBtnText() const;
   /// Sets the load button text
   void setLoadBtnText(const QString & /*text*/);
+  /// Sets the DataSelector to always load data inside a WorkspaceGroup
+  void setAlwaysLoadAsGroup(bool const loadAsGroup);
+  /// Set an extra property on the load algorithm before execution
+  void setLoadProperty(std::string const &propertyName, bool const value);
 
   // These are accessors/modifiers of the child FileFinderWidget
   /**
@@ -341,6 +341,8 @@ signals:
   void dataReady(const QString &wsname);
   /// Signal emitted when the load button is clicked
   void loadClicked();
+  /// Signal emitted when files are found and autoloaded
+  void filesAutoLoaded();
 
 protected:
   // Method for handling drop events
@@ -361,16 +363,20 @@ private slots:
 private:
   /// Attempt to automatically load a file
   void autoLoadFile(const QString &filenames);
+  /// Execute load algorithm
+  void executeLoadAlgorithm(std::string const &filename, std::string const &outputWorkspace);
   /// Member containing the widgets child widgets.
   Ui::DataSelector m_uiForm;
+  /// Extra load properties to set on the load algorithm before execution
+  Mantid::API::AlgorithmRuntimeProps m_loadProperties;
   /// Algorithm Runner used to run the load algorithm
-  MantidQt::API::AlgorithmRunner m_algRunner;
-  /// Flag to enable auto loading. By default this is set to true.
-  bool m_autoLoad;
+  MantidQt::API::QtAlgorithmRunner m_algRunner;
   /// Flag to show or hide the load button. By default this is set to true.
   bool m_showLoad;
   /// Flag if optional
   bool m_isOptional;
+  /// Flag to always load data, placing it inside a WorkspaceGroup, even if there is 1 entry
+  bool m_alwaysLoadAsGroup;
 };
 
 } /* namespace MantidWidgets */

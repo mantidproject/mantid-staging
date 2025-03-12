@@ -16,6 +16,7 @@
 #define NAME_MAX 260
 #endif /* _WIN32 */
 #include "MantidAPI/NumericAxis.h"
+#include "MantidDataObjects/EventWorkspace.h"
 #include "MantidDataObjects/PeaksWorkspace.h"
 #include "MantidDataObjects/RebinnedOutput.h"
 #include "MantidDataObjects/TableWorkspace.h"
@@ -118,10 +119,10 @@ void NexusFileIO::openNexusWrite(const std::string &fileName, NexusFileIO::optio
       g_log.error("Unable to open file " + fileName);
       throw Exception::FileError("Unable to open File:", fileName);
     }
+
     auto file = new ::NeXus::File(fileID, true);
-    // clang-format off
-    m_filehandle = std::shared_ptr< ::NeXus::File>(file);
-    // clang-format on
+
+    m_filehandle = std::shared_ptr<::NeXus::File>(file);
   }
 
   //
@@ -132,9 +133,9 @@ void NexusFileIO::openNexusWrite(const std::string &fileName, NexusFileIO::optio
   //
   if (mode == NXACC_RDWR) {
     size_t count = 0;
-    if (entryNumber.is_initialized()) {
+    if (entryNumber.has_value()) {
       // Use the entry number provided.
-      count = entryNumber.get();
+      count = entryNumber.value();
     } else {
       // Have to figure it our ourselves. Requires opening the exisitng file to
       // get the information via a search.
@@ -278,8 +279,9 @@ bool NexusFileIO::writeNxNote(const std::string &noteName, const std::string &au
  * Use writeNexusProcessedDataEvent if writing an EventWorkspace.
  */
 int NexusFileIO::writeNexusProcessedData2D(const API::MatrixWorkspace_const_sptr &localworkspace,
-                                           const bool &uniformSpectra, const std::vector<int> &indices,
-                                           const char *group_name, bool write2Ddata) const {
+                                           const bool &uniformSpectra, const bool &raggedSpectra,
+                                           const std::vector<int> &indices, const char *group_name,
+                                           bool write2Ddata) const {
   NXstatus status;
 
   // write data entry
@@ -291,8 +293,11 @@ int NexusFileIO::writeNexusProcessedData2D(const API::MatrixWorkspace_const_sptr
   const size_t nHist = localworkspace->getNumberHistograms();
   if (nHist < 1)
     return (2);
-  const size_t nSpectBins = localworkspace->y(0).size();
   const size_t nSpect = indices.size();
+  size_t nSpectBins = localworkspace->y(0).size();
+  if (raggedSpectra)
+    for (size_t i = 0; i < nSpect; i++)
+      nSpectBins = std::max(nSpectBins, localworkspace->y(indices[i]).size());
   int dims_array[2] = {static_cast<int>(nSpect), static_cast<int>(nSpectBins)};
 
   // Set the axis labels and values
@@ -403,7 +408,32 @@ int NexusFileIO::writeNexusProcessedData2D(const API::MatrixWorkspace_const_sptr
   }
 
   // write X data, as single array or all values if "ragged"
-  if (uniformSpectra) {
+  if (raggedSpectra) {
+    size_t max_x_size{0};
+    for (size_t i = 0; i < nSpect; i++)
+      max_x_size = std::max(max_x_size, localworkspace->x(indices[i]).size());
+    dims_array[0] = static_cast<int>(nSpect);
+    dims_array[1] = static_cast<int>(max_x_size);
+    NXmakedata(fileID, "axis1", NX_FLOAT64, 2, dims_array);
+    NXopendata(fileID, "axis1");
+    start[0] = 0;
+
+    // create vector of NaNs to fill invalid space at end of ragged array
+    std::vector<double> nans(max_x_size, std::numeric_limits<double>::quiet_NaN());
+
+    for (size_t i = 0; i < nSpect; i++) {
+      size_t nBins = localworkspace->x(indices[i]).size();
+      asize[1] = static_cast<int>(nBins);
+      NXputslab(fileID, localworkspace->x(indices[i]).rawData().data(), start, asize);
+      if (nBins < max_x_size) {
+        start[1] = asize[1];
+        asize[1] = static_cast<int>(max_x_size - nBins);
+        NXputslab(fileID, nans.data(), start, asize);
+        start[1] = 0;
+      }
+      start[0]++;
+    }
+  } else if (uniformSpectra) {
     dims_array[0] = static_cast<int>(localworkspace->x(0).size());
     NXmakedata(fileID, "axis1", NX_FLOAT64, 1, dims_array);
     NXopendata(fileID, "axis1");
@@ -963,9 +993,7 @@ int NexusFileIO::getWorkspaceSize(int &numberOfSpectra, int &numberOfChannels, i
 bool NexusFileIO::checkAttributeName(const std::string &target) const {
   // see if the given attribute name is in the current level
   // return true if it is.
-  // clang-format off
-  const std::vector< ::NeXus::AttrInfo> infos = m_filehandle->getAttrInfos();
-  // clang-format on
+  const std::vector<::NeXus::AttrInfo> infos = m_filehandle->getAttrInfos();
   return std::any_of(infos.cbegin(), infos.cend(), [&target](const auto &info) { return info.name == target; });
 }
 
@@ -1193,10 +1221,10 @@ int getNexusEntryTypes(const std::string &fileName, std::vector<std::string> &en
     NXopengroup(fileH, entry.c_str(), "NXentry");
     // loop through field names in this entry
     while ((NXgetnextentry(fileH, nxname, nxclass, &nxdatatype)) == NX_OK) {
-      std::string nxc(nxclass), nxn(nxname);
       // if a data field
-      if (nxc == "SDS")
+      if (std::string(nxclass) == "SDS") {
         // if one of the two names we are looking for
+        const std::string nxn(nxname);
         if (nxn == "definition" || nxn == "analysis") {
           NXopendata(fileH, nxname);
           stat = NXgetinfo(fileH, &rank, dims, &type);
@@ -1215,6 +1243,7 @@ int getNexusEntryTypes(const std::string &fileName, std::vector<std::string> &en
           NXclosegroup(fileH);
           break;
         }
+      }
     }
   }
   NXclose(&fileH);

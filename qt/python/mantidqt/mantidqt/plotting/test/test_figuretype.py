@@ -25,6 +25,9 @@ from mantidqt.plotting.figuretype import figure_type, FigureType
 
 
 class FigureTypeTest(TestCase):
+    def tearDown(self):
+        plt.close("all")
+
     def test_figure_type_empty_figure_returns_empty(self):
         self.assertEqual(FigureType.Empty, figure_type(plt.figure()))
 
@@ -36,6 +39,11 @@ class FigureTypeTest(TestCase):
         ax = plt.subplot(111)
         ax.plot([1])
         self.assertEqual(FigureType.Line, figure_type(ax.figure))
+
+    def test_line_plot_returns_line_when_ax_specified(self):
+        ax = plt.subplot(111)
+        ax.plot(range(3))
+        self.assertEqual(FigureType.Line, figure_type(ax.figure, ax))
 
     def test_error_plot_returns_error(self):
         ax = plt.subplot(111)

@@ -8,13 +8,12 @@
 import unittest
 from testhelpers import assertRaisesNothing
 
-from LoadCIF import SpaceGroupBuilder, UnitCellBuilder, AtomListBuilder, UBMatrixBuilder, CrystalStructureBuilder
+from LoadCIF import SpaceGroupBuilder, UnitCellBuilder, AtomListBuilder, UBMatrixBuilder
 
 from mantid.api import AlgorithmFactory
 from mantid.geometry import UnitCell
 
 import numpy as np
-import sys
 
 
 def merge_dicts(lhs, rhs):
@@ -47,6 +46,9 @@ class SpaceGroupBuilderTest(unittest.TestCase):
         self.assertEqual(self.builder._getSpaceGroupFromString(merge_dicts(valid_new, valid_old)), "P m -3 m")
         self.assertEqual(self.builder._getSpaceGroupFromString(merge_dicts(valid_new, valid_old_different)), "P m -3 m")
         self.assertEqual(self.builder._getSpaceGroupFromString(merge_dicts(valid_new, invalid_old)), "P m -3 m")
+
+    def test_getSpaceGroupFromString_valid_correct_add_inversion(self):
+        self.assertEqual(self.builder._getSpaceGroupFromString({"_space_group_name_h-m_alt": "F m 3 m"}), "F m -3 m")
 
     def test_getSpaceGroupFromString_invalid(self):
         valid_old = {"_symmetry_space_group_name_h-m": "P m -3 m"}

@@ -74,21 +74,21 @@ class SimpleShapeMonteCarloAbsorption(DataProcessorAlgorithm):
         self.declareProperty(
             name="CoherentXSection",
             defaultValue=Property.EMPTY_DBL,
-            doc="The coherent cross section of the sample in barns. It can be used instead of the" "Chemical Formula.",
+            doc="The coherent cross section of the sample in barns. It can be used instead of the Chemical Formula.",
         )
         self.setPropertySettings("CoherentXSection", material_defined_prop)
 
         self.declareProperty(
             name="IncoherentXSection",
             defaultValue=Property.EMPTY_DBL,
-            doc="The incoherent cross section of the sample in barns. It can be used instead of the" "Chemical Formula.",
+            doc="The incoherent cross section of the sample in barns. It can be used instead of the Chemical Formula.",
         )
         self.setPropertySettings("IncoherentXSection", material_defined_prop)
 
         self.declareProperty(
             name="AttenuationXSection",
             defaultValue=Property.EMPTY_DBL,
-            doc="The absorption cross section of the sample in barns. It can be used instead of the" "Chemical Formula.",
+            doc="The absorption cross section of the sample in barns. It can be used instead of the Chemical Formula.",
         )
         self.setPropertySettings("AttenuationXSection", material_defined_prop)
 
@@ -217,7 +217,6 @@ class SimpleShapeMonteCarloAbsorption(DataProcessorAlgorithm):
         )
 
     def PyExec(self):
-
         self.log().warning("SimpleShapeMonteCarloAbsorption is deprecated, please use PaalmanPingsMonteCarloAbsorption instead.")
 
         # setup progress reporting
@@ -316,7 +315,6 @@ class SimpleShapeMonteCarloAbsorption(DataProcessorAlgorithm):
         self.setProperty("OutputWorkspace", output_ws)
 
     def _setup(self):
-
         # basic options
         self._input_ws = self.getProperty("InputWorkspace").value
         self._material_defined = self.getProperty("MaterialAlreadyDefined").value
@@ -360,7 +358,6 @@ class SimpleShapeMonteCarloAbsorption(DataProcessorAlgorithm):
         self._output_ws = self.getPropertyValue("OutputWorkspace")
 
     def validateInputs(self):
-
         self._setup()
         issues = dict()
 

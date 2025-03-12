@@ -81,7 +81,7 @@ class FermiChopper(object):
     Class which represents a Fermi chopper package
     """
 
-    __allowed_var_names = ["name", "pslit", "pslat", "radius", "rho", "tjit", "fluxcorr", "isPi"]
+    __allowed_var_names = ["name", "pslit", "pslat", "radius", "rho", "tjit", "fluxcorr", "isPi", "ei_limits"]
 
     def __init__(self, inval=None):
         wrap_attributes(self, inval, self.__allowed_var_names)
@@ -100,6 +100,14 @@ class FermiChopper(object):
         """Calculates the chopper transmission"""
         dslat = (self.pslit + self.pslat) / 1000
         return Chop.achop(Ei, freq, dslat, self.pslit / 1000.0, self.radius / 1000.0, self.rho / 1000.0) / dslat
+
+    @property
+    def emin(self):
+        return self.ei_limits[0] if hasattr(self, "ei_limits") else 0.1
+
+    @property
+    def emax(self):
+        return self.ei_limits[1] if hasattr(self, "ei_limits") else 1000.0
 
 
 class ChopperSystem(object):
@@ -127,6 +135,7 @@ class ChopperSystem(object):
         "flux_ref_slot",
         "flux_ref_freq",
         "frequency_names",
+        "phaseOffset",
     ]
 
     def __init__(self, inval=None):
@@ -160,6 +169,7 @@ class ChopperSystem(object):
         self.isFermi = False
         self.isPhaseIndependent = []
         self.defaultPhase = []
+        self.phaseOffset = None
         self.phaseNames = []
         for idx, chopper in enumerate(self.choppers):
             self.distance.append(chopper["distance"])
@@ -182,6 +192,8 @@ class ChopperSystem(object):
                 self.numDisk.append(2 if ("isDouble" in chopper and chopper["isDouble"]) else 1)
                 self.isPhaseIndependent.append(True if ("isPhaseIndependent" in chopper and chopper["isPhaseIndependent"]) else False)
                 self.defaultPhase.append(chopper["defaultPhase"] if "defaultPhase" in chopper else 0)
+                if "phaseOffset" in chopper:
+                    self.phaseOffset = chopper["phaseOffset"]
                 self.phaseNames.append(chopper["phaseName"] if "phaseName" in chopper else "Chopper %d phase delay time" % (idx))
         if not any(self.slot_ang_pos):
             self.slot_ang_pos = None
@@ -221,7 +233,7 @@ class ChopperSystem(object):
             self._variant_defaults[key] = copy.deepcopy(getattr(self, key))
         if "_variant" not in self.__dict__:
             self._default_variant = list(self.variants.keys())[0]
-            warnings.warn("No default variants defined. Using " "%s" " as default" % (self._default_variant), SyntaxWarning)
+            warnings.warn("No default variants defined. Using %s as default" % (self._default_variant), SyntaxWarning)
             self.variant = self._default_variant
 
     def setChopper(self, *args, **kwargs):
@@ -275,6 +287,10 @@ class ChopperSystem(object):
 
     def setEi(self, Ei):
         """Sets the (focussed) incident energy"""
+        emin = max(self.emin, self.packages[self.package].emin if self.isFermi else 0)
+        emax = min(self.emax, self.packages[self.package].emax if self.isFermi else np.inf)
+        if Ei < emin or Ei > emax:
+            raise ValueError(f"Ei={Ei} is outside limits [{emin}, {emax}]")
         self.ei = Ei
 
     def getEi(self):
@@ -403,7 +419,9 @@ class ChopperSystem(object):
         """Private method to calculate resolution for given Ei from chopper opening times"""
         Ei = _check_input(self, Ei_in)
         if "_saved_state" not in self.__dict__ or (self._saved_state[0] != self._get_state(Ei)):
-            Eis, all_times, chop_times, lastChopDist, lines = MulpyRep.calcChopTimes(Ei, self._long_frequency, self._instpar, self.phase)
+            Eis, all_times, chop_times, lastChopDist, lines = MulpyRep.calcChopTimes(
+                Ei, self._long_frequency, self._instpar, self.phase, self.phaseOffset
+            )
             Eis, lines = self._removeLowIntensityReps(Eis, lines, Ei)
             self._saved_state = [self._get_state(Ei), Eis, chop_times, lastChopDist, lines, all_times]
         else:
@@ -475,7 +493,7 @@ class ChopperSystem(object):
         if value not in self.packages.keys():
             ky = [k for k in self.packages.keys() if str(value).upper() == k.upper()]
             if not ky:
-                raise ValueError("Fermi package " "%s" " not recognised. Allowed values are: %s" % (value, ", ".join(self.packages.keys())))
+                raise ValueError("Fermi package %s not recognised. Allowed values are: %s" % (value, ", ".join(self.packages.keys())))
             else:
                 value = ky[0]
         self._package = value
@@ -500,7 +518,7 @@ class ChopperSystem(object):
         if value not in self.variants.keys():
             ky = [k for k in self.variants.keys() if str(value).upper() == k.upper()]
             if not ky:
-                raise ValueError("Variant " "%s" " not recognised. Allowed values are: %s" % (value, ", ".join(self.variants.keys())))
+                raise ValueError("Variant %s not recognised. Allowed values are: %s" % (value, ", ".join(self.variants.keys())))
             else:
                 value = ky[0]
         for prop in self.variants[value]:
@@ -552,9 +570,12 @@ class Moderator(object):
 
     def __init__(self, inval=None):
         wrap_attributes(self, inval, self.__allowed_var_names)
+        self.flux_units = "n/cm^2/s"
         if hasattr(self, "measured_flux") and self.measured_flux:
             if "scale_factor" in self.measured_flux:
                 self.measured_flux["flux"] = np.array(self.measured_flux["flux"]) * float(self.measured_flux["scale_factor"])
+            if "units" in self.measured_flux:
+                self.flux_units = self.measured_flux["units"]
             idx = np.argsort(self.measured_flux["wavelength"])
             wavelength = np.array(self.measured_flux["wavelength"])[idx]
             flux = np.array(self.measured_flux["flux"])[idx]
@@ -632,8 +653,10 @@ class Moderator(object):
         """Interpolates flux from a table of measured flux"""
         if not hasattr(self, "flux_interp"):
             raise AttributeError("This instrument does not have a table of measured flux")
-        wavelength = [min(max(l, self.fmn), self.fmx) for l in np.sqrt(E2L / np.array(Ei if hasattr(Ei, "__len__") else [Ei]))]
-        return self.flux_interp(wavelength)
+        wavelengths = [
+            min(max(wavelength, self.fmn), self.fmx) for wavelength in np.sqrt(E2L / np.array(Ei if hasattr(Ei, "__len__") else [Ei]))
+        ]
+        return self.flux_interp(wavelengths[0])
 
     @property
     def theta_m(self):
@@ -852,8 +875,8 @@ class Instrument(object):
         Ei, _ = _check_input(self.chopper_system, Ei_in, frequency)
         Etrans = np.array(Etrans if np.shape(Etrans) else [Etrans])
         if frequency:
-            oldfreq = self.frequency
-            self.frequency = frequency
+            oldfreq = self.chopper_system.frequency
+            self.chopper_system.frequency = frequency
         tsqmod = self.moderator.getWidthSquared(Ei)
         tsqchp = self.chopper_system.getWidthSquared(Ei)
         tsqjit = self.tjit**2
@@ -868,7 +891,7 @@ class Instrument(object):
         tsqchp = tsqchp[0]
         tsqmodchop = np.array([tsqmod, tsqchp, x0])
         # Propagate the time widths to the sample position
-        omega = self.frequency[0] * 2 * np.pi
+        omega = self.chopper_system.frequency[0] * 2 * np.pi
         vi = E2V * np.sqrt(Ei)
         vf = E2V * np.sqrt(Ei - Etrans)
         vratio = (vi / vf) ** 3
@@ -900,7 +923,7 @@ class Instrument(object):
             vsqvan += tsqsam
             outdic["sample"] = tsqsam
         if frequency:
-            self.frequency = oldfreq
+            self.chopper_system.frequency = oldfreq
         return vsqvan, outdic, tsqmodchop
 
     @property
@@ -981,9 +1004,8 @@ class Instrument(object):
             try:
                 etrans = float(etrans)
             except TypeError:
-                etrans = np.asfarray(etrans)
+                etrans = np.asarray(etrans, dtype=float)
         res = obj.getResolution(etrans)
-
         if return_polynomial:
 
             def cubic(x, x_0, x_1, x_2, x_3):

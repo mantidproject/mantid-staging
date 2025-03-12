@@ -1,5 +1,4 @@
 set(SRC_FILES
-    src/H5ForwardCompatibility.cpp
     src/Hdf5Version.cpp
     src/InstrumentBuilder.cpp
     src/JSONGeometryParser.cpp
@@ -14,7 +13,6 @@ set(SRC_FILES
 
 set(INC_FILES
     inc/MantidNexusGeometry/AbstractLogger.h
-    inc/MantidNexusGeometry/H5ForwardCompatibility.h
     inc/MantidNexusGeometry/Hdf5Version.h
     inc/MantidNexusGeometry/InstrumentBuilder.h
     inc/MantidNexusGeometry/JSONGeometryParser.h
@@ -67,7 +65,7 @@ set_property(TARGET NexusGeometry PROPERTY FOLDER "MantidFramework")
 target_link_libraries(
   NexusGeometry
   PUBLIC Mantid::Geometry Mantid::API
-  PRIVATE Mantid::Kernel Mantid::Json Mantid::Indexing Boost::filesystem
+  PRIVATE Mantid::Kernel Mantid::Json Mantid::Indexing
 )
 
 # Add the unit tests directory

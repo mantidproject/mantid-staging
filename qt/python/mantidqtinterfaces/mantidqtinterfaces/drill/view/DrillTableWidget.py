@@ -7,7 +7,7 @@
 
 from qtpy.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QStyle, QAbstractItemView, QMessageBox
 from qtpy.QtGui import QBrush, QColor
-from qtpy.QtCore import *
+from qtpy.QtCore import Qt
 
 from .DrillHeaderView import DrillHeaderView
 from .DrillItemDelegate import DrillItemDelegate
@@ -478,9 +478,7 @@ class DrillTableWidget(QTableWidget):
                 if self.getCellContents(j, i):
                     empty = False
             if not empty:
-                q = QMessageBox.question(
-                    self, "Column is not empty", "Hiding " "the column will erase its content. " "Do you want to continue?"
-                )
+                q = QMessageBox.question(self, "Column is not empty", "Hiding the column will erase its content. Do you want to continue?")
                 if q == QMessageBox.Yes:
                     for j in range(self.rowCount()):
                         self.setCellContents(j, i, "")

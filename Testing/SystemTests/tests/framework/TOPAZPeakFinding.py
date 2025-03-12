@@ -10,10 +10,13 @@ System test that loads TOPAZ single-crystal data,
 converts to Q space, finds peaks and indexes
 them.
 """
+
 import systemtesting
 import numpy
-from mantid.simpleapi import *
+from mantid.api import mtd
+from mantid.simpleapi import BinMD, ConvertToDiffractionMDWorkspace, CopySample, FindPeaksMD, FindUBUsingFFT, IndexPeaks, LoadEventNexus
 from mantid.dataobjects import PeaksWorkspace, LeanElasticPeaksWorkspace
+from mantid.geometry import UnitCell
 
 
 class TOPAZPeakFinding(systemtesting.MantidSystemTest):
@@ -22,6 +25,8 @@ class TOPAZPeakFinding(systemtesting.MantidSystemTest):
         return 2000
 
     def runTest(self):
+        unitcell_exp = UnitCell(4.714, 6.06, 10.40)  # orthorhombic
+
         # Load then convert to Q in the lab frame
         LoadEventNexus(Filename=r"TOPAZ_3132_event.nxs", OutputWorkspace="topaz_3132")
         ConvertToDiffractionMDWorkspace(
@@ -113,12 +118,12 @@ class TOPAZPeakFinding(systemtesting.MantidSystemTest):
         w = mtd["topaz_3132"]
         s = w.sample()
         ol = s.getOrientedLattice()
-        self.assertDelta(ol.a(), 4.714, 0.01, "Correct lattice a value not found.")
-        self.assertDelta(ol.b(), 6.06, 0.01, "Correct lattice b value not found.")
-        self.assertDelta(ol.c(), 10.42, 0.01, "Correct lattice c value not found.")
-        self.assertDelta(ol.alpha(), 90, 0.4, "Correct lattice angle alpha value not found.")
-        self.assertDelta(ol.beta(), 90, 0.4, "Correct lattice angle beta value not found.")
-        self.assertDelta(ol.gamma(), 90, 0.4, "Correct lattice angle gamma value not found.")
+        self.assertDelta(ol.a(), unitcell_exp.a(), 0.01, "Correct lattice a value not found.")
+        self.assertDelta(ol.b(), unitcell_exp.b(), 0.01, "Correct lattice b value not found.")
+        self.assertDelta(ol.c(), unitcell_exp.c(), 0.01, "Correct lattice c value not found.")
+        self.assertDelta(ol.alpha(), unitcell_exp.alpha(), 0.4, "Correct lattice angle alpha value not found.")
+        self.assertDelta(ol.beta(), unitcell_exp.beta(), 0.4, "Correct lattice angle beta value not found.")
+        self.assertDelta(ol.gamma(), unitcell_exp.gamma(), 0.4, "Correct lattice angle gamma value not found.")
 
         # Compare new and old UBs
         newUB = numpy.array(mtd["topaz_3132"].sample().getOrientedLattice().getUB())
@@ -128,7 +133,7 @@ class TOPAZPeakFinding(systemtesting.MantidSystemTest):
             # This compares each column, allowing old == new OR old == -new
             if not numpy.all(diff[:, c]):
                 raise Exception(
-                    "More than 0.001 difference between UB matrices: Q (lab frame):\n" "%s\nQ (sample frame):\n%s" % (originalUB, newUB)
+                    "More than 0.001 difference between UB matrices: Q (lab frame):\n%s\nQ (sample frame):\n%s" % (originalUB, newUB)
                 )
 
         # repeat but use LeanElasticPeaks
@@ -155,12 +160,12 @@ class TOPAZPeakFinding(systemtesting.MantidSystemTest):
         w = mtd["topaz_3132"]
         s = w.sample()
         ol = s.getOrientedLattice()
-        self.assertDelta(ol.a(), 4.714, 0.01, "Correct lattice a value not found.")
-        self.assertDelta(ol.b(), 6.06, 0.01, "Correct lattice b value not found.")
-        self.assertDelta(ol.c(), 10.42, 0.01, "Correct lattice c value not found.")
-        self.assertDelta(ol.alpha(), 90, 0.4, "Correct lattice angle alpha value not found.")
-        self.assertDelta(ol.beta(), 90, 0.4, "Correct lattice angle beta value not found.")
-        self.assertDelta(ol.gamma(), 90, 0.4, "Correct lattice angle gamma value not found.")
+        self.assertDelta(ol.a(), unitcell_exp.a(), 0.01, "Correct lattice a value not found.")
+        self.assertDelta(ol.b(), unitcell_exp.b(), 0.01, "Correct lattice b value not found.")
+        self.assertDelta(ol.c(), unitcell_exp.c(), 0.01, "Correct lattice c value not found.")
+        self.assertDelta(ol.alpha(), unitcell_exp.alpha(), 0.4, "Correct lattice angle alpha value not found.")
+        self.assertDelta(ol.beta(), unitcell_exp.beta(), 0.4, "Correct lattice angle beta value not found.")
+        self.assertDelta(ol.gamma(), unitcell_exp.gamma(), 0.4, "Correct lattice angle gamma value not found.")
 
         # Compare new and old UBs
         newUB = numpy.array(mtd["topaz_3132"].sample().getOrientedLattice().getUB())
@@ -170,7 +175,7 @@ class TOPAZPeakFinding(systemtesting.MantidSystemTest):
             # This compares each column, allowing old == new OR old == -new
             if not numpy.all(diff[:, c]):
                 raise Exception(
-                    "More than 0.001 difference between UB matrices: Q (lab frame):\n" "%s\nQ (sample frame):\n%s" % (originalUB, newUB)
+                    "More than 0.001 difference between UB matrices: Q (lab frame):\n%s\nQ (sample frame):\n%s" % (originalUB, newUB)
                 )
 
     def doValidation(self):

@@ -13,6 +13,7 @@
 #include "MantidGeometry/Instrument.h"
 #include "MantidGeometry/Instrument/DetectorInfo.h"
 #include "MantidKernel/PhysicalConstants.h"
+#include "MantidKernel/WarningSuppressions.h"
 
 namespace Mantid::Algorithms {
 
@@ -22,10 +23,18 @@ DECLARE_ALGORITHM(SofQWCentre)
 using namespace Kernel;
 using namespace API;
 
+/// Default constructor
+SofQWCentre::SofQWCentre() {
+  useAlgorithm("SofQWNormalisedPolygon");
+  deprecatedDate("2024-11-07");
+}
+
 /**
  * Create the input properties
  */
 void SofQWCentre::init() { SofQW::createCommonInputProperties(*this); }
+
+GNU_DIAG_OFF("dangling-reference")
 
 void SofQWCentre::exec() {
   using namespace Geometry;
@@ -149,6 +158,8 @@ void SofQWCentre::exec() {
     }
     prog.report();
   }
+
+  GNU_DIAG_ON("dangling-reference")
 
   // If the input workspace was a distribution, need to divide by q bin width
   if (inputWorkspace->isDistribution())

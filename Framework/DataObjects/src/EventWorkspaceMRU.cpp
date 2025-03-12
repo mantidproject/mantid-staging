@@ -5,7 +5,6 @@
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
 #include "MantidDataObjects/EventWorkspaceMRU.h"
-#include "MantidKernel/System.h"
 
 #include <algorithm>
 
@@ -141,7 +140,8 @@ void EventWorkspaceMRU::insertE(size_t thread_num, EType data, const EventList *
  * @param index :: index to delete.
  */
 void EventWorkspaceMRU::deleteIndex(const EventList *index) {
-  {
+  // acquire lock if the buffer isn't empty
+  if (!m_bufferedDataE.empty()) {
     Poco::ScopedReadRWLock _lock1(m_changeMruListsMutexE);
     for (auto &data : m_bufferedDataE) {
       if (data) {
@@ -149,10 +149,13 @@ void EventWorkspaceMRU::deleteIndex(const EventList *index) {
       }
     }
   }
-  Poco::ScopedReadRWLock _lock2(m_changeMruListsMutexY);
-  for (auto &data : m_bufferedDataY) {
-    if (data) {
-      data->deleteIndex(reinterpret_cast<std::uintptr_t>(index));
+  // acquire lock if the buffer isn't empty
+  if ((!m_bufferedDataY.empty())) {
+    Poco::ScopedReadRWLock _lock2(m_changeMruListsMutexY);
+    for (auto &data : m_bufferedDataY) {
+      if (data) {
+        data->deleteIndex(reinterpret_cast<std::uintptr_t>(index));
+      }
     }
   }
 }

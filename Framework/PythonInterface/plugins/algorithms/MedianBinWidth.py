@@ -11,7 +11,6 @@ import roundinghelper
 
 
 class MedianBinWidth(PythonAlgorithm):
-
     _PROP_BIN_WIDTH = "BinWidth"
     _PROP_INPUT_WS = "InputWorkspace"
 
@@ -31,7 +30,7 @@ class MedianBinWidth(PythonAlgorithm):
         """
         Return algorithm's summary.
         """
-        return "Calculates the average of workspace's histograms'" " median bin widths."
+        return "Calculates the average of workspace's histograms' median bin widths."
 
     def version(self):
         """

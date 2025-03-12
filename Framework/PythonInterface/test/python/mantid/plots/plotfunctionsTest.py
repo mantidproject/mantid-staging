@@ -15,7 +15,7 @@ from unittest import mock
 
 import matplotlib
 
-matplotlib.use("AGG")  # noqa
+matplotlib.use("AGG")
 import matplotlib.pyplot as plt
 
 # local imports
@@ -265,9 +265,7 @@ class FunctionsTest(unittest.TestCase):
         ws = self._test_md_ws
         plot_md_histo_ws([ws], fig=fig, overplot=True)
         ax = plt.gca()
-        self.assertEqual(
-            len(ax.lines), 2, msg=f"With overplot on an existing fig, there shall be 2 lines," f"but not {len(ax.lines)} lines."
-        )
+        self.assertEqual(len(ax.lines), 2, msg=f"With overplot on an existing fig, there shall be 2 lines,but not {len(ax.lines)} lines.")
 
     def test_superplot_bin_plot(self):
         fig = plt.gcf()

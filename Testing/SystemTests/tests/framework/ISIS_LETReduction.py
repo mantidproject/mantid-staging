@@ -5,9 +5,14 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
-""" Sample LET reduction script """
+"""Sample LET reduction script"""
 
-from Direct.ReductionWrapper import *
+from Direct.AbsorptionShapes import Cylinder
+from Direct.DirectEnergyConversion import DirectEnergyConversion
+from Direct.ReductionWrapper import AdvancedProperties, iliad, MainProperties, MethodType, ReductionWrapper
+from mantid.api import mtd
+from mantid.kernel import config, PropertyManager
+from mantid.simpleapi import ConjoinWorkspaces, LoadEventNexus, LoadRaw, Rebin, RenameWorkspace
 
 try:
     import reduce_vars as web_var
@@ -123,7 +128,7 @@ class ReduceLET_OneRep(ReductionWrapper):
         Rebin(InputWorkspace=sample_ws, OutputWorkspace=sample_ws, Params=tbin, PreserveEvents=True)
         Rebin(InputWorkspace=monitors_ws, OutputWorkspace=monitors_ws, Params=tbin, PreserveEvents=True)
 
-        ConjoinWorkspaces(InputWorkspace1=sample_ws, InputWorkspace2=monitors_ws)
+        ConjoinWorkspaces(InputWorkspace1=sample_ws, InputWorkspace2=monitors_ws, CheckMatchingBins=False)
         prop.bkgd_range = [int(t_elastic), int(tbin[2])]
 
         ebinstring = str(energybin[0]) + "," + str(energybin[1]) + "," + str(energybin[2])

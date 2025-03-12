@@ -131,44 +131,44 @@ PropertyManager &PropertyManager::operator+=(const PropertyManager &rhs) {
 /**
  * Filter the managed properties by the given boolean property mask. It replaces
  * all time series properties with filtered time series properties
- * @param filter :: A boolean time series to filter each property on
+ * @param logFilter :: A LogFilter instance to filter each log on
  * @param excludedFromFiltering :: A string list of properties that
  * will be excluded from filtering
  */
-void PropertyManager::filterByProperty(const Kernel::TimeSeriesProperty<bool> &filter,
+void PropertyManager::filterByProperty(Mantid::Kernel::LogFilter *logFilter,
                                        const std::vector<std::string> &excludedFromFiltering) {
+  auto filter = logFilter->filter();
   for (auto &orderedProperty : m_orderedProperties) {
-    if (std::find(excludedFromFiltering.cbegin(), excludedFromFiltering.cend(), orderedProperty->name()) !=
+    auto const propName = orderedProperty->name();
+    if (std::find(excludedFromFiltering.cbegin(), excludedFromFiltering.cend(), propName) !=
         excludedFromFiltering.cend()) {
       // this log should be excluded from filtering
       continue;
     }
 
-    Property *currentProp = orderedProperty;
-    if (auto doubleSeries = dynamic_cast<TimeSeriesProperty<double> *>(currentProp)) {
+    if (auto doubleSeries = dynamic_cast<TimeSeriesProperty<double> *>(orderedProperty)) {
       // don't filter the invalid values filters
-      if (PropertyManager::isAnInvalidValuesFilterLog(currentProp->name()))
+      if (PropertyManager::isAnInvalidValuesFilterLog(propName))
         break;
       std::unique_ptr<Property> filtered(nullptr);
-      if (this->existsProperty(PropertyManager::getInvalidValuesFilterLogName(currentProp->name()))) {
+      if (this->existsProperty(PropertyManager::getInvalidValuesFilterLogName(propName))) {
 
         // add the filter to the passed in filters
-        auto logFilter = std::make_unique<LogFilter>(filter);
-        auto filterProp = getPointerToProperty(PropertyManager::getInvalidValuesFilterLogName(currentProp->name()));
+        auto filterProp = getPointerToProperty(PropertyManager::getInvalidValuesFilterLogName(propName));
         auto tspFilterProp = dynamic_cast<TimeSeriesProperty<bool> *>(filterProp);
         if (!tspFilterProp)
           break;
         logFilter->addFilter(*tspFilterProp);
 
         filtered = std::make_unique<FilteredTimeSeriesProperty<double>>(doubleSeries, *logFilter->filter());
-      } else if (filter.size() > 0) {
+      } else if (filter->size() > 0) {
         // attach the filter to the TimeSeriesProperty, thus creating  the FilteredTimeSeriesProperty<double>
-        filtered = std::make_unique<FilteredTimeSeriesProperty<double>>(doubleSeries, filter);
+        filtered = std::make_unique<FilteredTimeSeriesProperty<double>>(doubleSeries, *filter);
       }
       if (filtered) {
         // Now replace in the map
         orderedProperty = filtered.get();
-        this->m_properties[createKey(currentProp->name())] = std::move(filtered);
+        this->m_properties[createKey(propName)] = std::move(filtered);
       }
     }
   }
@@ -177,9 +177,10 @@ void PropertyManager::filterByProperty(const Kernel::TimeSeriesProperty<bool> &f
 /**
  * Create a partial copy of this object such that every time series property is cloned according to the input TimeROI.
  * A partially cloned time series property should include all time values enclosed by the ROI regions,
- * each defined as [roi_start,roi_end), plus the values immediately before and after an ROI region, if available.
+ * each defined as [roi_begin,roi_end], plus the values immediately before and after an ROI region, if available.
  * Properties that are not time series will be cloned with no changes.
- * @param timeROI :: a series of time regions used to determine which time series values should be included in the copy.
+ * @param timeROI :: time region of interest, i.e. time boundaries used to determine which time series values should be
+ * included in the copy.
  */
 PropertyManager *PropertyManager::cloneInTimeROI(const Kernel::TimeROI &timeROI) {
   PropertyManager *newMgr = new PropertyManager();
@@ -198,7 +199,7 @@ PropertyManager *PropertyManager::cloneInTimeROI(const Kernel::TimeROI &timeROI)
 }
 
 /**
- * For time series properties, remove time values outside of TimeROI regions, each defined as [roi_start,roi_stop).
+ * For time series properties, remove time values outside of TimeROI regions, each defined as [roi_begin,roi_end].
  * However, keep the values immediately before and after each ROI region, if available.
  * @param timeROI :: a series of time regions used to determine which values to remove or to keep
  */

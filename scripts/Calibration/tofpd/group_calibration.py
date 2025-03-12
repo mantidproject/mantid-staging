@@ -112,7 +112,7 @@ def cc_calibrate_groups(
 
     :param data_ws: Input calibration raw data (in TOF), assumed to already be correctly masked
     :param group_ws: grouping workspace, e.g. output from LoadDetectorsGroupingFile
-    :param output_basename: Optional name to use for temporay and output workspace
+    :param output_basename: Optional name to use for temporary and output workspace
     :param previous_calibration: Optional previous diffcal workspace
     :param Step: step size for binning of data and input for GetDetectorOffsets, default 0.001
     :param DReference: Derefernce parameter for GetDetectorOffsets, default 1.2615
@@ -138,13 +138,13 @@ def cc_calibrate_groups(
         # Figure out input parameters for CrossCorrelate and GetDetectorOffset, specifically
         # for those parameters for which both a single value and a list is accepted. If a
         # list is given, that means different parameter setup will be used for different groups.
-        Xmin_group = Xmin[int(group) - 1] if type(Xmin) == list else Xmin
-        Xmax_group = Xmax[int(group) - 1] if type(Xmax) == list else Xmax
-        MDS_group = MaxDSpaceShift[int(group) - 1] if type(MaxDSpaceShift) == list else MaxDSpaceShift
-        DRef_group = DReference[int(group) - 1] if type(DReference) == list else DReference
-        OT_group = OffsetThreshold[int(group) - 1] if type(OffsetThreshold) == list else OffsetThreshold
-        pf_group = PeakFunction[int(group) - 1] if type(PeakFunction) == list else PeakFunction
-        snpts_group = SmoothNPoints[int(group) - 1] if type(SmoothNPoints) == list else SmoothNPoints
+        Xmin_group = Xmin[int(group) - 1] if isinstance(Xmin, list) else Xmin
+        Xmax_group = Xmax[int(group) - 1] if isinstance(Xmax, list) else Xmax
+        MDS_group = MaxDSpaceShift[int(group) - 1] if isinstance(MaxDSpaceShift, list) else MaxDSpaceShift
+        DRef_group = DReference[int(group) - 1] if isinstance(DReference, list) else DReference
+        OT_group = OffsetThreshold[int(group) - 1] if isinstance(OffsetThreshold, list) else OffsetThreshold
+        pf_group = PeakFunction[int(group) - 1] if isinstance(PeakFunction, list) else PeakFunction
+        snpts_group = SmoothNPoints[int(group) - 1] if isinstance(SmoothNPoints, list) else SmoothNPoints
         cycling = OT_group < 1.0
 
         try:
@@ -357,6 +357,7 @@ def pdcalibration_groups(
             PeakWindow=PeakWindow,
             PeakWidthPercent=PeakWidthPercent,
             OutputCalibrationTable=f"{output_basename}_pd_diffcal",
+            MaskWorkspace=f"{output_basename}_pd_diffcal_mask",
             DiagnosticWorkspaces=f"{output_basename}_pd_diag",
         )
         if to_skip:
@@ -444,6 +445,7 @@ def pdcalib_for_powgen(
         PeakWindow=PeakWindow,
         PeakWidthPercent=PeakWidthPercent,
         OutputCalibrationTable="PDCalib",
+        MaskWorkspace="PDCalib_mask",
         DiagnosticWorkspaces="diag",
     )
     PDCalibration(
@@ -455,6 +457,7 @@ def pdcalib_for_powgen(
         PeakWindow=PeakWindow,
         PeakWidthPercent=PeakWidthPercent / 2.0,
         OutputCalibrationTable="PDCalib",
+        MaskWorkspace="PDCalib_mask",
         DiagnosticWorkspaces="diag",
     )
     PDCalibration(
@@ -466,6 +469,7 @@ def pdcalib_for_powgen(
         PeakWindow=PeakWindow,
         PeakWidthPercent=PeakWidthPercent / 2.0,
         OutputCalibrationTable=OutPDCalib,
+        MaskWorkspace="PDCalib_mask",
         DiagnosticWorkspaces=OutPDCalibDiag,
     )
     DeleteWorkspace("PDCalib")

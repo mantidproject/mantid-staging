@@ -7,11 +7,13 @@
 #  This file is part of the mantid package
 from collections.abc import Iterable
 import copy
+from enum import IntEnum
 from functools import wraps
 
 import numpy as np
 import re
 
+from cycler import cycler
 from matplotlib.axes import Axes
 from matplotlib.cbook import safe_masked_invalid
 from matplotlib.collections import Collection, PolyCollection
@@ -22,21 +24,27 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.table import Table
 from matplotlib.ticker import NullLocator
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from mantid import logger
 from mantid.api import AnalysisDataService as ads
+from mantid.api import MatrixWorkspace
 from mantid.plots import datafunctions, axesfunctions, axesfunctions3D
 from mantid.plots.legend import LegendProperties
 from mantid.plots.datafunctions import get_normalize_by_bin_width
-from mantid.plots.utility import artists_hidden, autoscale_on_update, legend_set_draggable, MantidAxType
+from mantid.plots.utility import artists_hidden, autoscale_on_update, legend_set_draggable, MantidAxType, get_plot_specific_properties
 
 
 WATERFALL_XOFFSET_DEFAULT, WATERFALL_YOFFSET_DEFAULT = 10, 20
 
+
 # -----------------------------------------------------------------------------
 # Decorators
 # -----------------------------------------------------------------------------
+class AxisArgType(IntEnum):
+    WORKSPACE = 0
+    LINE = 1
 
 
 def plot_decorator(func):
@@ -47,6 +55,8 @@ def plot_decorator(func):
         # Saves saving it on array objects
         if datafunctions.validate_args(*args, **kwargs):
             # Fill out kwargs with the values of args
+            kwargs["argType"] = AxisArgType.WORKSPACE
+
             kwargs["workspaces"] = args[0].name()
             kwargs["function"] = func_name
 
@@ -55,8 +65,9 @@ def plot_decorator(func):
             if "cmap" in kwargs and isinstance(kwargs["cmap"], Colormap):
                 kwargs["cmap"] = kwargs["cmap"].name
             self.creation_args.append(kwargs)
-        elif func_name == "axhline" or func_name == "axvline":
-            self.creation_args.append({"function": func_name, "args": args, "kwargs": kwargs})
+        elif func_name in ["axhline", "axvline"]:
+            new_creation_args = {"function": func_name, "args": args, "kwargs": kwargs, "argType": AxisArgType.LINE}
+            self.creation_args.append(new_creation_args)
 
         return func_value
 
@@ -145,7 +156,9 @@ class MantidAxes(Axes):
         """
         if not ignore_artists:
             ignore_artists = []
-        prop_cycler = ax._get_lines.prop_cycler  # tracks line color cycle
+
+        default_cycle_colours = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        number_of_mpl_lines = len(ax.get_lines())
         artists = ax.get_children()
         mantid_axes = ax.figure.add_subplot(111, projection="mantid", label="mantid")
         for artist in artists:
@@ -155,9 +168,23 @@ class MantidAxes(Axes):
                 except NotImplementedError:
                     pass
         mantid_axes.set_title(ax.get_title())
-        mantid_axes._get_lines.prop_cycler = prop_cycler
+
+        if number_of_mpl_lines > 0:
+            used_colors = default_cycle_colours[: (number_of_mpl_lines % len(default_cycle_colours)) + 1]
+            remaining_colors = default_cycle_colours[(number_of_mpl_lines % len(default_cycle_colours)) + 1 :]
+            default_cycle_colours = remaining_colors + used_colors
+
+        mantid_axes.set_prop_cycle(cycler(color=default_cycle_colours))
+
         ax.remove()
         return mantid_axes
+
+    def set_title(self, label, fontdict=None, *args, **kwargs):
+        if not fontdict:
+            font_props = self.title.get_fontproperties()
+            fontdict = {"fontsize": font_props.get_size(), "fontweight": font_props.get_weight(), "color": self.title.get_color()}
+
+        super().set_title(label, fontdict=fontdict, *args, **kwargs)
 
     @staticmethod
     def is_axis_of_type(axis_type, kwargs):
@@ -236,6 +263,10 @@ class MantidAxes(Axes):
                     if artist == ws_artist:
                         return ws_artists.is_normalized
 
+    def get_is_mdhisto_workspace_for_artist(self, artist) -> bool:
+        workspace, _ = self.get_artists_workspace_and_workspace_index(artist)
+        return (workspace is not None) and workspace.isMDHistoWorkspace()
+
     def track_workspace_artist(
         self,
         workspace,
@@ -304,7 +335,7 @@ class MantidAxes(Axes):
     def artists_workspace_has_errors(self, artist):
         """Check if the given artist's workspace has errors"""
         if artist not in self.get_tracked_artists():
-            raise ValueError("Artist '{}' is not tracked and so does not have " "an associated workspace.".format(artist))
+            raise ValueError("Artist '{}' is not tracked and so does not have an associated workspace.".format(artist))
         workspace, spec_num = self.get_artists_workspace_and_spec_num(artist)
         if artist.axes.creation_args[0].get("axis", None) == MantidAxType.BIN:
             if any([workspace.readE(i)[spec_num] != 0 for i in range(0, workspace.getNumberHistograms())]):
@@ -455,8 +486,11 @@ class MantidAxes(Axes):
         :param new_name : the new name of workspace
         :param old_name : the old name of workspace
         """
+
         for cargs in self.creation_args:
-            if cargs["workspaces"] == old_name:
+            argType = cargs["argType"]
+            # for workspace creation args, since lines dont have "workspaces"
+            if argType == AxisArgType.WORKSPACE and cargs["workspaces"] == old_name:
                 cargs["workspaces"] = new_name
         for ws_name, ws_artist_list in list(self.tracked_workspaces.items()):
             for ws_artist in ws_artist_list:
@@ -672,6 +706,8 @@ class MantidAxes(Axes):
             spec_num = self.get_spec_number_or_bin(workspace, kwargs)
             normalize_by_bin_width, kwargs = get_normalize_by_bin_width(workspace, self, **kwargs)
             is_normalized = normalize_by_bin_width or (hasattr(workspace, "isDistribution") and workspace.isDistribution())
+            if isinstance(workspace, MatrixWorkspace):
+                kwargs = get_plot_specific_properties(workspace, workspace.getPlotType(), kwargs)
             with autoscale_on_update(self, autoscale_on):
                 artist = self.track_workspace_artist(
                     workspace,
@@ -958,7 +994,7 @@ class MantidAxes(Axes):
                 for col in artist_orig.collections:
                     col.remove()
             if hasattr(artist_orig, "colorbar_cid"):
-                artist_orig.callbacksSM.disconnect(artist_orig.colorbar_cid)
+                artist_orig.callbacks.disconnect(artist_orig.colorbar_cid)
         # If the colormap has been overridden then it needs to be passed in at
         # creation time
         if "colors" not in kwargs:
@@ -1122,7 +1158,7 @@ class MantidAxes(Axes):
         for i in range(len(self.get_lines())):
             datafunctions.convert_single_line_to_waterfall(self, i, x_offset, y_offset)
 
-        if x_offset == 0 and y_offset == 0:
+        if x_offset == 0 and y_offset == 0 and self.is_waterfall():
             self.set_waterfall_fill(False)
             logger.information("x and y offset have been set to zero so the plot is no longer a waterfall plot.")
 
@@ -1136,6 +1172,13 @@ class MantidAxes(Axes):
             self.add_line(cap)
 
         datafunctions.set_waterfall_toolbar_options_enabled(self)
+
+        self.relim()
+        if not self.waterfall_has_fill():
+            # The mpl ax.fill method already makes an autoscale request for us,
+            # so we only need to do this if waterfall_update_fill hasn't been called
+            self.autoscale()
+
         self.get_figure().canvas.draw()
 
     def set_waterfall(self, state, x_offset=None, y_offset=None, fill=False):
@@ -1167,7 +1210,7 @@ class MantidAxes(Axes):
                 # that they can use the update_waterfall function to do this.
                 if x_offset != self.waterfall_x_offset or y_offset != self.waterfall_y_offset:
                     logger.information(
-                        "If your plot is already a waterfall plot you can use update_waterfall(x, y) to" " change its offset values."
+                        "If your plot is already a waterfall plot you can use update_waterfall(x, y) to change its offset values."
                     )
                 else:
                     # Nothing needs to be changed.
@@ -1179,7 +1222,7 @@ class MantidAxes(Axes):
                 datafunctions.set_initial_dimensions(self)
         else:
             if bool(x_offset) or bool(y_offset) or fill:
-                raise RuntimeError("You have set waterfall to false but have given a non-zero value for the offset or " "set fill to true.")
+                raise RuntimeError("You have set waterfall to false but have given a non-zero value for the offset or set fill to true.")
 
             if not self.is_waterfall():
                 # Nothing needs to be changed.
@@ -1270,7 +1313,7 @@ class MantidAxes(Axes):
         cb = colorbar
         cb.mappable = mappable
         mappable.colorbar = cb
-        mappable.colorbar_cid = mappable.callbacksSM.connect("changed", cb.update_normal)
+        mappable.colorbar_cid = mappable.callbacks.connect("changed", cb.update_normal)
         cb.update_normal(mappable)
 
     def _remove_matching_curve_from_creation_args(self, workspace_name, workspace_index, spec_num):
@@ -1324,6 +1367,10 @@ class MantidAxes3D(Axes3D):
     def __init__(self, *args, **kwargs):
         kwargs["auto_add_to_figure"] = False
         super().__init__(*args, **kwargs)
+        # By default, when right click is held the plot will zoom in and out.
+        # For Mantid plots right click will open a context menu instead
+        # Unassigning the zoom button avoids zoom becoming toggled after leaving the context menu
+        self.mouse_init(zoom_btn=None)
 
     def set_title(self, *args, **kwargs):
         # The set_title function in Axes3D also moves the title downwards for some reason so the Axes function is called
@@ -1493,7 +1540,8 @@ class MantidAxes3D(Axes3D):
 
             # This is a bit of a hack, should be able to remove
             # when matplotlib supports plotting masked arrays
-            poly_c._A = safe_masked_invalid(poly_c._A)
+            if poly_c._A is not None:
+                poly_c._A = safe_masked_invalid(poly_c._A)
 
         # Create a copy of the original data points because data are set to nan when the axis limits are changed.
         self.original_data_surface = copy.deepcopy(poly_c._vec)

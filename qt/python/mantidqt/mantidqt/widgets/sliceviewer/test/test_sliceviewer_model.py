@@ -507,9 +507,10 @@ class SliceViewerModelTest(unittest.TestCase):
         ws.getExperimentInfo().run().get().value = [0, 1, 1, 0, 0, 1, 1, 0, 0]
         model = SliceViewerModel(ws)
 
-        # should revert to orthogonal
+        # should revert to orthogonal (as given by basis vectors on workspace)
+        # i.e. not angles returned by proj_matrix in ws.getExperimentInfo().run().get().value
         axes_angles = model.get_axes_angles()
-        self.assertAlmostEqual(axes_angles[1, 2], np.pi / 4, delta=1e-10)
+        self.assertAlmostEqual(axes_angles[1, 2], np.pi / 2, delta=1e-10)
         for iy in range(1, 3):
             self.assertAlmostEqual(axes_angles[0, iy], np.pi / 2, delta=1e-10)
 
@@ -538,7 +539,7 @@ class SliceViewerModelTest(unittest.TestCase):
     def test_calculate_axes_angles_uses_W_if_basis_vectors_unavailable_and_W_available_MDHisto(self):
         # test MD histo
         ws = _create_mock_workspace(IMDHistoWorkspace, SpecialCoordinateSystem.HKL, has_oriented_lattice=True, ndims=3)
-        ws.getBasisVector.side_effect = lambda x: [0.0]
+        ws.getBasisVector.side_effect = lambda x: [0.0]  # will cause proj_matrix to be all zeros
         ws.getExperimentInfo().run().get().value = [0, 1, 1, 0, 0, 1, 1, 0, 0]
         model = SliceViewerModel(ws)
 
@@ -684,7 +685,7 @@ class SliceViewerModelTest(unittest.TestCase):
         dimension_indices = [0, 1, None]  # Value at index i is the index of the axis that dimension i is displayed on
         transposed_dimension_indices = [1, 0, None]
 
-        def assert_call_as_expected(transpose, dimension_indices, export_type):
+        def assert_call_as_expected(transpose, dimension_indices, export_type, bin_params):
             model = SliceViewerModel(self.ws_MD_3D)
 
             if export_type == "r":
@@ -721,6 +722,9 @@ class SliceViewerModelTest(unittest.TestCase):
                     out_name = "ws_MD_3D_roi"
                     transpose_axes = [1, 0] if transpose else None
 
+                dim = self.ws_MD_3D.getDimension(2)
+                half_bin_width = bin_params[2] / 2 if bin_params is not None else dim.getBinWidth() / 2
+
                 # check call to IntegrateMDHistoWorkspace
                 mock_intMD.assert_has_calls(
                     [
@@ -728,7 +732,7 @@ class SliceViewerModelTest(unittest.TestCase):
                             InputWorkspace=self.ws_MD_3D,
                             P1Bin=p1_bin,
                             P2Bin=p2_bin,
-                            P3Bin=[slicepoint[2] - bin_params[2] / 2, slicepoint[2] + bin_params[2] / 2],
+                            P3Bin=[slicepoint[2] - half_bin_width, slicepoint[2] + half_bin_width],
                             OutputWorkspace=out_name,
                         )
                     ],
@@ -745,8 +749,14 @@ class SliceViewerModelTest(unittest.TestCase):
             mock_transposemd.reset_mock()
 
         for export_type in ("r", "x", "y", "c"):
-            assert_call_as_expected(transpose=False, dimension_indices=dimension_indices, export_type=export_type)
-            assert_call_as_expected(transpose=True, dimension_indices=transposed_dimension_indices, export_type=export_type)
+            assert_call_as_expected(transpose=False, dimension_indices=dimension_indices, export_type=export_type, bin_params=bin_params)
+            assert_call_as_expected(transpose=False, dimension_indices=dimension_indices, export_type=export_type, bin_params=None)
+            assert_call_as_expected(
+                transpose=True, dimension_indices=transposed_dimension_indices, export_type=export_type, bin_params=bin_params
+            )
+            assert_call_as_expected(
+                transpose=True, dimension_indices=transposed_dimension_indices, export_type=export_type, bin_params=None
+            )
 
     @patch("mantidqt.widgets.sliceviewer.models.model.TransposeMD")
     @patch("mantidqt.widgets.sliceviewer.models.model.BinMD")

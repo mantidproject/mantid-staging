@@ -10,6 +10,7 @@
 """
 Contains the Python wrapper class for the C++ instrument widget
 """
+
 # 3rdparty imports
 from qtpy.QtCore import Qt, Signal, Slot
 from qtpy.QtWidgets import QVBoxLayout, QWidget
@@ -48,7 +49,7 @@ class InstrumentView(QWidget, ObservingView):
 
         self.name = name
 
-        self.setWindowTitle(name)
+        self.setWindowTitle("Instrument - " + name)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.setWindowFlags(window_flags)
 

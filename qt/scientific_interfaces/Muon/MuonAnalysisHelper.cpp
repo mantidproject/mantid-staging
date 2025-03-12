@@ -278,7 +278,9 @@ const char *WidgetAutoSaver::changedSignal(QWidget *widget) {
  * @param enabled :: Whether auto-saving should be enabled or disabled
  */
 void WidgetAutoSaver::setAutoSaveEnabled(bool enabled) {
-  foreach (QWidget *w, m_registeredWidgets) { setAutoSaveEnabled(w, enabled); }
+  foreach (QWidget *w, m_registeredWidgets) {
+    setAutoSaveEnabled(w, enabled);
+  }
 }
 
 /**
@@ -351,7 +353,9 @@ void WidgetAutoSaver::loadWidgetValue(QWidget *widget) {
  * Load the auto-saved (or default) value of all the registered widgets.
  */
 void WidgetAutoSaver::loadWidgetValues() {
-  foreach (QWidget *w, m_registeredWidgets) { loadWidgetValue(w); }
+  foreach (QWidget *w, m_registeredWidgets) {
+    loadWidgetValue(w);
+  }
 }
 
 /**
@@ -969,6 +973,7 @@ void parseRunLabel(const std::string &label, std::string &instrument, std::vecto
   const size_t instPos = label.find_first_of("0123456789");
   instrument = label.substr(0, instPos);
   const size_t numPos = label.find_first_not_of('0', instPos);
+  runNumbers.clear();
   if (numPos != std::string::npos) {
     std::string runString = label.substr(numPos, label.size());
     // sets of continuous ranges
@@ -1000,7 +1005,7 @@ void parseRunLabel(const std::string &label, std::string &instrument, std::vecto
     }
   } else {
     // The string was "INST000" or similar...
-    runNumbers = {0};
+    runNumbers.emplace_back(0);
   }
 }
 

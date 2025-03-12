@@ -30,7 +30,7 @@ class EnggEstimateFocussedBackground(PythonAlgorithm):
 
         self.declareProperty(
             MatrixWorkspaceProperty("OutputWorkspace", "", Direction.Output),
-            "Workspace to contain the estimated background (one for each spectrum in the " "InputWorkspace)",
+            "Workspace to contain the estimated background (one for each spectrum in the InputWorkspace)",
         )
 
         self.declareProperty(
@@ -72,7 +72,6 @@ class EnggEstimateFocussedBackground(PythonAlgorithm):
         return issues
 
     def PyExec(self):
-
         # get input
         inws = self.getProperty("InputWorkspace").value
         niter = self.getProperty("NIterations").value

@@ -135,7 +135,7 @@ class GSAS2View(QtWidgets.QWidget, Ui_calib):
             and self.refine_gamma_y_checkbox.isChecked()
         ):
             self.checkboxes_invalid.show()
-            self.checkboxes_invalid.setToolTip("Refining the Microstrain with Sigma-1 and Gamma(Y)" " may not be advisable.")
+            self.checkboxes_invalid.setToolTip("Refining the Microstrain with Sigma-1 and Gamma(Y) may not be advisable.")
         else:
             self.checkboxes_invalid.hide()
             self.checkboxes_invalid.setToolTip("")
@@ -218,7 +218,7 @@ class GSAS2View(QtWidgets.QWidget, Ui_calib):
             if docked_height > new_height:
                 new_height = docked_height
             new_width = new_height * aspect_ratio
-            self.plot_dock.resize(new_width, new_height)
+            self.plot_dock.resize(int(new_width), int(new_height))
             self.has_first_undock_occurred = 1
 
         self.update_axes_position()

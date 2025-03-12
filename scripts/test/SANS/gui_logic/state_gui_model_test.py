@@ -325,7 +325,7 @@ class StateGuiModelTest(unittest.TestCase):
                 self.assertEqual(
                     user_input,
                     state_gui_model.wavelength_range,
-                    f"Setting enum from {original_val} to {new_val}" " did not preserve the users selected range",
+                    f"Setting enum from {original_val} to {new_val} did not preserve the users selected range",
                 )
                 self.assertEqual(2.0, state_gui_model.wavelength_min)
                 self.assertEqual(8.0, state_gui_model.wavelength_max)
@@ -542,6 +542,23 @@ class StateGuiModelTest(unittest.TestCase):
         state_gui_model = StateGuiModel(AllStates())
         state_gui_model.mask_files = ["file.txt", "file2.txt"]
         self.assertEqual(state_gui_model.mask_files, ["file.txt", "file2.txt"])
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Beam Centre
+    # ------------------------------------------------------------------------------------------------------------------
+
+    def test_setters_are_working_correctly(self):
+        state = AllStates()
+        state.move.detectors = {DetectorType.LAB.value: StateMoveDetectors(), DetectorType.HAB.value: StateMoveDetectors()}
+        state_gui_model = StateGuiModel(state)
+        state_gui_model.rear_pos_1 = 21.5
+        state_gui_model.rear_pos_2 = 17.8
+        state_gui_model.front_pos_1 = 25.1
+        state_gui_model.front_pos_2 = 16.9
+        self.assertEqual(state_gui_model.rear_pos_1, 21.5)
+        self.assertEqual(state_gui_model.rear_pos_2, 17.8)
+        self.assertEqual(state_gui_model.front_pos_1, 25.1)
+        self.assertEqual(state_gui_model.front_pos_2, 16.9)
 
     # ------------------------------------------------------------------------------------------------------------------
     # User files - focus on fields that are displayed in mm and stored in m

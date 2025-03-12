@@ -14,18 +14,20 @@
 #include "MantidAPI/Progress.h"
 #include "MantidAPI/RegisterFileLoader.h"
 #include "MantidAPI/Run.h"
+#include "MantidAPI/Sample.h"
 #include "MantidAPI/Workspace.h"
 #include "MantidAPI/WorkspaceFactory.h"
 #include "MantidAPI/WorkspaceUnitValidator.h"
-#include "MantidDataHandling/H5Util.h"
 #include "MantidDataHandling/NXcanSASDefinitions.h"
 #include "MantidKernel/Logger.h"
 #include "MantidKernel/UnitFactory.h"
+#include "MantidNexus/H5Util.h"
 
+#include "MantidNexusCpp/NeXusFile.hpp"
 #include <H5Cpp.h>
 #include <Poco/DirectoryIterator.h>
 #include <Poco/Path.h>
-#include <nexus/NeXusFile.hpp>
+#include <boost/algorithm/string.hpp>
 #include <type_traits>
 
 using namespace Mantid::Kernel;
@@ -51,8 +53,7 @@ DataSpaceInformation getDataSpaceInfo(H5::DataSet &dataSet) {
   auto dataSpace = dataSet.getSpace();
   const auto rank = dataSpace.getSimpleExtentNdims();
   if (rank > 2) {
-    std::invalid_argument("LoadNXcanSAS: Cannot load a data set "
-                          "with more than 2 dimensions.");
+    throw std::invalid_argument("LoadNXcanSAS: Cannot load a data set with more than 2 dimensions.");
   }
 
   hsize_t dims[2] = {0, 0};
@@ -104,7 +105,7 @@ Mantid::API::MatrixWorkspace_sptr createWorkspaceForHistogram(H5::DataSet &dataS
 
 void addLogFromGroupIfExists(H5::Group &sasGroup, std::string const &sasTerm, Run &run,
                              std::string const &propertyName) {
-  auto value = Mantid::DataHandling::H5Util::readString(sasGroup, sasTerm);
+  auto value = Mantid::NeXus::H5Util::readString(sasGroup, sasTerm);
   if (!value.empty()) {
     run.addLogData(new PropertyWithValue<std::string>(propertyName, value));
   }
@@ -122,9 +123,68 @@ void loadLogs(H5::Group &entry, const Mantid::API::MatrixWorkspace_sptr &workspa
   addLogFromGroupIfExists(entry, sasEntryRun, run, sasEntryRunInLogs);
 
   // Load Title (optional)
-  auto title = Mantid::DataHandling::H5Util::readString(entry, sasEntryTitle);
+  auto title = Mantid::NeXus::H5Util::readString(entry, sasEntryTitle);
   if (!title.empty()) {
     workspace->setTitle(title);
+  }
+}
+
+// ----- SAMPLE
+
+namespace {
+std::optional<H5::Group> getAperture(H5::Group &entry) {
+  try {
+    return entry.openGroup(sasInstrumentGroupName).openGroup(sasInstrumentApertureGroupName);
+  } catch (H5::GroupIException &) {
+  } catch (H5::FileIException &) {
+  }
+  return std::nullopt;
+}
+
+std::optional<H5::Group> getSample(H5::Group &entry) {
+  try {
+    return entry.openGroup(sasInstrumentSampleGroupAttr);
+  } catch (H5::GroupIException &) {
+  } catch (H5::FileIException &) {
+  }
+  return std::nullopt;
+}
+} // namespace
+
+void loadSample(H5::Group &entry, const Mantid::API::MatrixWorkspace_sptr &workspace) {
+  auto &&sample = workspace->mutableSample();
+
+  // Load Height, Width, and Geometry from the aperture group and save to Sample object.
+
+  if (auto &&maybeApertureGroup = getAperture(entry)) {
+    auto &&apertureGroup = *maybeApertureGroup;
+
+    auto &&height = Mantid::NeXus::H5Util::readArray1DCoerce<double>(apertureGroup, sasInstrumentApertureGapHeight);
+    if (!height.empty()) {
+      sample.setHeight(height.front());
+    }
+    auto &&width = Mantid::NeXus::H5Util::readArray1DCoerce<double>(apertureGroup, sasInstrumentApertureGapWidth);
+    if (!width.empty()) {
+      sample.setWidth(width.front());
+    }
+    auto &&geometry = Mantid::NeXus::H5Util::readString(apertureGroup, sasInstrumentApertureShape);
+    boost::to_lower(geometry);
+    if (geometry == "cylinder") {
+      sample.setGeometryFlag(1);
+    } else if (geometry == "flat plate" || geometry == "flatplate") {
+      sample.setGeometryFlag(2);
+    } else if (geometry == "disc") {
+      sample.setGeometryFlag(3);
+    } else {
+      sample.setGeometryFlag(0);
+    }
+  }
+
+  // Load thickness from the sample group and save to the Sample object.
+  if (auto &&maybeSampleGroup = getSample(entry)) {
+    auto &&sampleGroup = *maybeSampleGroup;
+    auto &&thickness = Mantid::NeXus::H5Util::readArray1DCoerce<double>(sampleGroup, sasInstrumentSampleThickness);
+    sample.setThickness(thickness.front());
   }
 }
 
@@ -158,13 +218,13 @@ void loadInstrument(H5::Group &entry, const Mantid::API::MatrixWorkspace_sptr &w
   auto instrument = entry.openGroup(sasInstrumentGroupName);
 
   // Get instrument name
-  auto instrumentName = Mantid::DataHandling::H5Util::readString(instrument, sasInstrumentName);
+  auto instrumentName = Mantid::NeXus::H5Util::readString(instrument, sasInstrumentName);
   if (instrumentName.empty()) {
     return;
   }
 
   // Get IDF
-  auto idf = Mantid::DataHandling::H5Util::readString(instrument, sasInstrumentIDF);
+  auto idf = Mantid::NeXus::H5Util::readString(instrument, sasInstrumentIDF);
   idf = extractIdfFileOnCurrentSystem(idf);
 
   // Try to load the instrument. If it fails we will continue nevertheless.
@@ -202,8 +262,10 @@ WorkspaceDimensionality getWorkspaceDimensionality(H5::Group &dataGroup) {
   return dimensionality;
 }
 
-std::string getUnit(H5::DataSet &dataSet) {
-  return Mantid::DataHandling::H5Util::readAttributeAsString(dataSet, sasUnitAttr);
+std::string getUnit(const H5::DataSet &dataSet) {
+  std::string unit;
+  Mantid::NeXus::H5Util::readStringAttribute(dataSet, sasUnitAttr, unit);
+  return unit;
 }
 
 bool hasQDev(H5::Group &dataGroup) {
@@ -224,24 +286,23 @@ void loadData1D(H5::Group &dataGroup, const Mantid::API::MatrixWorkspace_sptr &w
   workspace->setDistribution(true);
 
   // Load the Q value
-  workspace->mutableX(0) = Mantid::DataHandling::H5Util::readArray1DCoerce<double>(dataGroup, sasDataQ);
+  workspace->mutableX(0) = Mantid::NeXus::H5Util::readArray1DCoerce<double>(dataGroup, sasDataQ);
   workspace->getAxis(0)->setUnit("MomentumTransfer");
 
   // Load the I value + units
-  workspace->mutableY(0) = Mantid::DataHandling::H5Util::readArray1DCoerce<double>(dataGroup, sasDataI);
+  workspace->mutableY(0) = Mantid::NeXus::H5Util::readArray1DCoerce<double>(dataGroup, sasDataI);
 
   auto iDataSet = dataGroup.openDataSet(sasDataI);
   auto yUnit = getUnit(iDataSet);
   workspace->setYUnit(yUnit);
 
   // Load the Idev value
-  workspace->mutableE(0) = Mantid::DataHandling::H5Util::readArray1DCoerce<double>(dataGroup, sasDataIdev);
+  workspace->mutableE(0) = Mantid::NeXus::H5Util::readArray1DCoerce<double>(dataGroup, sasDataIdev);
 
   // Load the Qdev value (optional)
   bool hasQResolution = hasQDev(dataGroup);
   if (hasQResolution) {
-    workspace->setPointStandardDeviations(
-        0, Mantid::DataHandling::H5Util::readArray1DCoerce<double>(dataGroup, sasDataQdev));
+    workspace->setPointStandardDeviations(0, Mantid::NeXus::H5Util::readArray1DCoerce<double>(dataGroup, sasDataQdev));
   }
 }
 
@@ -326,7 +387,7 @@ void loadData2D(H5::Group &dataGroup, const Mantid::API::MatrixWorkspace_sptr &w
   auto iExtractor = [](const Mantid::API::MatrixWorkspace_sptr &ws, size_t index) -> HistogramY & {
     return ws->mutableY(index);
   };
-  auto iDataType = Mantid::DataHandling::H5Util::getType<double>();
+  auto iDataType = Mantid::NeXus::H5Util::getType<double>();
   read2DWorkspace(iDataSet, workspace, iExtractor, iDataType);
   auto yUnit = getUnit(iDataSet);
   workspace->setYUnit(yUnit);
@@ -345,14 +406,14 @@ void loadData2D(H5::Group &dataGroup, const Mantid::API::MatrixWorkspace_sptr &w
   auto qxExtractor = [](const Mantid::API::MatrixWorkspace_sptr &ws, size_t index) -> HistogramX & {
     return ws->mutableX(index);
   };
-  auto qxDataType = Mantid::DataHandling::H5Util::getType<double>();
+  auto qxDataType = Mantid::NeXus::H5Util::getType<double>();
   read2DWorkspace(qxDataSet, workspace, qxExtractor, qxDataType);
   workspace->getAxis(0)->setUnit("MomentumTransfer");
 
   //-----------------------------------------
   // Load the Qy value
   auto qyDataSet = dataGroup.openDataSet(sasDataQy);
-  auto qyDataType = Mantid::DataHandling::H5Util::getType<double>();
+  auto qyDataType = Mantid::NeXus::H5Util::getType<double>();
   readQyInto2DWorkspace(qyDataSet, workspace, qyDataType);
 }
 
@@ -375,7 +436,7 @@ bool findDefinition(::NeXus::File &file) {
   bool foundDefinition = false;
   auto entries = file.getEntries();
 
-  for (auto &entry : entries) {
+  for (const auto &entry : entries) {
     if (entry.second == sasEntryClassAttr || entry.second == nxEntryClassAttr) {
       file.openGroup(entry.first, entry.second);
       file.openData(sasEntryDefinition);
@@ -406,32 +467,23 @@ bool hasTransmissionEntry(H5::Group &entry, const std::string &name) {
 void loadTransmissionData(H5::Group &transmission, const Mantid::API::MatrixWorkspace_sptr &workspace) {
   //-----------------------------------------
   // Load T
-  workspace->mutableY(0) =
-      Mantid::DataHandling::H5Util::readArray1DCoerce<double>(transmission, sasTransmissionSpectrumT);
+  workspace->mutableY(0) = Mantid::NeXus::H5Util::readArray1DCoerce<double>(transmission, sasTransmissionSpectrumT);
   //-----------------------------------------
   // Load Tdev
-  workspace->mutableE(0) =
-      Mantid::DataHandling::H5Util::readArray1DCoerce<double>(transmission, sasTransmissionSpectrumTdev);
+  workspace->mutableE(0) = Mantid::NeXus::H5Util::readArray1DCoerce<double>(transmission, sasTransmissionSpectrumTdev);
   //-----------------------------------------
   // Load Lambda. A bug in older versions (fixed in 6.0) allowed the
   // transmission lambda points to be saved as bin edges rather than points as
   // required by the NXcanSAS standard. We allow loading those files and convert
   // to points on the fly
-  auto lambda = Mantid::DataHandling::H5Util::readArray1DCoerce<double>(transmission, sasTransmissionSpectrumLambda);
+  std::vector<double> lambda;
+  Mantid::NeXus::H5Util::readArray1DCoerce(transmission, sasTransmissionSpectrumLambda, lambda);
   if (lambda.size() == workspace->blocksize())
     workspace->setPoints(0, std::move(lambda));
   else if (lambda.size() == workspace->blocksize() + 1)
     workspace->setBinEdges(0, std::move(lambda));
   else {
-#if defined(H5_USE_18_API)
     const std::string objectName{transmission.getObjName()};
-#else
-    const size_t nchars = H5Iget_name(transmission.getId(), nullptr, 0);
-    std::string objectName;
-    objectName.resize(nchars);
-    H5Iget_name(transmission.getId(), objectName.data(),
-                nchars + 1); // +1 for null terminator
-#endif
     throw std::runtime_error("Unexpected array size for lambda in transmission group '" + objectName +
                              "'. Expected length=" + std::to_string(workspace->blocksize()) +
                              ", found length=" + std::to_string(lambda.size()));
@@ -509,6 +561,10 @@ void LoadNXcanSAS::exec() {
   // Load the logs
   progress.report("Loading logs.");
   loadLogs(entry, ws);
+
+  // Load sample info
+  progress.report("Loading sample.");
+  loadSample(entry, ws);
 
   // Load instrument
   progress.report("Loading instrument.");

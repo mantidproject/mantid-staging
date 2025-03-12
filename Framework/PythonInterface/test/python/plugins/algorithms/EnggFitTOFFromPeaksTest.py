@@ -5,8 +5,8 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
-from mantid.simpleapi import *
-from mantid.api import *
+from mantid.api import mtd
+from mantid.simpleapi import CreateEmptyTableWorkspace, CreateSampleWorkspace, EditInstrumentGeometry, EnggFitPeaks, EnggFitTOFFromPeaks
 
 
 class EnggFitTOFFromPeaksTest(unittest.TestCase):
@@ -15,11 +15,11 @@ class EnggFitTOFFromPeaksTest(unittest.TestCase):
         Handle in/out property issues appropriately.
         """
         # No InputWorkspace property (required)
-        self.assertRaises(RuntimeError, EnggFitTOFFromPeaks, OutParametersTable="param_table")
+        self.assertRaises(TypeError, EnggFitTOFFromPeaks, OutParametersTable="param_table")
 
         table = CreateEmptyTableWorkspace(OutputWorkspace="some_tbl_name")
         # This property doesn't belong here
-        self.assertRaises(RuntimeError, EnggFitTOFFromPeaks, FittedPeaks=table, ExpectedPeaks="0.6, 0.9")
+        self.assertRaises(TypeError, EnggFitTOFFromPeaks, FittedPeaks=table, ExpectedPeaks="0.6, 0.9")
 
     def test_runs_ok_3peaks(self):
         """
@@ -133,7 +133,7 @@ class EnggFitTOFFromPeaksTest(unittest.TestCase):
 
         approx_comp = abs((ref - val) / ref) < epsilon
         if not approx_comp:
-            print("Failed approximate comparison between value {0} and reference value " "{1}, with epsilon {2}".format(val, ref, epsilon))
+            print("Failed approximate comparison between value {0} and reference value {1}, with epsilon {2}".format(val, ref, epsilon))
 
         return approx_comp
 

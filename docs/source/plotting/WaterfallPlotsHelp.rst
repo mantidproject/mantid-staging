@@ -132,7 +132,7 @@ An example script for a Waterfall Plot:
    # Update the offsets
    ax.update_waterfall(x_offset=10, y_offset=30)
 
-   plt.show()
+   fig.show()
 
 For more advice: :ref:`02_scripting_plots`
 
@@ -175,7 +175,7 @@ File > Settings
 **Other Plotting Documentation**
 
 * :ref:`plotting`
-* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/3.1.1/users/navigation_toolbar.html#navigation-keyboard-shortcuts>`_
+* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/stable/users/explain/figure/interactive.html#navigation-keyboard-shortcuts>`_
 
 .. |O| image:: /images/FigureOptionsGear.png
    :width: 150px

@@ -8,13 +8,14 @@
 """These are more integration tests as they will require that the test data is available
 and that mantid can be imported
 """
+
 import systemtesting
 import numpy as np
 
-from mantid.api import WorkspaceGroup, MatrixWorkspace
-from mantid.simpleapi import *
+from mantid.api import mtd, WorkspaceGroup, MatrixWorkspace
+from mantid.simpleapi import CropWorkspace, LoadVesuvio, Rebin
 from vesuvio.commands import fit_tof
-from vesuvio.instrument import *
+from vesuvio.instrument import VESUVIO
 
 
 # =====================================Helper Function=================================
@@ -33,7 +34,6 @@ def _make_names_unique(names):
 
 
 def _test_caad_workspace(self, workspace_name, functions):
-
     try:
         caad_workspace = mtd[workspace_name]
     except RuntimeError:
@@ -121,7 +121,7 @@ def load_and_crop_data(runs, spectra, ip_file, diff_mode="single", fit_mode="spe
         elif spectra == "backward":
             bank_ranges = instrument.backward_banks
         else:
-            raise ValueError("Fitting by bank requires selecting either 'forward' or 'backward' " "for the spectra to load")
+            raise ValueError("Fitting by bank requires selecting either 'forward' or 'backward' for the spectra to load")
         bank_ranges = ["{0}-{1}".format(x, y) for x, y in bank_ranges]
         spectra = ";".join(bank_ranges)
     else:

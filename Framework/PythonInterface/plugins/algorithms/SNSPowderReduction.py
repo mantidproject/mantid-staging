@@ -81,7 +81,7 @@ def get_workspace(workspace_name):
     :param workspace_name:
     :return:
     """
-    assert isinstance(workspace_name, str), "Input workspace name {0} must be a string but not a {1}." "".format(
+    assert isinstance(workspace_name, str), "Input workspace name {0} must be a string but not a {1}.".format(
         workspace_name, type(workspace_name)
     )
 
@@ -116,7 +116,7 @@ def allEventWorkspaces(*args):
 
 
 def getBasename(filename):
-    if type(filename) == list:
+    if isinstance(filename, list):
         filename = filename[0]
     name = os.path.split(filename)[-1]
     for extension in EXTENSIONS_NXS:
@@ -129,6 +129,7 @@ def getBasename(filename):
 
 class SNSPowderReduction(DataProcessorAlgorithm):
     COMPRESS_TOL_TOF = 0.01
+    _compressBinningMode = None
     _resampleX = None
     _binning = None
     _bin_in_dspace = None
@@ -159,6 +160,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
     _sampleFormula = None
     _massDensity = None
     _containerShape = None
+    _compressionThreshold = None
 
     def category(self):
         return "Diffraction\\Reduction"
@@ -177,7 +179,9 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         return "The algorithm used for reduction of powder diffraction data obtained on SNS instruments (e.g. PG3)"
 
     def PyInit(self):
-        self.copyProperties("AlignAndFocusPowderFromFiles", ["Filename", "PreserveEvents", "DMin", "DMax", "DeltaRagged"])
+        self.copyProperties(
+            "AlignAndFocusPowderFromFiles", ["Filename", "PreserveEvents", "DMin", "DMax", "DeltaRagged", "MinSizeCompressOnLoad"]
+        )
 
         self.declareProperty("Sum", False, "Sum the runs. Does nothing for characterization runs.")
         self.declareProperty(
@@ -325,6 +329,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         self.declareProperty("NormalizeByCurrent", True, "Normalize by current")
 
         self.declareProperty("CompressTOFTolerance", 0.01, "Tolerance to compress events in TOF.")
+        self.copyProperties("AlignAndFocusPowderFromFiles", ["CompressBinningMode"])
 
         # reduce logs being loaded
         self.declareProperty(
@@ -337,6 +342,11 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         )
 
         self.copyProperties("AlignAndFocusPowderFromFiles", ["FrequencyLogNames", "WaveLengthLogNames"])
+        self.declareProperty(
+            "InterpolateTargetTemp",
+            0.0,
+            "Temperature in Kelvin. If specified, perform interpolation of background runs. Must specify exactly two background runs",
+        )
 
     def validateInputs(self):
         issues = dict()
@@ -367,6 +377,8 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         if self.getProperty("CleanCache").value and not bool(self.getProperty("CacheDir").value):
             issues["CleanCache"] = 'Property "CacheDir" must be set in order to clean the cache'
 
+        if self.getProperty("InterpolateTargetTemp").value > 0.0 and not len(self.getProperty("BackgroundNumber").value) == 2:
+            issues["InterpolateTargetTemp"] = "If InterpolateTargetTemp specified, you must provide two background run numbers"
         return issues
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -418,11 +430,18 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         self._elementSize = self.getProperty("ElementSize").value
         self._num_wl_bins = self.getProperty("NumWavelengthBins").value
 
+        self._interpoTemp = self.getProperty("InterpolateTargetTemp").value
+        self._enableInterpo = False
+        if self._interpoTemp > 0.0:
+            self._enableInterpo = True
+
         samRuns = self._getLinearizedFilenames("Filename")
         self._determineInstrument(samRuns[0])
 
         self._info = None
         self._chunks = self.getProperty("MaxChunkSize").value
+
+        self._compressionThreshold = self.getProperty("MinSizeCompressOnLoad").value
 
         # define splitters workspace and filter wall time
         self._splittersWS = self.getProperty("SplittersWorkspace").value
@@ -443,10 +462,9 @@ class SNSPowderReduction(DataProcessorAlgorithm):
 
         self._normalisebycurrent = self.getProperty("NormalizeByCurrent").value
 
-        # Tolerance for compress TOF event.  If given a negative value, then use default 0.01
+        # Tolerance for compress TOF event.
         self.COMPRESS_TOL_TOF = float(self.getProperty("CompressTOFTolerance").value)
-        if self.COMPRESS_TOL_TOF < -0.0:
-            self.COMPRESS_TOL_TOF = 0.01
+        self._compressBinningMode = self.getProperty("CompressBinningMode").value
 
         # Clean the cache directory if so requested
         if self._clean_cache:
@@ -522,7 +540,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                 raise NotImplementedError("Summing spectra and filtering events are not supported simultaneously.")
 
             sam_ws_name = self._focusAndSum(samRuns, preserveEvents=preserveEvents, absorptionWksp=a_sample)
-            assert isinstance(sam_ws_name, str), "Returned from _focusAndSum() must be a string but not" "%s. " % str(type(sam_ws_name))
+            assert isinstance(sam_ws_name, str), "Returned from _focusAndSum() must be a string but not %s. " % str(type(sam_ws_name))
 
             workspacelist.append(sam_ws_name)
             samwksplist.append(sam_ws_name)
@@ -543,9 +561,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                     # Returned with a list of workspaces
                     focusedwksplist = returned
                     for sam_ws_name in focusedwksplist:
-                        assert isinstance(sam_ws_name, str), (
-                            "Impossible to have a non-string value in " "returned focused workspaces' names."
-                        )
+                        assert isinstance(sam_ws_name, str), "Impossible to have a non-string value in returned focused workspaces' names."
                         samwksplist.append(sam_ws_name)
                         workspacelist.append(sam_ws_name)
                     # END-FOR
@@ -570,7 +586,10 @@ class SNSPowderReduction(DataProcessorAlgorithm):
             self._info = self._getinfo(sam_ws_name)
 
             # process the container
-            can_run_numbers = self._info["container"].value
+            if self._enableInterpo:
+                can_run_numbers = self.getProperty("BackgroundNumber").value
+            else:
+                can_run_numbers = self._info["container"].value
             can_run_numbers = ["%s_%d" % (self._instrument, value) for value in can_run_numbers]
             # Check if existing container
             #  - has history and is using SNSPowderReduction
@@ -618,11 +637,17 @@ class SNSPowderReduction(DataProcessorAlgorithm):
 
                 # remove container run
                 api.RebinToWorkspace(WorkspaceToRebin=can_run_ws_name, WorkspaceToMatch=sam_ws_name, OutputWorkspace=can_run_ws_name)
-                api.Scale(InputWorkspace=can_run_ws_name, OutputWorkspace=can_run_ws_name, Factor=self._containerScaleFactor)
+                if samRunIndex == 0:
+                    api.Scale(InputWorkspace=can_run_ws_name, OutputWorkspace=can_run_ws_name, Factor=self._containerScaleFactor)
                 api.Minus(LHSWorkspace=sam_ws_name, RHSWorkspace=can_run_ws_name, OutputWorkspace=sam_ws_name)
                 # compress event if the sample run workspace is EventWorkspace
-                if is_event_workspace(sam_ws_name) and self.COMPRESS_TOL_TOF > 0.0:
-                    api.CompressEvents(InputWorkspace=sam_ws_name, OutputWorkspace=sam_ws_name, Tolerance=self.COMPRESS_TOL_TOF)  # 10ns
+                if is_event_workspace(sam_ws_name) and self.COMPRESS_TOL_TOF != 0.0:
+                    api.CompressEvents(
+                        InputWorkspace=sam_ws_name,
+                        OutputWorkspace=sam_ws_name,
+                        Tolerance=self.COMPRESS_TOL_TOF,
+                        BinningMode=self._compressBinningMode,
+                    )  # 10ns
                 # canRun = str(canRun)
 
             if van_run_ws_name is not None:
@@ -643,8 +668,13 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                 normalized = False
 
             # Compress the event again
-            if is_event_workspace(sam_ws_name) and self.COMPRESS_TOL_TOF > 0.0:
-                api.CompressEvents(InputWorkspace=sam_ws_name, OutputWorkspace=sam_ws_name, Tolerance=self.COMPRESS_TOL_TOF)  # 5ns/
+            if is_event_workspace(sam_ws_name) and self.COMPRESS_TOL_TOF != 0.0:
+                api.CompressEvents(
+                    InputWorkspace=sam_ws_name,
+                    OutputWorkspace=sam_ws_name,
+                    Tolerance=self.COMPRESS_TOL_TOF,
+                    BinningMode=self._compressBinningMode,
+                )  # 5ns
 
             if self._scaleFactor != 1.0:
                 api.Scale(sam_ws_name, Factor=self._scaleFactor, OutputWorkspace=sam_ws_name)
@@ -675,7 +705,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         runnumbers = self.getProperty(propertyName).value
         linearizedRuns = []
         for item in runnumbers:
-            if type(item) == list:
+            if isinstance(item, list):
                 linearizedRuns.extend(item)
             else:
                 linearizedRuns.append(item)
@@ -761,7 +791,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                     chunk["FilterByTimeStop"] = filter_wall[1]
 
         # Call Mantid's Load algorithm to load complete or partial data
-        api.Load(Filename=filename, OutputWorkspace=out_ws_name, **chunk)
+        api.Load(Filename=filename, OutputWorkspace=out_ws_name, NumberOfBins=1, **chunk)
 
         # Log output
         if is_event_workspace(out_ws_name):
@@ -783,7 +813,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
 
             if is_event_workspace(out_ws_name):
                 # Event workspace
-                message = "FilterBadPulses reduces number of events from %d to %d (under %s percent) " "of workspace %s." % (
+                message = "FilterBadPulses reduces number of events from %d to %d (under %s percent) of workspace %s." % (
                     num_original_events,
                     get_workspace(out_ws_name).getNumberEvents(),
                     str(self._filterBadPulses),
@@ -889,6 +919,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
             PreserveEvents=preserveEvents,
             RemovePromptPulseWidth=self._removePromptPulseWidth,
             CompressTolerance=self.COMPRESS_TOL_TOF,
+            CompressBinningMode=self._compressBinningMode,
             LorentzCorrection=self._lorentz,
             UnwrapRef=self._LRef,
             LowResRef=self._DIFCref,
@@ -900,6 +931,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
             ReductionProperties="__snspowderreduction",
             LogAllowList=self.getPropertyValue("LogAllowList").strip(),
             LogBlockList=self.getPropertyValue("LogBlockList").strip(),
+            MinSizeCompressOnLoad=self._compressionThreshold,
             **otherArgs,
         )
 
@@ -1003,6 +1035,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                     PreserveEvents=preserveEvents,
                     RemovePromptPulseWidth=self._removePromptPulseWidth,
                     CompressTolerance=self.COMPRESS_TOL_TOF,
+                    CompressBinningMode=self._compressBinningMode,
                     LorentzCorrection=self._lorentz,
                     UnwrapRef=self._LRef,
                     LowResRef=self._DIFCref,
@@ -1065,11 +1098,12 @@ class SNSPowderReduction(DataProcessorAlgorithm):
 
         # Compress events
         for split_index in range(num_out_wksp):
-            if is_event_workspace(output_wksp_list[split_index]) and self.COMPRESS_TOL_TOF > 0.0:
+            if is_event_workspace(output_wksp_list[split_index]) and self.COMPRESS_TOL_TOF != 0.0:
                 api.CompressEvents(
                     InputWorkspace=output_wksp_list[split_index],
                     OutputWorkspace=output_wksp_list[split_index],
                     Tolerance=self.COMPRESS_TOL_TOF,
+                    BinningMode=self._compressBinningMode,
                 )  # 100ns
             try:
                 if self._normalisebycurrent is True:
@@ -1192,9 +1226,9 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                 If there is no split workspace defined, filter is (0., 0.) as the default
         """
         # supported case: support both workspace and workspace name
-        assert (
-            isinstance(split_ws_name, str) and len(split_ws_name) > 0
-        ), "SplittersWorkspace {0} must be a non-empty string but not a {1}." "".format(split_ws_name, type(split_ws_name))
+        assert isinstance(split_ws_name, str) and len(split_ws_name) > 0, (
+            "SplittersWorkspace {0} must be a non-empty string but not a {1}.".format(split_ws_name, type(split_ws_name))
+        )
         if AnalysisDataService.doesExist(split_ws_name):
             split_ws = get_workspace(split_ws_name)
         else:
@@ -1230,9 +1264,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         elif isinstance(split_ws, ITableWorkspace):
             # general table workspace: filter start and stop times are in seconds
             if split_ws.columnCount() < 3:
-                raise RuntimeError(
-                    "Table splitters workspace {0} has too few ({1}) columns." "".format(split_ws_name, split_ws.columnCount())
-                )
+                raise RuntimeError("Table splitters workspace {0} has too few ({1}) columns.".format(split_ws_name, split_ws.columnCount()))
 
             num_rows = split_ws.rowCount()
             # Searching for the table
@@ -1348,7 +1380,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
             # Check consistency with filterWall
             if filter_wall[0] < 1.0e-20 and filter_wall[1] < 1.0e-20:
                 # Default definition of filterWall when there is no split workspace specified.
-                raise RuntimeError("It is impossible to have a splitters workspace and a non-defined, i.e., (0,0) time " "filter wall.")
+                raise RuntimeError("It is impossible to have a splitters workspace and a non-defined, i.e., (0,0) time filter wall.")
             # ENDIF
 
             # Note: Unfiltered workspace (remainder) is not considered here
@@ -1398,7 +1430,28 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         :param can_run_numbers:
         :return:
         """
-        can_run_ws_name, can_run_number = self._generate_container_run_name(can_run_numbers, samRunIndex)
+        if self._enableInterpo:
+            can_run_ws_name_1, can_run_number_1 = self._generate_container_run_name(can_run_numbers, 0)
+            can_run_ws_name_2, can_run_number_2 = self._generate_container_run_name(can_run_numbers, 1)
+
+            self._focusAndSum([can_run_number_1], preserveEvents, final_name=can_run_ws_name_1, absorptionWksp=absorptionWksp)
+            self._focusAndSum([can_run_number_2], preserveEvents, final_name=can_run_ws_name_2, absorptionWksp=absorptionWksp)
+            empty_run_ws_group = api.GroupWorkspaces([can_run_ws_name_1, can_run_ws_name_2])
+            interpo_ws = api.InterpolateBackground(empty_run_ws_group, self._interpoTemp, OutputWorkspace="InterpolatedBackground")
+            # smooth background
+            smoothParams = self.getProperty("BackgroundSmoothParams").value
+            if smoothParams is not None and len(smoothParams) > 0:
+                api.FFTSmooth(
+                    InputWorkspace=interpo_ws,
+                    OutputWorkspace=interpo_ws,
+                    Filter="Butterworth",
+                    Params=smoothParams,
+                    IgnoreXBins=True,
+                    AllSpectra=True,
+                )
+            return interpo_ws.name()
+        else:
+            can_run_ws_name, can_run_number = self._generate_container_run_name(can_run_numbers, samRunIndex)
 
         if can_run_ws_name is not None:
             if self.does_workspace_exist(can_run_ws_name):
@@ -1543,9 +1596,12 @@ class SNSPowderReduction(DataProcessorAlgorithm):
                         )
 
                     # compress events
-                    if is_event_workspace(van_run_ws_name) and self.COMPRESS_TOL_TOF > 0.0:
+                    if is_event_workspace(van_run_ws_name) and self.COMPRESS_TOL_TOF != 0.0:
                         api.CompressEvents(
-                            InputWorkspace=van_run_ws_name, OutputWorkspace=van_run_ws_name, Tolerance=self.COMPRESS_TOL_TOF
+                            InputWorkspace=van_run_ws_name,
+                            OutputWorkspace=van_run_ws_name,
+                            Tolerance=self.COMPRESS_TOL_TOF,
+                            BinningMode=self._compressBinningMode,
                         )  # 10ns
                 except RuntimeError as e:
                     self.log().warning("Failed to process vanadium background. Skipping: {}".format(e))
@@ -1602,7 +1658,7 @@ class SNSPowderReduction(DataProcessorAlgorithm):
         """
         # Check requirements
         assert isinstance(raw_ws_name, str), "Raw workspace name must be a string."
-        assert isinstance(split_ws_name, str), "Input split workspace name must be string," "but not of type %s" % str(type(split_ws_name))
+        assert isinstance(split_ws_name, str), "Input split workspace name must be string, but not of type %s" % str(type(split_ws_name))
         assert self.does_workspace_exist(split_ws_name)
 
         assert is_event_workspace(raw_ws_name), "Input workspace for splitting must be an EventWorkspace."

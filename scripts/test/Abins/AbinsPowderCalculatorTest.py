@@ -58,17 +58,18 @@ class PowderCalculatorTest(unittest.TestCase):
         for key in ref_data["powder"]:
             for i in ref_data["powder"][key]:
                 try:
-                    assert_allclose(ref_data["powder"][key][i], calculated_data[key][i])
+                    assert_allclose(ref_data["powder"][key][i], calculated_data[key][i], atol=1e-12)
                 except AssertionError as e:
-                    raise AssertionError(f"Difference in field '{key}'") from e
+                    raise AssertionError(f"Difference in field '{key}' for case {name}") from e
 
         # check if loading powder data is correct
         new_tester = abins.PowderCalculator(filename=abins_data_filename, abins_data=ref_data["DFT"], temperature=300.0)
 
         loaded_data = new_tester.load_formatted_data().extract()
+
         for key in ref_data["powder"]:
             for i in ref_data["powder"][key]:
-                self.assertEqual(True, np.allclose(calculated_data[key][i], loaded_data[key][i]))
+                assert_allclose(calculated_data[key][i], loaded_data[key][i])
 
     def _get_ref_data(self, filename=None):
         with open(filename, "r") as fp:

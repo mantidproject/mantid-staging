@@ -10,7 +10,6 @@ import mantid.kernel as kernel
 from testhelpers import run_algorithm
 from mantid.api import AnalysisDataService
 import os
-from distutils.version import LooseVersion
 
 
 class ExportVulcanSampleLogTest(unittest.TestCase):
@@ -38,7 +37,7 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
             ifile = open(outfilename)
             lines = ifile.readlines()
             ifile.close()
-        except IOError as err:
+        except IOError:
             print("Unable to open file {0}.".format(outfilename))
             self.fail()
             return
@@ -86,7 +85,7 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
             ifile = open(outfilename)
             lines = ifile.readlines()
             ifile.close()
-        except IOError as err:
+        except IOError:
             print("Unable to open file {0}.".format(outfilename))
             self.fail()
             return
@@ -137,7 +136,7 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
             ifile = open(headerfilename)
             lines = ifile.readlines()
             ifile.close()
-        except IOError as err:
+        except IOError:
             errmsg = "Unable to open header file %s. " % (headerfilename)
             self.assertEqual(errmsg, "")
             return
@@ -190,7 +189,7 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
             ifile = open(headerfilename)
             lines = ifile.readlines()
             ifile.close()
-        except IOError as err:
+        except IOError:
             errmsg = "Unable to open header file %s. " % (headerfilename)
             self.assertEqual(errmsg, "")
             return
@@ -234,7 +233,7 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
             ifile = open(outfilename)
             lines = ifile.readlines()
             ifile.close()
-        except IOError as err:
+        except IOError:
             print("Unable to open file {0}.".format(outfilename))
             self.fail()
             return
@@ -295,7 +294,6 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
         """Create a workspace for testing against with more situation"""
         from mantid.simpleapi import CreateWorkspace
         from mantid.simpleapi import AddSampleLog
-        import numpy
         from numpy import datetime64, timedelta64
 
         # from time import gmtime, strftime,mktime # in debug prints
@@ -310,9 +308,6 @@ class ExportVulcanSampleLogTest(unittest.TestCase):
         dtimesec = 0.0010
         timefluc = 0.0001
         runstart = "2014-02-15T13:34:03"
-        # older numpy assumes local timezone
-        if LooseVersion(numpy.__version__) < LooseVersion("1.9"):
-            runstart = runstart + "Z"
         runstart = datetime64(runstart, "us")  # microsecond needed for deltas
 
         AddSampleLog(Workspace=wksp, LogName="run_start", LogText=str(runstart))

@@ -1130,8 +1130,9 @@ class Qt4MplCanvas(FigureCanvas):
         # Check input
         if isinstance(vec_x, np.ndarray) is False or isinstance(vec_y, np.ndarray) is False:
             raise NotImplementedError(
-                "Input vec_x {0} or vec_y {1} for addPlot() must be numpy.array, but they are "
-                "{2} and {3}.".format(vec_x, vec_y, type(vec_x), type(vec_y))
+                "Input vec_x {0} or vec_y {1} for addPlot() must be numpy.array, but they are {2} and {3}.".format(
+                    vec_x, vec_y, type(vec_x), type(vec_y)
+                )
             )
         plot_error = y_err is not None
         if plot_error is True:
@@ -1195,7 +1196,7 @@ class Qt4MplCanvas(FigureCanvas):
 
             for i_r in range(1, len(r)):
                 # remove the un-defined extra lines
-                self.axes.lines.remove(r[i_r])
+                r[i_r].remove()
         # END-IF-ELSE
 
         if annotation_list is not None and len(annotation_list) == len(vec_y):
@@ -1310,7 +1311,7 @@ class Qt4MplCanvas(FigureCanvas):
         grid_x, grid_y = np.meshgrid(vec_x, vec_y)
 
         # check size
-        assert grid_x.shape == matrix_z.shape, "Size of X (%d) and Y (%d) must match size of Z (%s)." "" % (
+        assert grid_x.shape == matrix_z.shape, "Size of X (%d) and Y (%d) must match size of Z (%s)." % (
             len(vec_x),
             len(vec_y),
             matrix_z.shape,
@@ -1378,7 +1379,7 @@ class Qt4MplCanvas(FigureCanvas):
                 continue
             if isinstance(plot, tuple) is False:
                 try:
-                    self.axes.lines.remove(plot)
+                    plot.remove()
                 except ValueError as e:
                     print(
                         "[Error] Plot %s is not in axes.lines which has %d lines. Error message: %s"
@@ -1545,10 +1546,8 @@ class Qt4MplCanvas(FigureCanvas):
         """
         # check input
         assert isinstance(title, str), "Title {0} must be a string but not a {1}.".format(title, type(title))
-        assert isinstance(color, str) and len(color) > 0, "Color {0} must be a non-empty string but not a {1}." "".format(
-            color, type(color)
-        )
-        assert isinstance(location, str) and len(location) > 0, "Location {0} must be a non-empty string but not a" " {1}.".format(
+        assert isinstance(color, str) and len(color) > 0, "Color {0} must be a non-empty string but not a {1}.".format(color, type(color))
+        assert isinstance(location, str) and len(location) > 0, "Location {0} must be a non-empty string but not a {1}.".format(
             location, type(location)
         )
 
@@ -1569,7 +1568,7 @@ class Qt4MplCanvas(FigureCanvas):
 
         if plot_key in self._lineDict:
             try:
-                self.axes.lines.remove(self._lineDict[plot_key])
+                self._lineDict[plot_key].remove()
             except ValueError as r_error:
                 error_message = "Unable to remove to 1D line %s (ID=%d) due to %s." % (
                     str(self._lineDict[plot_key]),

@@ -144,10 +144,11 @@ void updateLookupRowProperties(AlgorithmRuntimeProps &properties, LookupRow cons
   AlgorithmProperties::update("ProcessingInstructions", lookupRow.processingInstructions(), properties);
   AlgorithmProperties::update("BackgroundProcessingInstructions", lookupRow.backgroundProcessingInstructions(),
                               properties);
+  AlgorithmProperties::update("ROIDetectorIDs", lookupRow.roiDetectorIDs(), properties);
 }
 
 void updateWavelengthRangeProperties(AlgorithmRuntimeProps &properties,
-                                     boost::optional<RangeInLambda> const &rangeInLambda) {
+                                     std::optional<RangeInLambda> const &rangeInLambda) {
   if (!rangeInLambda)
     return;
 
@@ -228,7 +229,7 @@ void updateEventProperties(AlgorithmRuntimeProps &properties, Slicing const &sli
   boost::apply_visitor(UpdateEventPropertiesVisitor(properties), slicing);
 }
 
-boost::optional<double> getDouble(const IAlgorithm_sptr &algorithm, std::string const &property) {
+std::optional<double> getDouble(const IAlgorithm_sptr &algorithm, std::string const &property) {
   double result = algorithm->getProperty(property);
   return result;
 }
@@ -395,7 +396,6 @@ std::unique_ptr<Mantid::API::IAlgorithmRuntimeProps> createAlgorithmRuntimeProps
   auto lookupRow = row ? findLookupRow(*row, model) : findWildcardLookupRow(model);
   if (lookupRow) {
     updateLookupRowProperties(*properties, *lookupRow);
-    AlgorithmProperties::update("ROIDetectorIDs", lookupRow->roiDetectorIDs(), *properties);
   }
   // Update properties the user has specifically set for this run
   if (row) {

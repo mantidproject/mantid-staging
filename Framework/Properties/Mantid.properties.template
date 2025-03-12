@@ -21,7 +21,7 @@ Q.convention = Inelastic
 
 # Set of PyQt interfaces to add to the Interfaces menu, separated by a space.  Interfaces are separated from their respective categories by a "/".
 
-mantidqt.python_interfaces = ILL/Drill.py ILL/SimpleScanViewer.py Direct/DGS_Reduction.py Direct/DGSPlanner.py Direct/PyChop.py Direct/MSlice.py Direct/Shiver.py SANS/ORNL_SANS.py Utility/TofConverter.py Diffraction/Engineering_Diffraction.py Diffraction/Powder_Diffraction_Reduction.py Diffraction/SNAPRed.py Utility/FilterEvents.py Diffraction/HFIR_4Circle_Reduction.py Utility/QECoverage.py SANS/ISIS_SANS.py Muon/Frequency_Domain_Analysis.py Muon/Elemental_Analysis.py Muon/Muon_Analysis.py General/Sample_Transmission_Calculator.py Direct/DNS_Reduction.py
+mantidqt.python_interfaces = ILL/DrILL.py ILL/Simple_Scan_Viewer.py Direct/DGS_Reduction.py Direct/DGS_Planner.py Direct/PyChop.py Direct/MSlice.py Direct/Shiver.py SANS/ORNL_SANS.py Utility/TOF_Converter.py Diffraction/Engineering_Diffraction.py Diffraction/Powder_Diffraction_Reduction.py Diffraction/SNAPRed.py Utility/Filter_Events.py Diffraction/HFIR_4Circle_Reduction.py Utility/QE_Coverage.py SANS/ISIS_SANS.py Muon/Frequency_Domain_Analysis.py Muon/Elemental_Analysis.py Muon/Muon_Analysis.py General/Sample_Transmission_Calculator.py Direct/DNS_Reduction.py Diffraction/Garnet.py
 
 mantidqt.python_interfaces_io_registry = Engineering_Diffraction_register.py
 
@@ -79,6 +79,9 @@ pythonalgorithms.refresh.allowed = 0
 # Use forward slash / for all paths
 datasearch.directories = @DATADIRS@
 
+# Directory where data cache is stored, default IDaaS path
+datacachesearch.directory = /data/instrument
+
 # Root of html documentation (kept as unix-style path)
 docs.html.root = @HTML_ROOT@
 
@@ -130,6 +133,13 @@ MantidOptions.InvisibleWorkspaces=0
 # This flag controls the way the "unwrapped" instrument view is rendered.
 # Change to Off to disable OpenGL and use normal windows graphics.
 MantidOptions.InstrumentView.UseOpenGL = On
+
+# This will reduce the size of the OpenGL display lists used when drawing the
+# Instrument View. By doing this we reduce the chance that we will hit
+# a memory allocation bug in the Mesa graphics library that has been
+# fixed in version 24.1. This is only relevant if you are using both Linux and
+# a broken version of Mesa.
+MantidOptions.InstrumentView.MesaBugWorkaround = Off
 
 # Controls the default normalization mode for graph plotting
 # Allowed values are:
@@ -241,6 +251,12 @@ plots.font=
 plots.xAxesScale = Linear
 plots.yAxesScale = Linear
 
+# Default x/y ranges for 2d plots
+plots.x_min =
+plots.x_max =
+plots.y_min =
+plots.y_max =
+
 # The default width of the lines for the axes
 plots.axesLineWidth = 1
 
@@ -298,6 +314,12 @@ plots.errorbar.errorEvery = 1
 # Default width of error bars in 1d plots
 plots.errorbar.Width = 1.0
 
+# Default marker style for the errorbar workspace
+plots.errorbar.MarkerStyle = circle
+
+# Default marker size for the errorbar workspace
+plots.errorbar.MarkerSize = 4
+
 # Default legend location
 plots.legend.Location = best
 
@@ -309,3 +331,15 @@ plots.images.Colormap = viridis
 
 # Default colorbar scale for image plots
 plots.images.ColorBarScale = Linear
+
+# Default marker style for marker workspace plots
+plots.markerworkspace.MarkerStyle = vline
+
+# Default marker size for marker workspace plots
+plots.markerworkspace.MarkerSize = 6
+
+# Profiler Default Filename
+performancelog.filename = algotimeregister.out
+
+# Algorithm Profiler Default Status
+performancelog.write = Off

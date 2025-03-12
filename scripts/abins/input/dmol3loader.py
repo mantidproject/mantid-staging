@@ -42,8 +42,11 @@ class DMOL3Loader(AbInitioLoader):
         :param input_ab_initio_filename: name of file with vibrational data (foo.outmol)
         """
         super().__init__(input_ab_initio_filename=input_ab_initio_filename)
-        self._ab_initio_program = "DMOL3"
         self._norm = 0
+
+    @property
+    def _ab_initio_program(self) -> str:
+        return "DMOL3"
 
     def read_vibrational_or_phonon_data(self):
         """
@@ -57,7 +60,6 @@ class DMOL3Loader(AbInitioLoader):
             self._clerk.get_input_filename(),
             "rb",
         ) as dmol3_file:
-
             # Move read file pointer to the last calculation recorded in the .outmol file. First calculation could be
             # geometry optimization. The last calculation in the file is expected to be calculation of vibrational data.
             # There may be some intermediate resume calculations.

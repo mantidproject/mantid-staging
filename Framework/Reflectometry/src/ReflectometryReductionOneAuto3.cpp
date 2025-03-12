@@ -17,6 +17,9 @@
 #include "MantidKernel/RegexStrings.h"
 #include "MantidKernel/Strings.h"
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
 
@@ -64,7 +67,7 @@ std::vector<std::string> getGroupMemberNames(const std::string &groupName) {
 
 std::string vectorToString(const std::vector<std::string> &vec) {
   std::string result;
-  for (auto item : vec) {
+  for (const auto &item : vec) {
     if (!result.empty())
       result += ",";
     result += item;
@@ -78,7 +81,7 @@ void removeAllWorkspacesFromGroup(const std::string &groupName) {
 }
 
 void removeWorkspacesFromADS(const std::vector<std::string> &workspaceNames) {
-  for (auto workspaceName : workspaceNames)
+  for (const auto &workspaceName : workspaceNames)
     AnalysisDataService::Instance().remove(workspaceName);
 }
 
@@ -555,7 +558,6 @@ void ReflectometryReductionOneAuto3::populateAlgorithmicCorrectionProperties(con
 
   // With algorithmic corrections, monitors should not be integrated, see below
   const std::string correctionAlgorithm = getProperty("CorrectionAlgorithm");
-
   if (correctionAlgorithm == "PolynomialCorrection") {
     alg->setProperty("NormalizeByIntegratedMonitors", false);
     alg->setProperty("CorrectionAlgorithm", "PolynomialCorrection");
@@ -587,20 +589,22 @@ void ReflectometryReductionOneAuto3::populateAlgorithmicCorrectionProperties(con
         alg->setProperty("CorrectionAlgorithm", "PolynomialCorrection");
         alg->setProperty("Polynomial", polyVec[0]);
       } else if (correctionStr == "exponential") {
-        const auto c0Vec = instrument->getStringParameter("C0");
+        const auto c0Vec = instrument->getNumberParameter("C0");
         if (c0Vec.empty())
           throw std::runtime_error("Could not find parameter 'C0' in parameter "
                                    "file. Cannot apply exponential correction.");
-        const auto c1Vec = instrument->getStringParameter("C1");
+        const auto c1Vec = instrument->getNumberParameter("C1");
         if (c1Vec.empty())
           throw std::runtime_error("Could not find parameter 'C1' in parameter "
                                    "file. Cannot apply exponential correction.");
+
+        alg->setProperty("CorrectionAlgorithm", "ExponentialCorrection");
         alg->setProperty("C0", c0Vec[0]);
         alg->setProperty("C1", c1Vec[0]);
       }
       alg->setProperty("NormalizeByIntegratedMonitors", false);
     } catch (std::runtime_error &e) {
-      g_log.error() << e.what() << ". Polynomial correction will not be performed.";
+      g_log.error() << e.what() << ". Algorithmic correction will not be performed.";
       alg->setProperty("CorrectionAlgorithm", "None");
     }
   } else {
@@ -622,9 +626,9 @@ auto ReflectometryReductionOneAuto3::getRebinParams(const MatrixWorkspace_sptr &
  * @param theta :: the angle of this run
  * @return :: the rebin step in Q, or none if it could not be found
  */
-boost::optional<double> ReflectometryReductionOneAuto3::getQStep(const MatrixWorkspace_sptr &inputWS,
-                                                                 const double theta) {
-  Property *qStepProp = getProperty("MomentumTransferStep");
+std::optional<double> ReflectometryReductionOneAuto3::getQStep(const MatrixWorkspace_sptr &inputWS,
+                                                               const double theta) {
+  Property const *qStepProp = getProperty("MomentumTransferStep");
   double qstep;
   if (!qStepProp->isDefault()) {
     qstep = getProperty("MomentumTransferStep");
@@ -643,7 +647,7 @@ boost::optional<double> ReflectometryReductionOneAuto3::getQStep(const MatrixWor
     calcRes->execute();
 
     if (!calcRes->isExecuted()) {
-      return boost::none;
+      return std::nullopt;
     }
     qstep = calcRes->getProperty("Resolution");
     qstep = -qstep;
@@ -677,7 +681,7 @@ MatrixWorkspace_sptr ReflectometryReductionOneAuto3::rebin(const MatrixWorkspace
  * unchanged input workspace otherwise.
  */
 MatrixWorkspace_sptr ReflectometryReductionOneAuto3::scale(MatrixWorkspace_sptr inputWS) {
-  Property *scaleProp = getProperty("ScaleFactor");
+  Property const *scaleProp = getProperty("ScaleFactor");
   if (scaleProp->isDefault())
     return inputWS;
 
@@ -726,7 +730,7 @@ MatrixWorkspace_sptr ReflectometryReductionOneAuto3::cropQ(MatrixWorkspace_sptr 
  */
 double ReflectometryReductionOneAuto3::getPropertyOrDefault(const std::string &propertyName, const double defaultValue,
                                                             bool &isDefault) {
-  Property *property = getProperty(propertyName);
+  Property const *property = getProperty(propertyName);
   isDefault = property->isDefault();
   if (isDefault)
     return defaultValue;
@@ -796,9 +800,9 @@ Algorithm_sptr ReflectometryReductionOneAuto3::createAlgorithmForGroupMember(std
 
   // Copy all the non-workspace properties over
   const std::vector<Property *> props = getProperties();
-  for (auto &prop : props) {
+  for (const auto &prop : props) {
     if (prop) {
-      IWorkspaceProperty *wsProp = dynamic_cast<IWorkspaceProperty *>(prop);
+      IWorkspaceProperty const *wsProp = dynamic_cast<IWorkspaceProperty *>(prop);
       if (!wsProp)
         alg->setPropertyValue(prop->name(), prop->value());
     }
@@ -828,6 +832,10 @@ Algorithm_sptr ReflectometryReductionOneAuto3::createAlgorithmForGroupMember(std
         std::dynamic_pointer_cast<MatrixWorkspace>(AnalysisDataService::Instance().retrieve(outputNames.iVsLam));
     auto newProcInst = convertToSpectrumNumber("0", currentWorkspace);
     alg->setProperty("ProcessingInstructions", newProcInst);
+    // We only want to recalculate IvsQ, so we should not perform the sum banks or background subtraction steps
+    alg->setProperty("SubtractBackground", false);
+    alg->setProperty("BackgroundProcessingInstructions", "");
+    alg->setProperty("ROIDetectorIDs", "");
   }
 
   return alg;
@@ -1077,6 +1085,7 @@ void ReflectometryReductionOneAuto3::applyPolarizationCorrection(const std::stri
   polAlg->setProperty("Efficiencies", efficiencies);
   polAlg->setProperty("CorrectionMethod", correctionMethod);
   polAlg->setProperty(CorrectionMethod::OPTION_NAME.at(correctionMethod), correctionOption);
+  polAlg->setProperty("AddSpinStateToLog", true);
 
   if (correctionMethod == "Fredrikze") {
     polAlg->setProperty("InputWorkspaceGroup", outputIvsLam);

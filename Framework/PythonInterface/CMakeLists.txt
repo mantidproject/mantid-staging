@@ -13,8 +13,9 @@ endif()
 # Keep boost python separate from other boost
 set(_boost_libs_orig ${Boost_LIBRARIES})
 set(Boost_LIBRARIES)
+set(Boost_VERBOSE "ON")
 find_package(
-  Boost ${BOOST_VERSION_REQUIRED}
+  Boost CONFIG
   COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
   REQUIRED
 )
@@ -108,6 +109,7 @@ add_dependencies(
   PythonAPIModule
   PythonDataObjectsModule
   PythonCurveFittingModule
+  PythonReflHelpersModule
 )
 
 # Clear any leftover bin/$(Configuration)/mantid/ folder, from when PythonInterface was being copied over. The last

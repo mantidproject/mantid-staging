@@ -4,13 +4,12 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
+from mantid.kernel import IntArrayProperty, StringArrayProperty
 import h5py
 
 
 class EnggSaveSinglePeakFitResultsToHDF5(PythonAlgorithm):
-
     PROP_BANKIDS = "BankIDs"
     PROP_FILENAME = "Filename"
     PROP_INPUT_WS = "InputWorkspaces"
@@ -45,7 +44,7 @@ class EnggSaveSinglePeakFitResultsToHDF5(PythonAlgorithm):
         runNumbers = self.getProperty(self.PROP_RUN_NUMBERS).value
         if len(input_ws_names) > 1 and len(runNumbers) != len(input_ws_names):
             issues[self.PROP_RUN_NUMBERS] = (
-                "When saving multiple fit results at once, one run number must be " "supplied for every input workspace"
+                "When saving multiple fit results at once, one run number must be supplied for every input workspace"
             )
 
         return issues

@@ -11,12 +11,16 @@
 #include "MantidKernel/PhysicalConstants.h"
 #include "MantidKernel/Unit.h"
 #include "MantidKernel/UnitLabelTypes.h"
+#include "MantidKernel/WarningSuppressions.h"
 #include <boost/lexical_cast.hpp>
 #include <cfloat>
 #include <limits>
 
 using namespace Mantid::Kernel;
 using namespace Mantid::Kernel::Units;
+
+GNU_DIAG_OFF("array-bounds")
+GNU_DIAG_OFF("stringop-overflow")
 
 // function checks if conversion within limits works reversibly
 std::string convert_units_check_range(const Unit &aUnit, std::vector<double> &samples, std::vector<double> &results,
@@ -534,7 +538,7 @@ public:
     // DIFC = (mn/h)*(L1+L2)2sin(theta) * (1+|DX|)^{-offset}
     // function params: l1, l2, twoTheta, offset, binWidth
     const double l1 = 2.0, l2 = 2.0, tt = 1.0, offset = 1.0, dx = -1.0;
-    double difcValue_ref = (Mantid::PhysicalConstants::NeutronMass) / (Mantid::PhysicalConstants::h)*1e-4;
+    double difcValue_ref = (Mantid::PhysicalConstants::NeutronMass) / (Mantid::PhysicalConstants::h) * 1e-4;
     // with offset=1, DX=-1, (1+|DX|)^{-offset} = 0.5
     // then  DIFC = (mn/h)*(L1+L2) sin(theta)
     difcValue_ref *= (l1 + l2) * std::sin(tt / 2.0);

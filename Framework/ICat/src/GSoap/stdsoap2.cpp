@@ -16,6 +16,8 @@ GNU_DIAG_OFF("cast-align")
 GNU_DIAG_OFF("deprecated-copy")
 GNU_DIAG_OFF("stringop-truncation")
 GNU_DIAG_OFF("restrict")
+GNU_DIAG_OFF("stringop-overread")
+GNU_DIAG_OFF("maybe-uninitialized")
 
 /*
   stdsoap2.c[pp] 2.8.15
@@ -447,8 +449,7 @@ static const struct soap_code_map h_http_error_codes[] = {{200, "OK"},
 
 #ifdef WITH_OPENSSL
 static const struct soap_code_map h_ssl_error_codes[] = {
-#define _SSL_ERROR(e)                                                                                                  \
-  { e, #e }
+#define _SSL_ERROR(e) {e, #e}
     _SSL_ERROR(SSL_ERROR_SSL),          _SSL_ERROR(SSL_ERROR_ZERO_RETURN),
     _SSL_ERROR(SSL_ERROR_WANT_READ),    _SSL_ERROR(SSL_ERROR_WANT_WRITE),
     _SSL_ERROR(SSL_ERROR_WANT_CONNECT), _SSL_ERROR(SSL_ERROR_WANT_X509_LOOKUP),
@@ -15460,3 +15461,4 @@ GNU_DIAG_ON("format-truncation")
 GNU_DIAG_ON("implicit-fallthrough")
 GNU_DIAG_ON("cast-align")
 GNU_DIAG_OFF("deprecated-copy")
+GNU_DIAG_ON("maybe-uninitialized")

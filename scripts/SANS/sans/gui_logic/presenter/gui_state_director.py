@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-"""  The GuiStateDirector generates the state object from the models.
+"""The GuiStateDirector generates the state object from the models.
 
 The GuiStateDirector gets the information from the table and state model and generates state objects. It delegates
 the main part of the work to an StateDirectorISIS object.
@@ -54,12 +54,12 @@ class GuiStateDirector(object):
         self._apply_column_options_to_state(row_entry, gui_state)
 
         # 3. Add other columns
-        gui_state.all_states.save = self._state_gui_model.all_states.save
+        if row_user_file:
+            # We need to copy these particular settings from the GUI when custom user file settings are being applied
+            gui_state.all_states.save = copy.deepcopy(self._state_gui_model.all_states.save)
+            gui_state.reduction_dimensionality = self._state_gui_model.reduction_dimensionality
 
-        output_name = row_entry.output_name
-        if output_name:
-            gui_state.output_name = output_name
-        gui_state.reduction_dimensionality = self._state_gui_model.reduction_dimensionality
+        gui_state.output_name = row_entry.output_name if row_entry.output_name else None
 
         if row_entry.sample_thickness:
             gui_state.sample_thickness = float(row_entry.sample_thickness)
@@ -69,6 +69,11 @@ class GuiStateDirector(object):
             gui_state.sample_width = float(row_entry.sample_width)
         if row_entry.sample_shape:
             gui_state.sample_shape = row_entry.sample_shape
+
+        if row_entry.background_ws:
+            gui_state.background_workspace = row_entry.background_ws
+        if row_entry.scale_factor:
+            gui_state.scale_factor = row_entry.scale_factor
 
         # 4. Create the rest of the state based on the builder.
         gui_state.all_states.data = data_builder.build()
@@ -93,7 +98,7 @@ class GuiStateDirector(object):
             # Has a custom user file so ignore any settings from GUI
             user_file_path = FileFinder.getFullPath(row_user_file)
             if not os.path.exists(user_file_path):
-                raise ValueError(f"The user file '{row_user_file}'" " cannot be found. Make sure a valid user file has been specified.")
+                raise ValueError(f"The user file '{row_user_file}' cannot be found. Make sure a valid user file has been specified.")
             state = FileLoading.load_user_file(user_file_path, file_information=file_information)
             gui_state = StateGuiModel(state)
         else:
@@ -153,9 +158,3 @@ class GuiStateDirector(object):
 
         if "UseMirror" in options.keys():
             state_gui_model.phi_limit_use_mirror = options["UseMirror"]
-
-        if "BackgroundWorkspace" in options.keys():
-            state_gui_model.background_workspace = options["BackgroundWorkspace"]
-
-        if "ScaleFactor" in options.keys():
-            state_gui_model.scale_factor = options["ScaleFactor"]

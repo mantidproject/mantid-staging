@@ -15,6 +15,7 @@
 #include "MantidKernel/TimeROI.h"
 #include "MantidKernel/Timer.h"
 #include "MantidKernel/Unit.h"
+#include "MantidKernel/VectorHelper.h"
 
 #include <cxxtest/TestSuite.h>
 
@@ -142,30 +143,54 @@ public:
     EventList eventList;
     eventList.setHistogram(BinEdges{0.0, 2.0});
     eventList += TofEvent(1.0, 2);
+    constexpr std::size_t NUM_EVENTS{1};
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
+
     EventList target;
 
+    eventList.switchTo(EventType::TOF);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     target.copyDataFrom(eventList);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     TS_ASSERT_EQUALS(target.getEventType(), EventType::TOF)
     TS_ASSERT_EQUALS(target.getSortType(), eventList.getSortType());
+    TS_ASSERT_EQUALS(target.getNumberEvents(), 1);
     TS_ASSERT_EQUALS(target.getEvents(), eventList.getEvents());
     TS_ASSERT_THROWS(target.getWeightedEvents(), const std::runtime_error &);
     TS_ASSERT_THROWS(target.getWeightedEventsNoTime(), const std::runtime_error &);
 
     eventList.switchTo(EventType::WEIGHTED);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     target.copyDataFrom(eventList);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     TS_ASSERT_EQUALS(target.getEventType(), EventType::WEIGHTED)
     TS_ASSERT_EQUALS(target.getSortType(), eventList.getSortType());
+    TS_ASSERT_EQUALS(target.getNumberEvents(), NUM_EVENTS);
     TS_ASSERT_THROWS(target.getEvents(), const std::runtime_error &);
     TS_ASSERT_EQUALS(target.getWeightedEvents(), eventList.getWeightedEvents());
     TS_ASSERT_THROWS(target.getWeightedEventsNoTime(), const std::runtime_error &);
 
     eventList.switchTo(EventType::WEIGHTED_NOTIME);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     target.copyDataFrom(eventList);
+    TS_ASSERT_EQUALS(eventList.getNumberEvents(), NUM_EVENTS);
     TS_ASSERT_EQUALS(target.getEventType(), EventType::WEIGHTED_NOTIME)
     TS_ASSERT_EQUALS(target.getSortType(), eventList.getSortType());
+    TS_ASSERT_EQUALS(target.getNumberEvents(), 1);
     TS_ASSERT_THROWS(target.getEvents(), const std::runtime_error &);
     TS_ASSERT_THROWS(target.getWeightedEvents(), const std::runtime_error &);
     TS_ASSERT_EQUALS(target.getWeightedEventsNoTime(), eventList.getWeightedEventsNoTime());
+  }
+
+  void test_EventTypeConstructor() {
+    EventList tof;
+    TS_ASSERT_EQUALS(tof.getEventType(), TOF);
+
+    EventList weighted(WEIGHTED);
+    TS_ASSERT_EQUALS(weighted.getEventType(), WEIGHTED);
+
+    EventList weightedNoTime(WEIGHTED_NOTIME);
+    TS_ASSERT_EQUALS(weightedNoTime.getEventType(), WEIGHTED_NOTIME);
   }
 
   //==================================================================================
@@ -369,7 +394,7 @@ public:
     // But you can still add a plain one
     TofEvent e(789, 654);
     el += e;
-    TS_ASSERT_EQUALS(el.getWeightedEvents()[NUMEVENTS + 1], e);
+    TS_ASSERT_EQUALS(el.getWeightedEvents()[NUMEVENTS + 1], static_cast<WeightedEvent>(e));
     TS_ASSERT_EQUALS(el.getEvent(NUMEVENTS + 1).weight(), 1.0);
   }
 
@@ -1402,11 +1427,6 @@ public:
     TS_ASSERT_EQUALS(dates[5], "2023-Jan-01 12:01:40");
   }
 
-  /**
-   *
-   * @param factor
-   * @param shift
-   */
   void test_getPulseTOFTimesAtSample() {
     const DateAndTime startTime{"2023-01-01T12:00:00"};
     const double pulsePeriod{60.0}; // in seconds
@@ -1973,7 +1993,7 @@ public:
         if (!inplace)
           delete el_out;
       } // inplace
-    }   // starting event type
+    } // starting event type
   }
 
   void test_compressFatEvents() {
@@ -2145,6 +2165,335 @@ public:
     // first value
     TS_ASSERT_DELTA(result[el.getNumberEvents() - 1], 2.5, 0.000001);
     // last value
+  }
+
+  void test_compressEvents_log() {
+    this->fake_uniform_data(10000.);
+
+    // First lets compare histogramming with compression versus without.
+    // This may only work exactly when the smallest tof is equal to the minimum rebin parameter,
+    // in this case 100
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams({100., -1., 819200}, X, true);
+
+    // get expected results
+    el.generateHistogram(X, expected_Y, expected_E);
+
+    // do compress events with log binning then histogram to compare to un-compressed
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressEvents(-1, &el_output));
+    el_output.generateHistogram(X, Y, E);
+
+    for (size_t i = 0; i < Y.size(); i++) {
+      TS_ASSERT_EQUALS(expected_Y[i], Y[i]);
+      TS_ASSERT_EQUALS(expected_E[i], E[i]);
+    }
+
+    // now check individual events
+    TS_ASSERT_EQUALS(el.getNumberEvents(), 9999900);
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 17);
+
+    // event weights should double for each one, 100, 200, 400, 800...
+    // event tofs should double, it will be roughly 150, 300, 600, 1200...
+
+    // don't check last event as bin will be partially filled
+    for (int i = 0; i < 16; i++) {
+      TS_ASSERT_EQUALS(el_output.getEvent(i).weight(), 100 * pow(2, i))
+      TS_ASSERT_EQUALS(el_output.getEvent(i).errorSquared(), 100 * pow(2, i))
+      TS_ASSERT_DELTA(el_output.getEvent(i).tof(), 150 * pow(2, i), 0.5)
+    }
+  }
+
+  void test_compressEvents_log2() {
+    // Check that for very sparse events
+    // Add four events, one that is repeated
+    // Should result in 3 events, with the second of weight 2
+    el = EventList();
+    el += TofEvent(100, 0);
+    el += TofEvent(1000, 0);
+    el += TofEvent(1000, 0);
+    el += TofEvent(100000, 0);
+
+    // do compress events with log binning
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressEvents(-0.01, &el_output))
+
+    // now check individual events
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 3)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(0).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(0).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(0).tof(), 100, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(1).weight(), 2)
+    TS_ASSERT_EQUALS(el_output.getEvent(1).errorSquared(), 2)
+    TS_ASSERT_DELTA(el_output.getEvent(1).tof(), 1000, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(2).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(2).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(2).tof(), 100000, 1e-5)
+  }
+
+  void test_compressEvents_log3() {
+    // check the behavior when TOF is zero or negative
+    el = EventList();
+    el += TofEvent(0, 0);
+    el += TofEvent(0.5, 0);
+    el += TofEvent(1, 0);
+
+    // Do compress events with log binning
+    // Since there is a tof==0 then the first bin_end should be 1
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressEvents(-1, &el_output))
+
+    // now check individual events
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 2)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(0).weight(), 2)
+    TS_ASSERT_EQUALS(el_output.getEvent(0).errorSquared(), 2)
+    TS_ASSERT_DELTA(el_output.getEvent(0).tof(), 0.25, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(1).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(1).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(1).tof(), 1, 1e-5)
+
+    // now add a negative TOF and it should throw
+    el += TofEvent(-1, 0);
+    TS_ASSERT_THROWS(el.compressEvents(-1, &el_output), const std::runtime_error &)
+  }
+
+  void test_compressFatEvents_log() {
+    el = EventList();
+    for (int pulseTime = 0; pulseTime < 5; pulseTime++)
+      for (double tof = 100; tof < 51200; tof++)
+        el += TofEvent(tof, DateAndTime{pulseTime, 0});
+
+    // First lets compare histogramming with compression versus without.
+    // This may only work exactly when the smallest tof is equal to the minimum rebin parameter,
+    // in this case 100
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams({100., -1., 51200}, X, true);
+
+    // get expected results
+    el.generateHistogram(X, expected_Y, expected_E);
+
+    /// do compress events with log binning
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressFatEvents(-1, DateAndTime{0}, 2., &el_output));
+
+    // check individual events
+    // with a pulsetime delta of 2 seconds we should end up with 3 pulsetime groups with 9 events in each group, so 27
+    // events total
+
+    TS_ASSERT_EQUALS(el.getNumberEvents(), 255500);
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 27);
+
+    // First pulse group with pulsetime = 500ms
+    // Event weights should double for each one, 200, 400, 800, 1600...
+    // Event tofs should double, it will be roughly 150, 300, 600, 1200...
+    for (int i = 0; i < 9; i++) {
+      TS_ASSERT_EQUALS(el_output.getEvent(i).pulseTime().totalNanoseconds(), 500000000)
+      TS_ASSERT_EQUALS(el_output.getEvent(i).weight(), 200 * pow(2, i))
+      TS_ASSERT_EQUALS(el_output.getEvent(i).errorSquared(), 200 * pow(2, i))
+      TS_ASSERT_DELTA(el_output.getEvent(i).tof(), 150 * pow(2, i), 0.5)
+    }
+
+    // Second pulse group with pulsetime = 2500ms
+    // Event weights should double for each one, 200, 400, 800, 1600...
+    // Event tofs should double, it will be roughly 150, 300, 600, 1200...
+    for (int i = 9; i < 18; i++) {
+      TS_ASSERT_EQUALS(el_output.getEvent(i).pulseTime().totalNanoseconds(), 2500000000)
+      TS_ASSERT_EQUALS(el_output.getEvent(i).weight(), 200 * pow(2, i - 9))
+      TS_ASSERT_EQUALS(el_output.getEvent(i).errorSquared(), 200 * pow(2, i - 9))
+      TS_ASSERT_DELTA(el_output.getEvent(i).tof(), 150 * pow(2, i - 9), 0.5)
+    }
+
+    // Third pulse group with pulsetime = 4000ms
+    // Event weights should double for each one, 100, 200, 400, 800...
+    // Event tofs should double, it will be roughly 150, 300, 600, 1200...
+    for (int i = 18; i < 27; i++) {
+      TS_ASSERT_EQUALS(el_output.getEvent(i).pulseTime().totalNanoseconds(), 4000000000)
+      TS_ASSERT_EQUALS(el_output.getEvent(i).weight(), 100 * pow(2, i - 18))
+      TS_ASSERT_EQUALS(el_output.getEvent(i).errorSquared(), 100 * pow(2, i - 18))
+      TS_ASSERT_DELTA(el_output.getEvent(i).tof(), 150 * pow(2, i - 18), 0.5)
+    }
+
+    // histogram to compare to un-compressed
+    el_output.generateHistogram(X, Y, E);
+
+    for (size_t i = 0; i < Y.size(); i++) {
+      TS_ASSERT_EQUALS(expected_Y[i], Y[i]);
+      TS_ASSERT_EQUALS(expected_E[i], E[i]);
+    }
+  }
+
+  void test_compressFatEvents_log2() {
+    el = EventList();
+    el += TofEvent(100, DateAndTime{0, 0});
+    el += TofEvent(1000, DateAndTime{0, 0});
+    el += TofEvent(1001, DateAndTime{0, 0});
+    el += TofEvent(100, DateAndTime{3, 0});
+    el += TofEvent(1000, DateAndTime{3, 0});
+    el += TofEvent(1001, DateAndTime{3, 0});
+    el += TofEvent(100, DateAndTime{6, 0});
+    el += TofEvent(1000, DateAndTime{6, 0});
+    el += TofEvent(1001, DateAndTime{6, 0});
+
+    // Do compress events with log binning.
+    // With a large pulseTime delta of 10 seconds we should end up with 2 events with same pulsetime but different TOFs
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressFatEvents(-1, DateAndTime{0}, 10, &el_output));
+
+    TS_ASSERT_EQUALS(el.getNumberEvents(), 9)
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 2)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(0).weight(), 3)
+    TS_ASSERT_EQUALS(el_output.getEvent(0).errorSquared(), 3)
+    TS_ASSERT_DELTA(el_output.getEvent(0).tof(), 100, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(0).pulseTime().totalNanoseconds(), 3000000000, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(1).weight(), 6)
+    TS_ASSERT_EQUALS(el_output.getEvent(1).errorSquared(), 6)
+    TS_ASSERT_DELTA(el_output.getEvent(1).tof(), 1000.5, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(1).pulseTime().totalNanoseconds(), 3000000000, 1e-5)
+
+    // Do compress events with log binning.
+    // With a pulseTime delta of 5 seconds we should end up with 4 events
+    el_output = EventList();
+    TS_ASSERT_THROWS_NOTHING(el.compressFatEvents(-1, DateAndTime{0}, 5, &el_output));
+
+    TS_ASSERT_EQUALS(el.getNumberEvents(), 9)
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 4)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(0).weight(), 2)
+    TS_ASSERT_EQUALS(el_output.getEvent(0).errorSquared(), 2)
+    TS_ASSERT_DELTA(el_output.getEvent(0).tof(), 100, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(0).pulseTime().totalNanoseconds(), 1500000000, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(1).weight(), 4)
+    TS_ASSERT_EQUALS(el_output.getEvent(1).errorSquared(), 4)
+    TS_ASSERT_DELTA(el_output.getEvent(1).tof(), 1000.5, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(1).pulseTime().totalNanoseconds(), 1500000000, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(2).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(2).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(2).tof(), 100, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(2).pulseTime().totalNanoseconds(), 6000000000, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(3).weight(), 2)
+    TS_ASSERT_EQUALS(el_output.getEvent(3).errorSquared(), 2)
+    TS_ASSERT_DELTA(el_output.getEvent(3).tof(), 1000.5, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(3).pulseTime().totalNanoseconds(), 6000000000, 1e-5)
+  }
+
+  void test_compressFatEvents_log3() {
+    // check the behavior when TOF is zero or negative
+    el = EventList();
+    el += TofEvent(0.5, 1);
+    el += TofEvent(1, 2);
+    el += TofEvent(0, 3);
+    el += TofEvent(1, 15000000000); // 15 seconds, one event in second wall clock bin
+
+    // Do compress events with log binning
+    // Since there is a tof==0 then the first bin_end should be 1
+    EventList el_output;
+    TS_ASSERT_THROWS_NOTHING(el.compressFatEvents(-1, DateAndTime{0}, 10, &el_output))
+
+    // now check individual events
+    TS_ASSERT_EQUALS(el_output.getNumberEvents(), 3)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(0).weight(), 2)
+    TS_ASSERT_EQUALS(el_output.getEvent(0).errorSquared(), 2)
+    TS_ASSERT_DELTA(el_output.getEvent(0).tof(), 0.25, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(0).pulseTime().totalNanoseconds(), 2, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(1).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(1).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(1).tof(), 1, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(1).pulseTime().totalNanoseconds(), 2, 1e-5)
+
+    TS_ASSERT_EQUALS(el_output.getEvent(2).weight(), 1)
+    TS_ASSERT_EQUALS(el_output.getEvent(2).errorSquared(), 1)
+    TS_ASSERT_DELTA(el_output.getEvent(2).tof(), 1, 1e-5)
+    TS_ASSERT_DELTA(el_output.getEvent(2).pulseTime().totalNanoseconds(), 15000000000, 1e-5)
+
+    // now add a negative TOF and it should throw
+    el += TofEvent(-1, 0);
+    TS_ASSERT_THROWS(el.compressFatEvents(-1, DateAndTime{0}, 10, &el_output), const std::runtime_error &)
+  }
+
+  void test_compressEvents_unsorted() {
+    el = EventList();
+    el += TofEvent(2.8, 0);
+    el += TofEvent(2.9, 0);
+    el += TofEvent(3.0, 0);
+    el += TofEvent(3.1, 0);
+    el += TofEvent(3.2, 0);
+    el += TofEvent(1, 0);
+    compressEvents_unsorted(el, 1.0, false);
+    compressEvents_unsorted(el, 1.0, true);
+  }
+
+  void test_compressEvents_unsorted_weighted() {
+    el = EventList();
+    el.switchTo(WEIGHTED);
+    el += WeightedEvent(2.8, 0, 2.0, 2.0);
+    el += WeightedEvent(2.9, 0, 2.0, 2.0);
+    el += WeightedEvent(3.0, 0, 2.0, 2.0);
+    el += WeightedEvent(3.1, 0, 2.0, 2.0);
+    el += WeightedEvent(3.2, 0, 2.0, 2.0);
+    el += WeightedEvent(1, 0, 2.0, 2.0);
+    compressEvents_unsorted(el, 2.0, false);
+    compressEvents_unsorted(el, 2.0, true);
+  }
+
+  void test_compressEvents_unsorted_weighted_notime() {
+    el = EventList();
+    el.switchTo(WEIGHTED);
+    el += WeightedEvent(2.8, 0, 2.0, 2.0);
+    el += WeightedEvent(2.9, 0, 2.0, 2.0);
+    el += WeightedEvent(3.0, 0, 2.0, 2.0);
+    el += WeightedEvent(3.1, 0, 2.0, 2.0);
+    el += WeightedEvent(3.2, 0, 2.0, 2.0);
+    el += WeightedEvent(1, 0, 2.0, 2.0);
+    el.switchTo(WEIGHTED_NOTIME);
+    compressEvents_unsorted(el, 2.0, false);
+    compressEvents_unsorted(el, 2.0, true);
+  }
+
+  void compressEvents_unsorted(EventList el, double event_weight, bool inplace) {
+    auto histogram = std::make_shared<std::vector<double>>();
+    VectorHelper::createAxisFromRebinParams({1., 1., 4.0}, *histogram);
+    EventList *el_output;
+    if (inplace)
+      el_output = &el;
+    else
+      el_output = new EventList();
+
+    TS_ASSERT_THROWS_NOTHING(el.compressEvents(1., el_output, histogram));
+
+    // verify that the input remained unsorted if not inplace
+    if (!inplace)
+      TS_ASSERT_EQUALS(el.getSortType(), UNSORTED)
+    else
+      TS_ASSERT_EQUALS(el.getSortType(), TOF_SORT)
+
+    // now check events
+    TS_ASSERT_EQUALS(el_output->getEventType(), WEIGHTED_NOTIME);
+    TS_ASSERT_EQUALS(el_output->getSortType(), TOF_SORT);
+    TS_ASSERT_EQUALS(el_output->getNumberEvents(), 3);
+
+    TS_ASSERT_DELTA(el_output->getEvent(0).tof(), 1, 1e-5)
+    TS_ASSERT_EQUALS(el_output->getEvent(0).weight(), event_weight)
+    TS_ASSERT_EQUALS(el_output->getEvent(0).errorSquared(), event_weight)
+
+    TS_ASSERT_DELTA(el_output->getEvent(1).tof(), 2.85, 1e-5) // (2.8+2.9)/2 = 2.85
+    TS_ASSERT_EQUALS(el_output->getEvent(1).weight(), event_weight * 2)
+    TS_ASSERT_EQUALS(el_output->getEvent(1).errorSquared(), event_weight * 2)
+
+    TS_ASSERT_DELTA(el_output->getEvent(2).tof(), 3.1, 1e-5) // (3.0+3.1+3.2)/3 = 3.1
+    TS_ASSERT_EQUALS(el_output->getEvent(2).weight(), event_weight * 3)
+    TS_ASSERT_EQUALS(el_output->getEvent(2).errorSquared(), event_weight * 3)
   }
 
   //==================================================================================
@@ -2485,6 +2834,172 @@ public:
     auto freqHist = e.histogram();
     TS_ASSERT_EQUALS(freqHist.counts()[0], 4.0);
     TS_ASSERT_EQUALS(freqHist.counts()[1], 2.0);
+  }
+
+  void test_generateHistogramUnsortedLinear_TOF() {
+    const auto e = createLinearTestData();
+    run_generateHistogramUnsortedTest(e, {0., 0.1, 100.}, 999.);
+    run_generateHistogramUnsortedTest(e, {50., 1.0, 100.}, 490.);
+  }
+
+  void test_generateHistogramUnsortedLinear_WEIGHTED() {
+    const auto e = createLinearTestData(WEIGHTED);
+    run_generateHistogramUnsortedTest(e, {0., 0.1, 100.}, 999.);
+    run_generateHistogramUnsortedTest(e, {50., 1.0, 100.}, 490.);
+  }
+
+  void test_generateHistogramUnsortedLinear_WEIGHTED_NOTIME() {
+    const auto e = createLinearTestData(WEIGHTED_NOTIME);
+    run_generateHistogramUnsortedTest(e, {0., 0.1, 100.}, 999.);
+    run_generateHistogramUnsortedTest(e, {50., 1.0, 100.}, 490.);
+  }
+
+  void test_generateHistogramUnsortedLog_TOF() {
+    const auto e = createLogTestData();
+    run_generateHistogramUnsortedTest(e, {1., -0.001, 1.1}, 95.);
+    run_generateHistogramUnsortedTest(e, {1.05, -0.002, 1.1}, 45.);
+  }
+
+  void test_generateHistogramUnsortedLog_WEIGHTED() {
+    const auto e = createLogTestData(WEIGHTED);
+    run_generateHistogramUnsortedTest(e, {1., -0.001, 1.1}, 95.);
+    run_generateHistogramUnsortedTest(e, {1.05, -0.002, 1.1}, 45.);
+  }
+
+  void test_generateHistogramUnsortedLog_WEIGHTED_NOTIME() {
+    const auto e = createLogTestData(WEIGHTED_NOTIME);
+    run_generateHistogramUnsortedTest(e, {1., -0.001, 1.1}, 95.);
+    run_generateHistogramUnsortedTest(e, {1.05, -0.002, 1.1}, 45.);
+  }
+
+  void test_generateHistogramUnsortedLinear_TOF_bad_params() {
+    // putting incorrect parameters in generateHistogram should not cause segfault
+    const auto e = createLinearTestData();
+
+    std::vector<double> rebinParams = {0., 0.1, 100.};
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams(rebinParams, X, true);
+
+    TS_ASSERT(!e.isSortedByTof());
+
+    // setting step size to 0.001 will cause findLinearBin to get bin out of range of X
+    TS_ASSERT_THROWS_NOTHING(e.generateHistogram(0.01, X, Y, E));
+
+    TS_ASSERT_DELTA(std::reduce(Y.begin(), Y.end()), 101, 1e-8);
+  }
+
+  void test_generateHistogramUnsortedLinear_WEIGHTED_bad_params() {
+    // putting incorrect parameters in generateHistogram should not cause segfault
+    const auto e = createLinearTestData(WEIGHTED);
+
+    std::vector<double> rebinParams = {0., 0.1, 100.};
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams(rebinParams, X, true);
+
+    TS_ASSERT(!e.isSortedByTof());
+
+    // setting step size to 0.001 will cause findLinearBin to get bin out of range of X
+    TS_ASSERT_THROWS_NOTHING(e.generateHistogram(0.01, X, Y, E));
+
+    TS_ASSERT_DELTA(std::reduce(Y.begin(), Y.end()), 101, 1e-8);
+  }
+
+  void test_generateHistogramUnsortedLog_bad_params() {
+    // putting incorrect parameters in generateHistogram should not cause segfault
+    const auto e = createLogTestData();
+
+    std::vector<double> rebinParams = {1., -0.001, 1.1};
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams(rebinParams, X, true);
+
+    TS_ASSERT(!e.isSortedByTof());
+
+    // setting step size to -0.001 will cause findLogBin to get bin out of range of X
+    TS_ASSERT_THROWS_NOTHING(e.generateHistogram(-0.0001, X, Y, E));
+
+    TS_ASSERT_DELTA(std::reduce(Y.begin(), Y.end()), 10, 1e-8);
+  }
+
+  void run_generateHistogramUnsortedTest(EventList e, std::vector<double> rebinParams,
+                                         const double expected_total = 0) {
+    MantidVec X, expected_Y, expected_E, Y, E;
+    VectorHelper::createAxisFromRebinParams(rebinParams, X, true);
+
+    TS_ASSERT(!e.isSortedByTof());
+    // set the values of Y to be one so we can check that the values are zeroed out
+    Y.resize(X.size() - 1, 1.);
+
+    // do unsorted histogram then compare and check still unsorted
+    e.generateHistogram(rebinParams[1], X, Y, E);
+    TS_ASSERT(!e.isSortedByTof());
+
+    // do sorted method to get expected results
+    e.generateHistogram(X, expected_Y, expected_E);
+    TS_ASSERT(e.isSortedByTof());
+
+    double total_counts = 0;
+
+    for (size_t i = 1; i < Y.size(); i++) {
+      TS_ASSERT_EQUALS(expected_Y[i], Y[i]);
+      total_counts += Y[i];
+      TS_ASSERT_EQUALS(expected_E[i], E[i]);
+    }
+
+    TS_ASSERT_DELTA(total_counts, expected_total, 1e-8);
+  }
+
+  const EventList createLinearTestData(EventType eventType = TOF) {
+    EventList e;
+
+    if (eventType != TOF)
+      el.switchTo(eventType);
+
+    // some of these values will go to incorrect bins when simply converted from tof to bin_number when binned with {0.,
+    // 0.1, 100.}
+
+    switch (eventType) {
+    case TOF:
+      for (int x = -10; x < 1010; x++)
+        e += TofEvent(x * 0.1);
+      break;
+    case WEIGHTED:
+      for (int x = -10; x < 1010; x++)
+        e += WeightedEvent(x * 0.1);
+      break;
+    case WEIGHTED_NOTIME:
+      for (int x = -10; x < 1010; x++)
+        e += TofEvent(x * 0.1);
+      break;
+    }
+
+    return e;
+  }
+
+  const EventList createLogTestData(EventType eventType = TOF) {
+    EventList e;
+
+    if (eventType != TOF)
+      el.switchTo(eventType);
+
+    // some of these values will go to incorrect bins when simply converted from tof to bin_number when binned with {1.,
+    // -0.001, 1.1}
+
+    switch (eventType) {
+    case TOF:
+      for (int x = 0; x < 100; x++)
+        e += TofEvent(pow(1.001, x));
+      break;
+    case WEIGHTED:
+      for (int x = 0; x < 100; x++)
+        e += WeightedEvent(pow(1.001, x));
+      break;
+    case WEIGHTED_NOTIME:
+      for (int x = 0; x < 100; x++)
+        e += TofEvent(pow(1.001, x));
+      break;
+    }
+
+    return e;
   }
 };
 

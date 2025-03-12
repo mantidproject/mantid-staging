@@ -10,9 +10,9 @@ import math
 import numpy as np
 import scipy as sc
 
-from mantid.simpleapi import *
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import mtd, AlgorithmFactory, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import Direction, FloatMandatoryValidator
+from mantid.simpleapi import CreateWorkspace
 
 
 class NMoldyn4Interpolation(PythonAlgorithm):
@@ -23,7 +23,6 @@ class NMoldyn4Interpolation(PythonAlgorithm):
         return "Maps NMoldyn simulated s(q,e) data onto OSIRIS' Q and E values"
 
     def PyInit(self):
-
         self.declareProperty(
             WorkspaceProperty(name="InputWorkspace", defaultValue="", direction=Direction.Input), doc="Simulated workspace"
         )
@@ -36,7 +35,7 @@ class NMoldyn4Interpolation(PythonAlgorithm):
         self.declareProperty(
             name="EFixed",
             defaultValue=1.845,
-            doc=("EFixed value of OSIRIS data (should be default" " in almost all circumstances)"),
+            doc=("EFixed value of OSIRIS data (should be default in almost all circumstances)"),
             validator=FloatMandatoryValidator(),
             direction=Direction.Input,
         )
@@ -65,8 +64,9 @@ class NMoldyn4Interpolation(PythonAlgorithm):
         self.validate_bounds(sim_X, ref_X, sim_Q, ref_Q)
 
         # Interpolates the simulated data onto the OSIRIS grid
-        interp = sc.interpolate.interp2d(sim_X, sim_Q, sim_Y)
-        interp_Y = interp(ref_X_bins, ref_Q)
+
+        interp = sc.interpolate.RectBivariateSpline(sim_Q, sim_X, sim_Y)
+        interp_Y = interp(ref_Q, ref_X_bins)
 
         # Outputs interpolated data into a new workspace
         interp_Y = interp_Y.flatten()
@@ -85,13 +85,13 @@ class NMoldyn4Interpolation(PythonAlgorithm):
 
     def validate_bounds(self, sim_X, ref_X, sim_Q, ref_Q):
         if min(sim_X) > min(ref_X):
-            raise ValueError("Minimum simulated X value is higher than minimum " "reference X value")
+            raise ValueError("Minimum simulated X value is higher than minimum reference X value")
         if max(sim_X) < max(ref_X):
-            raise ValueError("Maximum simulated X value is lower than maximum " "reference X value")
+            raise ValueError("Maximum simulated X value is lower than maximum reference X value")
         if min(sim_Q) > min(ref_Q):
-            raise ValueError("Minimum simulated Q value is higher than minimum " "reference Q value")
+            raise ValueError("Minimum simulated Q value is higher than minimum reference Q value")
         if max(sim_Q) < max(ref_Q):
-            raise ValueError("Maximum simulated Q value is lower than maximum " "reference Q value")
+            raise ValueError("Maximum simulated Q value is lower than maximum reference Q value")
         else:
             return
 

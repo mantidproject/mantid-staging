@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 
-""" SANSReductionCoreEventSlice algorithm runs the sequence of reduction steps which are necessary to reduce a data set,
+"""SANSReductionCoreEventSlice algorithm runs the sequence of reduction steps which are necessary to reduce a data set,
 for which data must be event sliced. These steps are: slicing, adjustment, convert to q."""
 
 from SANSReductionCoreBase import SANSReductionCoreBase
@@ -21,7 +21,7 @@ class SANSReductionCoreEventSlice(SANSReductionCoreBase):
         return "SANS\\Reduction"
 
     def summary(self):
-        return "Runs the core reduction elements which need to be carried out " "on individual event slices."
+        return "Runs the core reduction elements which need to be carried out on individual event slices."
 
     def PyInit(self):
         # ----------
@@ -37,7 +37,7 @@ class SANSReductionCoreEventSlice(SANSReductionCoreBase):
         )
         self.declareProperty(
             MatrixWorkspaceProperty("DummyMaskWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
-            doc="The histogram workspace containing mask bins for the event workspace, to be copied " "over after event slicing.",
+            doc="The histogram workspace containing mask bins for the event workspace, to be copied over after event slicing.",
         )
         self.declareProperty(
             MatrixWorkspaceProperty("ScatterMonitorWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),

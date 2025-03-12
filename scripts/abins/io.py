@@ -10,54 +10,71 @@ import json
 import os
 import subprocess
 import shutil
+from typing import List, Optional
+
 import h5py
+
 import numpy as np
+from pydantic import BaseModel, ConfigDict, Field, validate_call
 
 import abins
-from abins.constants import AB_INITIO_FILE_EXTENSIONS, BUF
+from abins.constants import AB_INITIO_FILE_EXTENSIONS, BUF, HDF5_ATTR_TYPE
 from mantid.kernel import logger, ConfigService
 
 
-class IO(object):
+class IO(BaseModel):
     """
     Class for Abins I/O HDF file operations.
     """
 
-    def __init__(self, input_filename=None, group_name=None, setting="", autoconvolution: bool = False, temperature: float = None):
-        self._setting = setting
-        self._autoconvolution = autoconvolution
-        self._temperature = temperature
+    model_config = ConfigDict(strict=True)
 
-        if isinstance(input_filename, str):
-            self._input_filename = input_filename
-            try:
-                self._hash_input_filename = self.calculate_ab_initio_file_hash()
-            except IOError as err:
-                logger.error(str(err))
-            except ValueError as err:
-                logger.error(str(err))
+    input_filename: str = Field(min_length=1)
+    group_name: str = Field(min_length=1)
+    setting: str = ""
+    autoconvolution: int = 10
+    temperature: float = None
 
-            # extract name of file from the full path in the platform independent way
-            filename = os.path.basename(self._input_filename)
+    @staticmethod
+    def _dir_is_not_writeable(directory: str):
+        """Check write permissions of directory by writing a temporary file
 
-            if filename.strip() == "":
-                raise ValueError("Name of the file cannot be an empty string.")
+        This is the only _really_ reliable way of knowing; checking attributes can
+        still give incorrect answers depending on OS, network drive status etc.
+        """
+        from tempfile import NamedTemporaryFile
 
-        else:
-            raise ValueError("Invalid name of input file. String was expected.")
+        try:
+            with NamedTemporaryFile(mode="w", dir=directory) as fd:
+                print("check this directory is writeable", file=fd)
+        except IOError:
+            return True
 
-        if isinstance(group_name, str):
-            self._group_name = group_name
-        else:
-            raise ValueError("Invalid name of the group. String was expected.")
+        return False
+
+    def model_post_init(self, __context):
+        try:
+            self._hash_input_filename = self.calculate_ab_initio_file_hash()
+        except IOError as err:
+            logger.error(str(err))
+        except ValueError as err:
+            logger.error(str(err))
+
+        # extract name of file from the full path in the platform independent way
+        filename = os.path.basename(self.input_filename)
 
         if filename.split(".")[-1] in AB_INITIO_FILE_EXTENSIONS:
             core_name = filename[0 : filename.rfind(".")]  # e.g. NaCl.phonon -> NaCl (core_name) -> NaCl.hdf5
         else:
             core_name = filename  # e.g. OUTCAR -> OUTCAR (core_name) -> OUTCAR.hdf5
 
-        save_dir_path = ConfigService.getString("defaultsave.directory")
-        self._hdf_filename = os.path.join(save_dir_path, core_name + ".hdf5")  # name of hdf file
+        if self._dir_is_not_writeable(self.get_save_dir_path()):
+            raise Exception(
+                "Could not write a file to the default save directory: "
+                "this is required for caching. Please set 'Default Save Directory' to "
+                "a writeable location using the File/Manage User Directories interface."
+            )
+        self._hdf_filename = os.path.join(self.get_save_dir_path(), core_name + ".hdf5")  # name of hdf file
 
         self._attributes = {}  # attributes for group
 
@@ -67,6 +84,10 @@ class IO(object):
         self._data = {}
 
         # Fields which have a form of empty dictionaries have to be set by an inheriting class.
+
+    @staticmethod
+    def get_save_dir_path() -> str:
+        return ConfigService.getString("defaultsave.directory")
 
     def _valid_hash(self):
         """
@@ -82,7 +103,7 @@ class IO(object):
         :returns: True if consistent, otherwise False.
         """
         saved_setting = self.load(list_of_attributes=["setting"])
-        return self._setting == saved_setting["attributes"]["setting"]
+        return self.setting == saved_setting["attributes"]["setting"]
 
     def _valid_autoconvolution(self):
         """
@@ -90,7 +111,7 @@ class IO(object):
         :returns: True if consistent, otherwise False
         """
         saved_autoconvolution = self.load(list_of_attributes=["autoconvolution"])
-        return self._autoconvolution == saved_autoconvolution["attributes"]["autoconvolution"]
+        return self.autoconvolution == saved_autoconvolution["attributes"]["autoconvolution"]
 
     def _valid_temperature(self):
         """
@@ -101,7 +122,7 @@ class IO(object):
 
         :returns: True if consistent or temperature not set for Clerk, otherwise False
         """
-        if self._temperature is None:
+        if self.temperature is None:
             return True
 
         else:
@@ -112,7 +133,7 @@ class IO(object):
                 return False
 
             else:
-                return np.abs(self._temperature - saved_temperature["attributes"]["temperature"]) < T_THRESHOLD
+                return np.abs(self.temperature - saved_temperature["attributes"]["temperature"]) < T_THRESHOLD
 
     @classmethod
     def _close_enough(cls, previous, new):
@@ -128,6 +149,8 @@ class IO(object):
             return True
 
         if isinstance(new, (np.ndarray, float)):
+            if previous is None:
+                return False
             return np.allclose(previous, new)
         # Tuples are converted to list in caching
         elif isinstance(new, tuple):
@@ -210,7 +233,8 @@ class IO(object):
         with h5py.File(self._hdf_filename, "w") as hdf_file:
             hdf_file.close()
 
-    def add_attribute(self, name=None, value=None):
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True, strict=True))
+    def add_attribute(self, name: str, value: HDF5_ATTR_TYPE | None) -> None:
         """
         Adds attribute to the dictionary with other attributes.
         :param name: name of the attribute
@@ -223,10 +247,10 @@ class IO(object):
         Add attributes for input data filename, hash of file, advanced parameters to data for HDF5 file
         """
         self.add_attribute("hash", self._hash_input_filename)
-        self.add_attribute("setting", self._setting)
-        self.add_attribute("autoconvolution", self._autoconvolution)
-        self.add_attribute("temperature", self._temperature)
-        self.add_attribute("filename", self._input_filename)
+        self.add_attribute("setting", self.setting)
+        self.add_attribute("autoconvolution", self.autoconvolution)
+        self.add_attribute("temperature", self.temperature)
+        self.add_attribute("filename", self.input_filename)
         self.add_attribute("advanced_parameters", json.dumps(abins.parameters.non_performance_parameters))
 
     def add_data(self, name=None, value=None):
@@ -245,15 +269,10 @@ class IO(object):
         :param group: group to which attributes should be saved.
         """
         for name in self._attributes:
-            if isinstance(self._attributes[name], (np.int64, int, np.float64, float, str, bytes, bool)):
-                group.attrs[name] = self._attributes[name]
-            elif self._attributes[name] is None:
+            if self._attributes[name] is None:
                 group.attrs[name] = "None"
             else:
-                raise ValueError(
-                    "Invalid value of attribute. String, "
-                    "int, bool or bytes was expected! " + name + "= (invalid type : %s) " % type(self._attributes[name])
-                )
+                group.attrs[name] = self._attributes[name]
 
     def _recursively_save_structured_data_to_group(self, hdf_file=None, path=None, dic=None):
         """
@@ -304,7 +323,7 @@ class IO(object):
             elif isinstance(self._data[item], dict):
                 self._recursively_save_structured_data_to_group(hdf_file=hdf_file, path=group.name + "/" + item + "/", dic=self._data[item])
             else:
-                raise ValueError("Invalid structured dataset. Cannot save %s type" % type(item))
+                raise TypeError("Invalid structured dataset. Cannot save %s type" % type(item))
 
     def save(self):
         """
@@ -312,9 +331,9 @@ class IO(object):
         """
 
         with h5py.File(self._hdf_filename, "a") as hdf_file:
-            if self._group_name not in hdf_file:
-                hdf_file.create_group(self._group_name)
-            group = hdf_file[self._group_name]
+            if self.group_name not in hdf_file:
+                hdf_file.create_group(self.group_name)
+            group = hdf_file[self.group_name]
 
             if len(self._attributes.keys()) > 0:
                 self._save_attributes(group=group)
@@ -337,7 +356,8 @@ class IO(object):
             pass
 
     @staticmethod
-    def _list_of_str(list_str=None):
+    @validate_call
+    def _list_of_str(list_str: Optional[List[str]]) -> bool:
         """
         Checks if all elements of the list are strings.
         :param list_str: list to check
@@ -345,9 +365,6 @@ class IO(object):
         """
         if list_str is None:
             return False
-
-        if not (isinstance(list_str, list) and all([isinstance(list_str[item], str) for item in range(len(list_str))])):
-            raise ValueError("Invalid list of items to load!")
 
         return True
 
@@ -403,21 +420,8 @@ class IO(object):
         end = reversed_path.find("/")
         return reversed_path[:end]
 
-    @staticmethod
-    def _encode_utf8_if_text(item):
-        """
-        Convert atom element from unicode to str
-        but only in Python 2 where unicode handling is a mess
-
-        :param item: item to convert to unicode str if Python 2 str
-        :returns: laundered item
-        """
-        if isinstance(item, str):
-            return item.encode("utf-8")
-        else:
-            return item
-
-    def _load_dataset(self, hdf_file=None, name=None, group=None):
+    @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
+    def _load_dataset(self, *, hdf_file: h5py.File, name: str, group: h5py.Group):
         """
         Loads one structured dataset.
         :param hdf_file:  hdf file object from which structured dataset should be loaded.
@@ -425,31 +429,25 @@ class IO(object):
         :param group: name of the main group
         :returns: loaded dataset
         """
-        if not isinstance(name, str):
-            raise ValueError("Invalid name of the dataset.")
-
         if name in group:
             hdf_group = group[name]
         else:
-            raise ValueError("Invalid name of the dataset.")
+            raise ValueError(f"Dataset {name} not found in group {group.name}.")
 
         # noinspection PyUnresolvedReferences,PyProtectedMember
-        if isinstance(hdf_group, h5py._hl.dataset.Dataset):
+        if isinstance(hdf_group, h5py.Dataset):
             return hdf_group[()]
         elif all([self._get_subgrp_name(hdf_group[el].name).isdigit() for el in hdf_group.keys()]):
-            structured_dataset_list = []
-            # here we make an assumption about keys which have a numeric values; we assume that always : 1, 2, 3... Max
-            num_keys = len(hdf_group.keys())
-            for item in range(num_keys):
-                structured_dataset_list.append(
-                    self._recursively_load_dict_contents_from_group(hdf_file=hdf_file, path=hdf_group.name + "/%s" % item)
-                )
+            structured_dataset_list = [
+                self._recursively_load_dict_contents_from_group(hdf_file=hdf_file, path=f"{hdf_group.name}/{key}")
+                for key in sorted(hdf_group.keys(), key=int)
+            ]
             return structured_dataset_list
         else:
             return self._recursively_load_dict_contents_from_group(hdf_file=hdf_file, path=hdf_group.name + "/")
 
     @classmethod
-    def _recursively_load_dict_contents_from_group(cls, hdf_file=None, path=None):
+    def _recursively_load_dict_contents_from_group(cls, *, hdf_file: h5py.File, path: str):
         """
         Loads structure dataset which has form of Python dictionary.
         :param hdf_file:  hdf file object from which dataset is loaded
@@ -463,7 +461,7 @@ class IO(object):
             if isinstance(item, h5py._hl.dataset.Dataset):
                 ans[key] = item[()]
             elif isinstance(item, h5py._hl.group.Group):
-                ans[key] = cls._recursively_load_dict_contents_from_group(hdf_file, path + key + "/")
+                ans[key] = cls._recursively_load_dict_contents_from_group(hdf_file=hdf_file, path=f"{path}{key}/")
         return ans
 
     def load(self, list_of_attributes=None, list_of_datasets=None):
@@ -479,10 +477,10 @@ class IO(object):
 
         results = {}
         with h5py.File(self._hdf_filename, "r") as hdf_file:
-            if self._group_name not in hdf_file:
-                raise ValueError("No group %s in hdf file." % self._group_name)
+            if self.group_name not in hdf_file:
+                raise ValueError("No group %s in hdf file." % self.group_name)
 
-            group = hdf_file[self._group_name]
+            group = hdf_file[self.group_name]
 
             if self._list_of_str(list_str=list_of_attributes):
                 results["attributes"] = self._load_attributes(list_of_attributes=list_of_attributes, group=group)
@@ -516,7 +514,7 @@ class IO(object):
         return hash_calculator.hexdigest()
 
     def get_input_filename(self):
-        return self._input_filename
+        return self.input_filename
 
     def calculate_ab_initio_file_hash(self):
         """
@@ -525,4 +523,4 @@ class IO(object):
         :returns: string representation of hash for file with vibrational data which contains only hexadecimal digits
         """
 
-        return self._calculate_hash(filename=self._input_filename)
+        return self._calculate_hash(filename=self.input_filename)

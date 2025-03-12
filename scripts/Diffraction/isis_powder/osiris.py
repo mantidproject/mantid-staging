@@ -35,7 +35,7 @@ class Osiris(AbstractInst):
         sample_details_obj = common.dictionary_key_helper(
             dictionary=kwargs,
             key=kwarg_name,
-            exception_msg="The argument containing sample details was not found. Please" f" set the following argument: {kwarg_name}",
+            exception_msg=f"The argument containing sample details was not found. Please set the following argument: {kwarg_name}",
         )
         self._sample_details = sample_details_obj
 
@@ -184,6 +184,7 @@ class Osiris(AbstractInst):
         :param run_details: the run details of the workspace. Unused parameter added for API compatibility.
         :return: A workspace containing the corrections.
         """
+        self._check_sample_details()
         if self._inst_settings.simple_events_per_point:
             events_per_point = int(self._inst_settings.simple_events_per_point)
         else:
@@ -221,6 +222,9 @@ class Osiris(AbstractInst):
 
         ws_to_correct = ws_to_correct / corrections
 
+        if self._inst_settings.multiple_scattering:
+            ws_to_correct = self._apply_discus_multiple_scattering(ws_to_correct)
+
         if previous_units != ws_units.wavelength:
             ws_to_correct = mantid.ConvertUnits(
                 InputWorkspace=ws_to_correct,
@@ -244,12 +248,46 @@ class Osiris(AbstractInst):
         :return: The corrected workspace.
         """
         mantid.SetInstrumentParameter(Workspace=workspace, ParameterName="deltaE-mode", Value="Elastic")
-        return absorb_corrections.apply_paalmanpings_absorb_and_subtract_empty(
+        paalman_corrected = absorb_corrections.apply_paalmanpings_absorb_and_subtract_empty(
             workspace=workspace,
             summed_empty=summed_empty,
             sample_details=sample_details,
             paalman_pings_events_per_point=paalman_pings_events_per_point,
         )
+
+        if self._inst_settings.multiple_scattering:
+            return self._apply_discus_multiple_scattering(paalman_corrected)
+
+        return paalman_corrected
+
+    def _apply_discus_multiple_scattering(self, ws_to_correct):
+        if self._inst_settings.neutron_paths_single:
+            neutron_paths_single = int(self._inst_settings.neutron_paths_single)
+        else:
+            neutron_paths_single = 100
+
+        if self._inst_settings.neutron_paths_multiple:
+            neutron_paths_multiple = int(self._inst_settings.neutron_paths_multiple)
+        else:
+            neutron_paths_multiple = 100
+
+        X = [1.0]
+        Y = [1.0]
+        Sofq_isotropic = mantid.CreateWorkspace(DataX=X, DataY=Y, UnitX="MomentumTransfer")
+
+        ws_to_correct = mantid.ConvertUnits(InputWorkspace=ws_to_correct, OutputWorkspace=ws_to_correct, Target="Momentum")
+
+        mantid.DiscusMultipleScatteringCorrection(
+            InputWorkspace=ws_to_correct,
+            StructureFactorWorkspace=Sofq_isotropic,
+            NeutronPathsSingle=neutron_paths_single,
+            NeutronPathsMultiple=neutron_paths_multiple,
+            OutputWorkspace="MSResults",
+        )
+
+        ratio = mantid.mtd["MSResults_Ratio_Single_To_All"]
+
+        return ws_to_correct * ratio
 
     def apply_drange_cropping(self, run_number_string, focused_ws):
         """

@@ -11,6 +11,7 @@ import systemtesting
 
 import mantid.simpleapi as mantid
 from mantid import config
+from mantid.kernel import UnitConversion, DeltaEModeType
 
 from isis_powder import HRPD, SampleDetails
 
@@ -48,7 +49,6 @@ spline_path = os.path.join(calibration_dir, spline_rel_path)
 
 
 class CreateVanadiumNoSolidAngleTest(systemtesting.MantidSystemTest):
-
     calibration_results = None
     existing_config = config["datasearch.directories"]
 
@@ -57,9 +57,10 @@ class CreateVanadiumNoSolidAngleTest(systemtesting.MantidSystemTest):
 
     def runTest(self):
         setup_mantid_paths()
-        self.calibration_results = run_vanadium_calibration(do_solid_angle_corrections=False)
+        self.calibration_results = run_vanadium_calibration(do_solid_angle_corrections=False, subtract_empty_instrument=True)
 
     def validate(self):
+        self.checkInstrument = False  # want to check focused results, not the instrument geometry
         self.tolerance = 0.05  # Required for difference in spline data between operating systems
         return self.calibration_results.name(), "ISIS_Powder-HRPD-VanSplined_66031_hrpd_new_072_01_corr.cal.nxs"
 
@@ -72,8 +73,32 @@ class CreateVanadiumNoSolidAngleTest(systemtesting.MantidSystemTest):
             config["datasearch.directories"] = self.existing_config
 
 
-class FocusNoSolidAngleTest(systemtesting.MantidSystemTest):
+class CreateVanadiumNoSolidAngleNoEmptySubtractionTest(systemtesting.MantidSystemTest):
+    calibration_results = None
+    existing_config = config["datasearch.directories"]
 
+    def requiredFiles(self):
+        return _gen_required_files()
+
+    def runTest(self):
+        setup_mantid_paths()
+        self.calibration_results = run_vanadium_calibration(do_solid_angle_corrections=False, subtract_empty_instrument=False)
+
+    def validate(self):
+        self.checkInstrument = False  # want to check focused results, not the instrument geometry
+        self.tolerance = 0.05  # Required for difference in spline data between operating systems
+        return self.calibration_results.name(), "ISIS_Powder-HRPD-VanSplined_NoEmpty_66031_hrpd_new_072_01_corr.cal.nxs"
+
+    def cleanup(self):
+        try:
+            _try_delete(output_dir)
+            _try_delete(spline_path)
+        finally:
+            mantid.mtd.clear()
+            config["datasearch.directories"] = self.existing_config
+
+
+class FocusNoSolidAngleTest(systemtesting.MantidSystemTest):
     focus_results = None
     existing_config = config["datasearch.directories"]
 
@@ -87,6 +112,8 @@ class FocusNoSolidAngleTest(systemtesting.MantidSystemTest):
 
     def validate(self):
         # check output files as expected
+        self.checkInstrument = False  # want to check focused results, not the instrument geometry
+
         def generate_error_message(expected_file, output_dir):
             return "Unable to find {} in {}.\nContents={}".format(expected_file, output_dir, os.listdir(output_dir))
 
@@ -134,8 +161,37 @@ class FocusNoSolidAngleTest(systemtesting.MantidSystemTest):
             mantid.mtd.clear()
 
 
-class VanadiumAndFocusWithSolidAngleTest(systemtesting.MantidSystemTest):
+class FocusNoSolidAnglePromptSubtractedTest(systemtesting.MantidSystemTest):
+    calibration_results = None
+    existing_config = config["datasearch.directories"]
 
+    def requiredFiles(self):
+        return _gen_required_files()
+
+    def runTest(self):
+        setup_mantid_paths()
+        self.focus_results = run_focus(do_solid_angle_corrections=False, fit_prompt_pulse=True)
+
+    def validate(self):
+        # feature still in development - just assert value at TOF of a prompt pulse in backscattering bank
+        ws_backscatt = self.focus_results[0]
+        si = ws_backscatt.spectrumInfo()
+        diff_consts = si.diffractometerConstants(0)
+        tof_prompt = 20010
+        d_prompt = UnitConversion.run("TOF", "dSpacing", tof_prompt, 0, DeltaEModeType.Elastic, diff_consts)
+        # for now large tolerance for OS dependent fitting
+        self.assertAlmostEqual(ws_backscatt.readY(0)[ws_backscatt.yIndexOfX(d_prompt)], 7.3951, delta=1e-1)
+
+    def cleanup(self):
+        try:
+            _try_delete(output_dir)
+            _try_delete(spline_path)
+        finally:
+            mantid.mtd.clear()
+            config["datasearch.directories"] = self.existing_config
+
+
+class VanadiumAndFocusWithSolidAngleTest(systemtesting.MantidSystemTest):
     focus_results = None
     existing_config = config["datasearch.directories"]
 
@@ -148,6 +204,7 @@ class VanadiumAndFocusWithSolidAngleTest(systemtesting.MantidSystemTest):
         self.focus_results = run_focus(do_solid_angle_corrections=True)
 
     def validate(self):
+        self.checkInstrument = False  # want to check focused results, not the instrument geometry
         if platform.system() == "Darwin":  # OSX requires higher tolerance for splines
             self.tolerance = 0.1
             self.tolerance_is_rel_err = True
@@ -175,26 +232,22 @@ def gen_required_run_numbers():
     return ["66028", "66031", "66063"]  # Sample empty  # Vanadium  # Run to focus
 
 
-def run_vanadium_calibration(do_solid_angle_corrections):
+def run_vanadium_calibration(**kwargs):
+    kwargs = {"subtract_empty_instrument": True, "do_solid_angle_corrections": True, **kwargs}
     vanadium_run = 66031  # Choose arbitrary run from cycle 16_5
     inst_obj = setup_inst_object()
     inst_obj.create_vanadium(
-        first_cycle_run_no=vanadium_run,
-        do_solid_angle_corrections=do_solid_angle_corrections,
-        do_absorb_corrections=True,
-        multiple_scattering=False,
-        window=WINDOW,
+        first_cycle_run_no=vanadium_run, do_absorb_corrections=True, multiple_scattering=False, window=WINDOW, **kwargs
     )
 
     # Check the spline looks good and was saved
     if not os.path.exists(spline_path):
         raise RuntimeError("Could not find output spline at the following path: {}".format(spline_path))
     splined_ws = mantid.Load(Filename=spline_path)
-
     return splined_ws
 
 
-def run_focus(do_solid_angle_corrections):
+def run_focus(**kwargs):
     [sample_empty, _, run_number] = gen_required_run_numbers()
     sample_empty_scale = 1
 
@@ -216,9 +269,9 @@ def run_focus(do_solid_angle_corrections):
         sample_empty=sample_empty,
         sample_empty_scale=sample_empty_scale,
         vanadium_normalisation=True,
-        do_solid_angle_corrections=do_solid_angle_corrections,
         do_absorb_corrections=True,
         multiple_scattering=False,
+        **kwargs,
     )
 
 

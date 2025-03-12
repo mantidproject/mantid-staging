@@ -36,7 +36,7 @@ def _getBasename(filename):
     """
     Helper function to get the filename without the path or extension
     """
-    if type(filename) == list:
+    if isinstance(filename, list):
         filename = filename[0]
     name = os.path.split(filename)[-1]
     for extension in _EXTENSIONS_NXS:
@@ -91,6 +91,12 @@ def __get_cache_name(
     cache_filenames = []
     if cache_dirs:
         # generate the property string for hashing
+        try:
+            height_val_tmp = ws.run().getTimeAveragedValue("BL11A:CS:ITEMS:HeightInContainer")
+            height_unit_tmp = ws.run()["BL11A:CS:ITEMS:HeightInContainerUnits"].lastValue()
+        except RuntimeError as e:
+            raise RuntimeError("Currently only configured for POWGEN") from e
+
         property_string = [
             f"{key}={val}"
             for key, val in {
@@ -99,8 +105,8 @@ def __get_cache_name(
                 "num_wl_bins": len(ws.readX(0)) - 1,
                 "sample_formula": ws.run()["SampleFormula"].lastValue().strip(),
                 "mass_density": ws.run()["SampleDensity"].lastValue(),
-                "height_unit": ws.run()["BL11A:CS:ITEMS:HeightInContainerUnits"].lastValue(),
-                "height": ws.run()["BL11A:CS:ITEMS:HeightInContainer"].lastValue(),
+                "height_unit": height_unit_tmp,
+                "height": height_val_tmp,
                 "sample_container": ws.run()["SampleContainer"].lastValue().replace(" ", ""),
                 "abs_method": abs_method,
                 "ms_method": ms_method,

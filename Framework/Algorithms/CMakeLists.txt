@@ -2,7 +2,6 @@ set(SRC_FILES
     src/AbsorptionCorrection.cpp
     src/AddAbsorptionWeightedPathLengths.cpp
     src/AddLogDerivative.cpp
-    src/AddNote.cpp
     src/AddPeak.cpp
     src/AddSampleLog.cpp
     src/AddTimeSeriesLog.cpp
@@ -42,7 +41,6 @@ set(SRC_FILES
     src/ChangePulsetime.cpp
     src/ChangePulsetime2.cpp
     src/ChangeTimeZero.cpp
-    src/CheckWorkspacesMatch.cpp
     src/ChopData.cpp
     src/ClearCache.cpp
     src/ClearInstrumentParameters.cpp
@@ -57,7 +55,6 @@ set(SRC_FILES
     src/ConvertAxesToRealSpace.cpp
     src/ConvertAxisByFormula.cpp
     src/ConvertDiffCal.cpp
-    src/ConvertEmptyToTof.cpp
     src/ConvertFromDistribution.cpp
     src/ConvertSpectrumAxis.cpp
     src/ConvertSpectrumAxis2.cpp
@@ -150,12 +147,14 @@ set(SRC_FILES
     src/FindEPP.cpp
     src/FindPeakBackground.cpp
     src/FindPeaks.cpp
+    src/FindPeaksConvolve.cpp
     src/FitPeak.cpp
     src/FitPeaks.cpp
     src/FixGSASInstrumentFile.cpp
     src/FlatPlateAbsorption.cpp
     src/GeneralisedSecondDifference.cpp
     src/GenerateEventsFilter.cpp
+    src/GenerateGoniometerIndependentBackground.cpp
     src/GenerateIPythonNotebook.cpp
     src/GeneratePeaks.cpp
     src/GeneratePythonFitScript.cpp
@@ -235,9 +234,16 @@ set(SRC_FILES
     src/Plus.cpp
     src/PointByPointVCorrection.cpp
     src/PoissonErrors.cpp
+    src/PolarizationCorrections/HeliumAnalyserEfficiency.cpp
+    src/PolarizationCorrections/PolarizationCorrectionsHelpers.cpp
+    src/PolarizationCorrections/SpinStateValidator.cpp
+    src/PolarizationCorrections/PolarizerEfficiency.cpp
     src/PolarizationCorrectionFredrikze.cpp
     src/PolarizationCorrectionWildes.cpp
     src/PolarizationEfficiencyCor.cpp
+    src/PolarizationCorrections/DepolarizedAnalyserTransmission.cpp
+    src/PolarizationCorrections/FlipperEfficiency.cpp
+    src/PolarizationCorrections/PolarizationEfficienciesWildes.cpp
     src/PolynomialCorrection.cpp
     src/Power.cpp
     src/PowerLawCorrection.cpp
@@ -254,9 +260,9 @@ set(SRC_FILES
     src/RebinByPulseTimes.cpp
     src/RebinByTimeAtSample.cpp
     src/RebinByTimeBase.cpp
+    src/RebinRagged2.cpp
     src/RebinToWorkspace.cpp
     src/Rebunch.cpp
-    src/RecordPythonScript.cpp
     src/Regroup.cpp
     src/RemoveBackground.cpp
     src/RemoveBins.cpp
@@ -346,7 +352,6 @@ set(INC_FILES
     inc/MantidAlgorithms/AbsorptionCorrection.h
     inc/MantidAlgorithms/AddAbsorptionWeightedPathLengths.h
     inc/MantidAlgorithms/AddLogDerivative.h
-    inc/MantidAlgorithms/AddNote.h
     inc/MantidAlgorithms/AddPeak.h
     inc/MantidAlgorithms/AddSampleLog.h
     inc/MantidAlgorithms/AddTimeSeriesLog.h
@@ -386,7 +391,6 @@ set(INC_FILES
     inc/MantidAlgorithms/ChangePulsetime.h
     inc/MantidAlgorithms/ChangePulsetime2.h
     inc/MantidAlgorithms/ChangeTimeZero.h
-    inc/MantidAlgorithms/CheckWorkspacesMatch.h
     inc/MantidAlgorithms/ChopData.h
     inc/MantidAlgorithms/ClearCache.h
     inc/MantidAlgorithms/ClearInstrumentParameters.h
@@ -401,7 +405,6 @@ set(INC_FILES
     inc/MantidAlgorithms/ConvertAxesToRealSpace.h
     inc/MantidAlgorithms/ConvertAxisByFormula.h
     inc/MantidAlgorithms/ConvertDiffCal.h
-    inc/MantidAlgorithms/ConvertEmptyToTof.h
     inc/MantidAlgorithms/ConvertFromDistribution.h
     inc/MantidAlgorithms/ConvertSpectrumAxis.h
     inc/MantidAlgorithms/ConvertSpectrumAxis2.h
@@ -494,6 +497,7 @@ set(INC_FILES
     inc/MantidAlgorithms/FindEPP.h
     inc/MantidAlgorithms/FindPeakBackground.h
     inc/MantidAlgorithms/FindPeaks.h
+    inc/MantidAlgorithms/FindPeaksConvolve.h
     inc/MantidAlgorithms/FitPeak.h
     inc/MantidAlgorithms/FitPeaks.h
     inc/MantidAlgorithms/FixGSASInstrumentFile.h
@@ -501,6 +505,7 @@ set(INC_FILES
     inc/MantidAlgorithms/GSLFunctions.h
     inc/MantidAlgorithms/GeneralisedSecondDifference.h
     inc/MantidAlgorithms/GenerateEventsFilter.h
+    inc/MantidAlgorithms/GenerateGoniometerIndependentBackground.h
     inc/MantidAlgorithms/GenerateIPythonNotebook.h
     inc/MantidAlgorithms/GeneratePeaks.h
     inc/MantidAlgorithms/GeneratePythonFitScript.h
@@ -583,6 +588,13 @@ set(INC_FILES
     inc/MantidAlgorithms/Plus.h
     inc/MantidAlgorithms/PointByPointVCorrection.h
     inc/MantidAlgorithms/PoissonErrors.h
+    inc/MantidAlgorithms/PolarizationCorrections/DepolarizedAnalyserTransmission.h
+    inc/MantidAlgorithms/PolarizationCorrections/HeliumAnalyserEfficiency.h
+    inc/MantidAlgorithms/PolarizationCorrections/PolarizationCorrectionsHelpers.h
+    inc/MantidAlgorithms/PolarizationCorrections/SpinStateValidator.h
+    inc/MantidAlgorithms/PolarizationCorrections/FlipperEfficiency.h
+    inc/MantidAlgorithms/PolarizationCorrections/PolarizerEfficiency.h
+    inc/MantidAlgorithms/PolarizationCorrections/PolarizationEfficienciesWildes.h
     inc/MantidAlgorithms/PolarizationCorrectionFredrikze.h
     inc/MantidAlgorithms/PolarizationCorrectionWildes.h
     inc/MantidAlgorithms/PolarizationEfficiencyCor.h
@@ -602,9 +614,9 @@ set(INC_FILES
     inc/MantidAlgorithms/RebinByPulseTimes.h
     inc/MantidAlgorithms/RebinByTimeAtSample.h
     inc/MantidAlgorithms/RebinByTimeBase.h
+    inc/MantidAlgorithms/RebinRagged2.h
     inc/MantidAlgorithms/RebinToWorkspace.h
     inc/MantidAlgorithms/Rebunch.h
-    inc/MantidAlgorithms/RecordPythonScript.h
     inc/MantidAlgorithms/Regroup.h
     inc/MantidAlgorithms/RemoveBackground.h
     inc/MantidAlgorithms/RemoveBins.h
@@ -694,19 +706,9 @@ set(INC_FILES
     inc/MantidAlgorithms/XrayAbsorptionCorrection.h
 )
 
-set(SRC_UNITY_IGNORE_FILES src/AlignDetectors.cpp src/FFTSmooth.cpp src/FFTSmooth2.cpp src/FilterBadPulses.cpp
-                           src/SetUncertainties.cpp
-)
-
-if(UNITY_BUILD)
-  include(UnityBuild)
-  enable_unity_build(Algorithms SRC_FILES C_SRC_FILES SRC_UNITY_IGNORE_FILES 10)
-endif(UNITY_BUILD)
-
 set(TEST_FILES
     AddAbsorptionWeightedPathLengthsTest.h
     AddLogDerivativeTest.h
-    AddNoteTest.h
     AddPeakTest.h
     AddSampleLogTest.h
     AddTimeSeriesLogTest.h
@@ -746,7 +748,6 @@ set(TEST_FILES
     ChangePulsetime2Test.h
     ChangePulsetimeTest.h
     ChangeTimeZeroTest.h
-    CheckWorkspacesMatchTest.h
     ChopDataTest.h
     CircularBeamProfileTest.h
     ClearCacheTest.h
@@ -762,7 +763,6 @@ set(TEST_FILES
     ConvertAxesToRealSpaceTest.h
     ConvertAxisByFormulaTest.h
     ConvertDiffCalTest.h
-    ConvertEmptyToTofTest.h
     ConvertFromDistributionTest.h
     ConvertSpectrumAxis2Test.h
     ConvertSpectrumAxisTest.h
@@ -850,6 +850,7 @@ set(TEST_FILES
     FindDetectorsOutsideLimitsTest.h
     FindEPPTest.h
     FindPeakBackgroundTest.h
+    FindPeaksConvolveTest.h
     FindPeaksTest.h
     FitPeakTest.h
     FitPeaksTest.h
@@ -857,6 +858,7 @@ set(TEST_FILES
     FlatPlateAbsorptionTest.h
     GeneralisedSecondDifferenceTest.h
     GenerateEventsFilterTest.h
+    GenerateGoniometerIndependentBackgroundTest.h
     GenerateIPythonNotebookTest.h
     GeneratePeaksTest.h
     GeneratePythonFitScriptTest.h
@@ -935,6 +937,13 @@ set(TEST_FILES
     PlusTest.h
     PointByPointVCorrectionTest.h
     PoissonErrorsTest.h
+    PolarizationCorrections/DepolarizedAnalyserTransmissionTest.h
+    PolarizationCorrections/HeliumAnalyserEfficiencyTest.h
+    PolarizationCorrections/PolarizationCorrectionsHelpersTest.h
+    PolarizationCorrections/SpinStateValidatorTest.h
+    PolarizationCorrections/FlipperEfficiencyTest.h
+    PolarizationCorrections/PolarizerEfficiencyTest.h
+    PolarizationCorrections/PolarizationEfficienciesWildesTest.h
     PolarizationCorrectionFredrikzeTest.h
     PolarizationCorrectionWildesTest.h
     PolarizationEfficiencyCorTest.h
@@ -951,6 +960,7 @@ set(TEST_FILES
     Rebin2DTest.h
     RebinByPulseTimesTest.h
     RebinByTimeAtSampleTest.h
+    RebinRagged2Test.h
     RebinTest.h
     RebinToWorkspaceTest.h
     RebunchTest.h
@@ -1068,7 +1078,7 @@ set_property(TARGET Algorithms PROPERTY FOLDER "MantidFramework")
 target_link_libraries(
   Algorithms
   PUBLIC Mantid::API Mantid::HistogramData Mantid::Kernel Mantid::Geometry Mantid::Indexing
-  PRIVATE Mantid::DataObjects Mantid::Parallel Mantid::Types Boost::filesystem
+  PRIVATE Mantid::DataObjects Mantid::Parallel Mantid::Types
 )
 
 # Add the unit tests directory

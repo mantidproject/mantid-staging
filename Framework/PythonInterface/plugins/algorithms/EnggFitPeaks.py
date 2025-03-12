@@ -6,9 +6,18 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 import math
 
-from mantid.kernel import *
-from mantid.api import *
-from mantid.simpleapi import *
+from mantid.api import (
+    AlgorithmFactory,
+    FileAction,
+    FileProperty,
+    FunctionFactory,
+    ITableWorkspaceProperty,
+    MatrixWorkspaceProperty,
+    Progress,
+    PythonAlgorithm,
+)
+from mantid.kernel import Direction, FloatArrayProperty
+from mantid.simpleapi import ConvertUnits, CreateEmptyTableWorkspace, CreateWorkspace, FindPeaks, Fit
 
 
 class EnggFitPeaks(PythonAlgorithm):
@@ -45,7 +54,7 @@ class EnggFitPeaks(PythonAlgorithm):
 
         self.declareProperty(
             FloatArrayProperty("ExpectedPeaks", (self._get_default_peaks())),
-            "A list of peak centre values to be translated into TOF (if required) to find expected " "peaks.",
+            "A list of peak centre values to be translated into TOF (if required) to find expected peaks.",
         )
 
         self.declareProperty(
@@ -158,12 +167,13 @@ class EnggFitPeaks(PythonAlgorithm):
         # seemed to have good effects overall, but that can lead to fitting the wrong
         # (neighbor) peaks.
         MIN_RANGE_WIDTH = 1
+        MIN_WIDTH = 175
 
         startx = center - (width * COEF_LEFT)
         endx = center + (width * COEF_RIGHT)
         x_diff = endx - startx
         if x_diff < MIN_RANGE_WIDTH:
-            inc = (min_width - x_diff) / 5
+            inc = (MIN_WIDTH - x_diff) / 5
             endx = endx + 3 * inc
             startx = startx - 2 * inc
 
@@ -207,7 +217,7 @@ class EnggFitPeaks(PythonAlgorithm):
             # and it should be clarified when the role of FindPeaks etc. is fixed (trac ticket #10907)
             width = initial_params[2]
             if width <= 0.0:
-                failure_msg = "Cannot fit a peak with these initial parameters from FindPeaks, center: %s " ", width: %s, height: %s" % (
+                failure_msg = "Cannot fit a peak with these initial parameters from FindPeaks, center: %s , width: %s, height: %s" % (
                     initial_params[0],
                     width,
                     initial_params[1],
@@ -300,8 +310,9 @@ class EnggFitPeaks(PythonAlgorithm):
         fit_function = "name=LinearBackground;{0}".format(peak)
         (startx, endx) = self._estimate_start_end_fitting_range(center, width)
         self.log().debug(
-            "Fitting for peak expected in (d-spacing): {0}, Fitting peak function: "
-            "{1}, with startx: {2}, endx: {3}".format(expected_center, fit_function, startx, endx)
+            "Fitting for peak expected in (d-spacing): {0}, Fitting peak function: {1}, with startx: {2}, endx: {3}".format(
+                expected_center, fit_function, startx, endx
+            )
         )
 
         fit_output = Fit(
@@ -427,8 +438,9 @@ class EnggFitPeaks(PythonAlgorithm):
             output_ws = ConvertUnits(InputWorkspace=ws_from, Target=target_units)
         except:
             raise RuntimeError(
-                "Conversion of units went wrong. Failed to run ConvertUnits for {0} "
-                "peaks. Details: {1}".format(len(expected_peaks), expected_peaks)
+                "Conversion of units went wrong. Failed to run ConvertUnits for {0} peaks. Details: {1}".format(
+                    len(expected_peaks), expected_peaks
+                )
             )
 
         peaks_tof = output_ws.readX(0)
@@ -534,7 +546,7 @@ class EnggFitPeaks(PythonAlgorithm):
             return fitted_params["X0"]
         else:
             raise ValueError(
-                "Inconsistency found. I do not know how to deal with centers of peaks " "of types other than {0}".format(PEAK_TYPE)
+                "Inconsistency found. I do not know how to deal with centers of peaks of types other than {0}".format(self.PEAK_TYPE)
             )
 
     def _find_peak_intensity_in_params(self, fitted_params):
@@ -548,7 +560,7 @@ class EnggFitPeaks(PythonAlgorithm):
             return fitted_params["I"]
         else:
             raise ValueError(
-                "Inconsistency found. I do not know how to deal with intensities of " "peaks of types other than {0}".format(PEAK_TYPE)
+                "Inconsistency found. I do not know how to deal with intensities of peaks of types other than {0}".format(self.PEAK_TYPE)
             )
 
     def _b2bexp_is_acceptable(self, fitted_params):

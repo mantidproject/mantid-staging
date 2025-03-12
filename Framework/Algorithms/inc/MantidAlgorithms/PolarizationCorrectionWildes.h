@@ -7,6 +7,7 @@
 #pragma once
 
 #include "MantidAPI/Algorithm.h"
+#include "MantidAPI/MatrixWorkspace.h"
 #include "MantidAPI/WorkspaceGroup_fwd.h"
 #include "MantidAlgorithms/DllConfig.h"
 
@@ -28,6 +29,7 @@ public:
   int version() const override;
   const std::string category() const override;
   const std::string summary() const override;
+  const std::vector<std::string> seeAlso() const override;
 
 private:
   /// A convenience set of workspaces corresponding flipper configurations.
@@ -58,11 +60,15 @@ private:
   WorkspaceMap twoInputCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
   WorkspaceMap threeInputCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
   WorkspaceMap fullCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
-  API::WorkspaceGroup_sptr groupOutput(const WorkspaceMap &outputs);
+  API::WorkspaceGroup_sptr groupOutput(const WorkspaceMap &outputs, const bool hasAnalyser);
   WorkspaceMap mapInputsToDirections(const std::vector<std::string> &flippers);
   void threeInputsSolve01(WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
   void threeInputsSolve10(WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
   void twoInputsSolve01And10(WorkspaceMap &fullInputs, const WorkspaceMap &inputs, const EfficiencyMap &efficiencies);
+  void addSpinStateOutput(std::vector<std::string> &names, const std::string &spinStateOrder,
+                          const std::string &baseName, const API::MatrixWorkspace_sptr &ws,
+                          const std::string &spinState, const bool addSpinStateLog, const bool hasAnalyser);
+  void addSpinStateLogToWs(const API::MatrixWorkspace_sptr &ws, const std::string &spinState, const bool hasAnalyser);
 };
 } // namespace Algorithms
 } // namespace Mantid

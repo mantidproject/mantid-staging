@@ -15,7 +15,6 @@ from isis_powder.gem_routines import gem_output
 
 
 class ISISPowderGemOutputTest(unittest.TestCase):
-
     _folders_to_remove = set()
     CHECK_AGAINST = "BANK 1 100  25 RALF  -12266  96  -12266 -0.022 ALT                              \n"
     GROUPING_SCHEME = [1, 2]
@@ -32,7 +31,7 @@ class ISISPowderGemOutputTest(unittest.TestCase):
             try:
                 shutil.rmtree(folder)
             except OSError as exc:
-                warnings.warn('Could not remove folder at "{}"\n' "Error message:\n{}".format(folder, exc))
+                warnings.warn('Could not remove folder at "{}"\nError message:\n{}'.format(folder, exc))
 
     def test_valid_save(self):
         path_to_ipf = self._find_file_or_die(self.IPF_FILE)

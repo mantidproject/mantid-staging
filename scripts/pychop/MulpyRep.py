@@ -55,10 +55,10 @@ def checkPath(chop_times, lines, chopDist, chop5Dist):
 
         # then compare this time window to when this chopper is open, keep the range if it is possible
         for i in range(len(chop_times[0])):
-            if (chop_times[0][i][0] < earlyT) and ((chop_times[0][i][1] > lateT)):
+            if (chop_times[0][i][0] < earlyT) and (chop_times[0][i][1] > lateT):
                 # the chopper window is larger than the maximum possible spread, change nothing
                 newLines.append(line)
-            elif (chop_times[0][i][0] > earlyT) and ((chop_times[0][i][1] < lateT)):
+            elif (chop_times[0][i][0] > earlyT) and (chop_times[0][i][1] < lateT):
                 # both are within the window, draw a new box
                 chop5_open = (chop5Dist - line[0][1]) / line[0][0]
                 leftM = (chopDist[0] - chop5Dist) / (chop_times[0][i][0] - chop5_open)
@@ -280,7 +280,7 @@ def calcFlux(Ei, freq1, percent, slot):
     return flux
 
 
-def calcChopTimes(efocus, freq, instrumentpars, chop2Phase=5):
+def calcChopTimes(efocus, freq, instrumentpars, chop2Phase=5, phaseOffset=None):
     """
     A method to calculate the various possible incident energies with a given chopper setup on LET.
     The window of energy transfers plotted is 85% by default.
@@ -310,6 +310,10 @@ def calcChopTimes(efocus, freq, instrumentpars, chop2Phase=5):
     ph_ind = np.array([False] * len(dist))
     if not len(ph_ind_v) == len(dist) and ph_ind_v:
         ph_ind[ph_ind_v] = True
+        # For Merlin, subtract the experimental offset of 4500
+        # This value can be set as phaseOffset in the input file for Merlin
+        if phaseOffset is not None:
+            chop2Phase[0] -= phaseOffset
         chop2Phase = phase = chop2Phase if hasattr(chop2Phase, "__len__") else [chop2Phase]
         if len(chop2Phase) != len(dist):
             if len(chop2Phase) == len(ph_ind_v):
@@ -378,4 +382,5 @@ def calcChopTimes(efocus, freq, instrumentpars, chop2Phase=5):
                 lines_all.append(line)
     # ok, now we know the possible neutron velocities. we now need their energies
     Ei = calcEnergy(lines_all, (dist[-1] + chop_samp))
+
     return Ei, chop_times, [chop_times[0][0], chop_times[-1][0]], dist[-1] - dist[0], lines_all

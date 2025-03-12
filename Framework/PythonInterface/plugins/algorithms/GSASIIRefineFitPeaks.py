@@ -4,14 +4,24 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+# ruff: noqa: E741  # Ambiguous variable name
 from contextlib import contextmanager
 import numpy
 import os
 import sys
 import tempfile
 
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import (
+    AlgorithmFactory,
+    FileAction,
+    FileProperty,
+    ITableWorkspaceProperty,
+    MultipleFileProperty,
+    Progress,
+    PythonAlgorithm,
+    WorkspaceProperty,
+)
+from mantid.kernel import logger, Direction, StringListValidator
 import mantid.simpleapi as mantid
 
 
@@ -57,7 +67,7 @@ class GSASIIRefineFitPeaks(PythonAlgorithm):
         return "GSASIIRefineFitPeaks"
 
     def summary(self):
-        return "Perform Rietveld or Pawley refinement of lattice parameters on a diffraction spectrum " "using GSAS-II scriptable API"
+        return "Perform Rietveld or Pawley refinement of lattice parameters on a diffraction spectrum using GSAS-II scriptable API"
 
     def validateInputs(self):
         errors = {}
@@ -190,7 +200,7 @@ class GSASIIRefineFitPeaks(PythonAlgorithm):
             name=self.PROP_SUPPRESS_GSAS_OUTPUT,
             defaultValue=False,
             direction=Direction.Input,
-            doc="Set to True to prevent GSAS run info from being " "printed (not recommended, but can be useful for debugging)",
+            doc="Set to True to prevent GSAS run info from being printed (not recommended, but can be useful for debugging)",
         )
 
     def PyExec(self):

@@ -4,10 +4,14 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Sample MARI reduction scrip used in testing ReductionWrapper """
-from Direct.AbsorptionShapes import *
+"""Sample MARI reduction scrip used in testing ReductionWrapper"""
 
-from Direct.ReductionWrapper import *
+from Direct.AbsorptionShapes import Cylinder
+from Direct.DirectEnergyConversion import DirectEnergyConversion
+from Direct.PropertyManager import PropertyManager
+from Direct.ReductionWrapper import AdvancedProperties, iliad, MainProperties, ReductionWrapper
+
+from types import MethodType
 
 try:
     import reduce_vars as web_var
@@ -19,11 +23,18 @@ except:
     mpl = None
 
 
+def reduced_filename(runs, ei, is_sum, prefix=None):
+    runs = [runs] if not isinstance(runs, list) else runs
+    is_sum = is_sum if len(runs) > 1 else False
+    if not prefix:
+        prefix = f"MAR{runs[0]}to{runs[-1]}sum" if is_sum else f"MAR{runs[0]}"
+    return f"{prefix}_Ei{ei:<3.2f}meV"
+
+
 class ReduceMARI(ReductionWrapper):
     # -------------------------------------------------------------------------------------------------#
     @MainProperties
     def def_main_properties(self):
-
         """Define main properties used in reduction"""
         prop = {}
         prop["sample_run"] = 11001

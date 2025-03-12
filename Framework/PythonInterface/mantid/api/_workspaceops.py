@@ -5,12 +5,11 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 """
-    This module adds functions to  the Workspace classes
-    so that Python operators, i.e +-*/,  can be used on them
+This module adds functions to  the Workspace classes
+so that Python operators, i.e +-*/,  can be used on them
 
-    It is intended for internal use.
+It is intended for internal use.
 """
-
 
 import inspect as _inspect
 
@@ -55,7 +54,7 @@ def attach_binary_operators_to_workspace():
 
     # Loop through and add each one in turn
     for alg, attributes in operations.items():
-        if type(attributes) == str:
+        if isinstance(attributes, str):
             attributes = [attributes]
         for attr in attributes:
             add_operator_func(attr, alg, attr.startswith("__i"), attr.startswith("__r"))
@@ -105,7 +104,7 @@ def _do_binary_operation(op, self, rhs, lhs_vars, inplace, reverse):
                 del ads[name]
         _workspace_op_tmps = []
     else:
-        if type(resultws) == WorkspaceGroup:
+        if type(resultws) is WorkspaceGroup:
             # Ensure the members are removed aswell
             members = resultws.getNames()
             for member in members:
@@ -140,7 +139,7 @@ def attach_unary_operators_to_workspace():
     operations = {"NotMD": "__invert__"}
     # Loop through and add each one in turn
     for alg, attributes in operations.items():
-        if type(attributes) == str:
+        if isinstance(attributes, str):
             attributes = [attributes]
         for attr in attributes:
             add_operator_func(attr, alg)

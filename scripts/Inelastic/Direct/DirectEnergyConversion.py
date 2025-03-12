@@ -16,7 +16,7 @@ import copy
 import math
 import time
 import numpy as np
-import collections
+import collections.abc
 import Direct.CommonFunctions as common
 import Direct.diagnostics as diagnostics
 from Direct.PropertyManager import PropertyManager
@@ -474,8 +474,9 @@ class DirectEnergyConversion(object):
         if prop_man.motor_offset is not None and np.isnan(psi):
             # logs have a problem
             prop_man.log(
-                "*** Can not retrieve rotation value from sample environment logs: {0}.\n"
-                "     Rotation angle remains undefined".format(prop_man.motor_log_names)
+                "*** Can not retrieve rotation value from sample environment logs: {0}.\n     Rotation angle remains undefined".format(
+                    prop_man.motor_log_names
+                )
             )
             PropertyManager.psi = None  # Just in case
         else:
@@ -835,7 +836,7 @@ class DirectEnergyConversion(object):
             ConjoinWorkspaces(InputWorkspace1="spectr_ws1", InputWorkspace2="spectr_ws2")
             RenameWorkspace(InputWorkspace="spectr_ws1", OutputWorkspace=monitor_ws_name)
             if "_OtherMon" in mtd:
-                ConjoinWorkspaces(InputWorkspace1=monitor_ws_name, InputWorkspace2="_OtherMon")
+                ConjoinWorkspaces(InputWorkspace1=monitor_ws_name, InputWorkspace2="_OtherMon", CheckMatchingBins=False)
             else:
                 pass
 
@@ -1018,9 +1019,7 @@ class DirectEnergyConversion(object):
             if case():  # default
                 raise RuntimeError(
                     """Normalization method {0} not found.
-                                   It must be one of monitor-1, monitor-2, current, or None""".format(
-                        method
-                    )
+                                   It must be one of monitor-1, monitor-2, current, or None""".format(method)
                 )
         # endCase
 
@@ -1081,7 +1080,7 @@ class DirectEnergyConversion(object):
             IntegrationRangeMin=range_min,
             IntegrationRangeMax=range_max,
             IncludePartialBins=True,
-            **kwargs
+            **kwargs,
         )
         norm_mon1ws = mtd["Monitor1_norm_ws"]
         norm_factor = norm_mon1ws.dataY(0)
@@ -1159,7 +1158,7 @@ class DirectEnergyConversion(object):
             IntegrationRangeMin=range_min,
             IntegrationRangeMax=range_max,
             IncludePartialBins=True,
-            **kwargs
+            **kwargs,
         )
 
         norm_ws_name = kwargs["NormFactorWS"]
@@ -1252,12 +1251,12 @@ class DirectEnergyConversion(object):
                 mon1_peak = 0
             else:
                 mon_1_spec_ID = ei_mon_spectra[0]
-                if isinstance(mon_1_spec_ID, collections.Iterable):
+                if isinstance(mon_1_spec_ID, collections.abc.Iterable):
                     fix_ei = True  # This could be a HACK
                     mon_1_spec_ID = mon_1_spec_ID[0]
                 # -----------
                 mon_2_spec_ID = ei_mon_spectra[1]
-                if isinstance(mon_2_spec_ID, collections.Iterable):
+                if isinstance(mon_2_spec_ID, collections.abc.Iterable):
                     fix_ei = True  # This could be a HACK
                     mon_2_spec_ID = mon_2_spec_ID[1]
                 # -----------
@@ -1488,9 +1487,7 @@ class DirectEnergyConversion(object):
 
             prop_man.log(
                 """*** Absolute correction factor(s): S^2: {0:10.4f}
-*** LibISIS: {1:10.4f} Poisson: {2:10.4f}  TGP: {3:10.4f} """.format(
-                    anf_LibISIS, anf_SS2, anf_Puas, anf_TGP
-                ),
+*** LibISIS: {1:10.4f} Poisson: {2:10.4f}  TGP: {3:10.4f} """.format(anf_LibISIS, anf_SS2, anf_Puas, anf_TGP),
                 "notice",
             )
             prop_man.log("*** If these factors are substantially different, something is wrong                    ***", "notice")
@@ -1790,7 +1787,7 @@ class DirectEnergyConversion(object):
 
     def _do_mono_SNS(self, data_ws, result_name, ei_guess, white_run=None, map_file=None, spectra_masks=None, Tzero=None):
         # does not work -- retrieve from repo and fix if this functionality is needed.
-        raise NotImplementedError("Non currently implemented. Retrieve from repository" " if necessary and fix")
+        raise NotImplementedError("Non currently implemented. Retrieve from repository if necessary and fix")
         # return
 
     # -------------------------------------------------------------------------------

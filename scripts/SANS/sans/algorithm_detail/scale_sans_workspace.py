@@ -4,12 +4,13 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Multiplies a SANS workspace by an absolute scale and divides it by the sample volume. """
+"""Multiplies a SANS workspace by an absolute scale and divides it by the sample volume."""
 
 import math
 
 from sans.common.constants import EMPTY_NAME
 from sans.common.enums import SampleShape, SANSInstrument
+from sans.common.file_information import convert_to_flag
 
 from sans.common.general_functions import append_to_sans_file_tag, create_unmanaged_algorithm
 
@@ -19,6 +20,7 @@ DEFAULT_SCALING = 100.0
 def scale_workspace(workspace, instrument, state_scale):
     workspace = _multiply_by_abs_scale(instrument, state_scale, workspace)
     workspace = _divide_by_sample_volume(workspace, scale_info=state_scale)
+    workspace = _set_sample_values(workspace, state_scale)
 
     append_to_sans_file_tag(workspace, "_scale")
     return workspace
@@ -65,6 +67,15 @@ def _divide_by_sample_volume(workspace, scale_info):
     return divide_alg.getProperty("OutputWorkspace").value
 
 
+def _set_sample_values(workspace, scale_info):
+    sample = workspace.sample()
+    sample.setThickness(scale_info.thickness if scale_info.thickness is not None else scale_info.thickness_from_file)
+    sample.setWidth(scale_info.width if scale_info.width is not None else scale_info.width_from_file)
+    sample.setHeight(scale_info.height if scale_info.height is not None else scale_info.height_from_file)
+    sample.setGeometryFlag(convert_to_flag(scale_info.shape if scale_info.shape is not None else scale_info.shape_from_file))
+    return workspace
+
+
 def _get_volume(scale_info):
     thickness = scale_info.thickness if scale_info.thickness is not None else scale_info.thickness_from_file
     width = scale_info.width if scale_info.width is not None else scale_info.width_from_file
@@ -86,5 +97,5 @@ def _get_volume(scale_info):
         volume = thickness * math.pi
         volume *= math.pow(width, 2) / 4.0
     else:
-        raise NotImplementedError("DivideByVolumeISIS: The shape {0} is not in the list of " "supported shapes".format(shape))
+        raise NotImplementedError("DivideByVolumeISIS: The shape {0} is not in the list of supported shapes".format(shape))
     return volume

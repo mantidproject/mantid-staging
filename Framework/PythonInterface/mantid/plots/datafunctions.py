@@ -398,13 +398,13 @@ def get_bin_indices(workspace):
     else:
         # the following two lines can be replaced by np.isin when > version 1.7.0 is used on RHEL7
         total_range = np.asarray(range(total_range))
-        indices = np.where(np.in1d(total_range, monitors_indices, invert=True).reshape(total_range.shape))
+        indices = np.where(np.isin(total_range, monitors_indices, invert=True).reshape(total_range.shape))
         # this check is necessary as numpy may return a tuple or a plain array based on platform.
         indices = indices[0] if isinstance(indices, tuple) else indices
         return indices
 
 
-def get_bins(workspace, bin_index, withDy=False):
+def get_bins(workspace, bin_index, withDy=False, withDx=False):
     """
     Extract a requested bin from each spectrum, except if they correspond to monitors
 
@@ -416,6 +416,7 @@ def get_bins(workspace, bin_index, withDy=False):
     indices = get_bin_indices(workspace)
     x_values, y_values = [], []
     dy = [] if withDy else None
+    dx = [] if withDx else None
     for row_index in indices:
         y_data = workspace.readY(int(row_index))
         if bin_index < len(y_data):
@@ -423,7 +424,9 @@ def get_bins(workspace, bin_index, withDy=False):
             y_values.append(y_data[bin_index])
             if withDy:
                 dy.append(workspace.readE(int(row_index))[bin_index])
-    dx = None
+            if withDx:
+                dx.append(workspace.readDx(int(row_index))[bin_index])
+
     return x_values, y_values, dy, dx
 
 
@@ -1271,18 +1274,16 @@ def update_colorbar_scale(figure, image, scale, vmin, vmax):
     image.set_norm(scale(vmin=vmin, vmax=vmax))
 
     if image.colorbar:
-        label = image.colorbar.ax.get_ylabel()
-        image.colorbar.remove()
+        colorbar = image.colorbar
         locator = None
         if scale == LogNorm:
             locator = LogLocator(subs=np.arange(1, 10))
             if locator.tick_values(vmin=vmin, vmax=vmax).size == 0:
                 locator = LogLocator()
                 mantid.kernel.logger.warning(
-                    "Minor ticks on colorbar scale cannot be shown " "as the range between min value and max value is too large"
+                    "Minor ticks on colorbar scale cannot be shown as the range between min value and max value is too large"
                 )
-        colorbar = figure.colorbar(image, ax=figure.axes, ticks=locator, pad=0.05)
-        colorbar.set_label(label)
+            colorbar.set_ticks(locator)
 
 
 def add_colorbar_label(colorbar, axes):

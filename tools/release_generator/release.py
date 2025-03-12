@@ -83,6 +83,8 @@ Changes
 
   - :doc:`Indirect Geometry <indirect_geometry>`
 
+  - :doc:`Inelastic <inelastic>`
+
 Full Change Listings
 --------------------
 
@@ -106,27 +108,30 @@ TECH_DOCS = [
     "diffraction.rst",
     "direct_geometry.rst",
     "indirect_geometry.rst",
+    "inelastic.rst",
     "muon.rst",
     "sans.rst",
     "reflectometry.rst",
 ]
 
-MANTID_DOI = "`doi: 10.5286/SOFTWARE/MANTID{version_maj_min} <https://dx.doi.org/10.5286/SOFTWARE/" "MANTID{version_maj_min}>`_"
+MANTID_DOI = "`doi: 10.5286/SOFTWARE/MANTID{version_maj_min} <https://dx.doi.org/10.5286/SOFTWARE/MANTID{version_maj_min}>`_"
 
 #################################################################################
 # Lists to help create the subfolders
 level1 = ["Diffraction", "Direct_Geometry", "Framework", "Muon"]
 # For upper level folders that will require Bugfixes, Improvements and New features as sub directories
-level1Upper = ["Workbench", "Reflectometry", "SANS", "Indirect"]
+level1Upper = ["Workbench", "Reflectometry", "SANS", "Indirect", "Inelastic"]
 
 diffraction = ["Powder", "Single_Crystal", "Engineering"]
-framework = ["Algorithms", "Data_Objects", "Fit_Functions", "Python"]
+framework = ["Algorithms", "Data_Objects", "Dependencies", "Fit_Functions", "Python"]
 workbench = ["InstrumentViewer", "SliceViewer"]
 direct = ["General", "CrystalField", "MSlice"]
 indirect = ["Algorithms"]
+inelastic = ["Algorithms"]
 muon = ["FDA", "Muon_Analysis", "MA_FDA", "ALC", "Elemental_Analysis", "Algorithms"]
 
 subfolders = ["Bugfixes", "New_features"]
+deprecated_subfolders = subfolders + ["Deprecated", "Removed"]
 muon_subfolders = ["Bugfixes"]
 #################################################################################
 
@@ -210,6 +215,7 @@ def makeReleaseNoteDirectories(HigherLevel):
     makeSubDirectoriesFromList(workbench, "Workbench", HigherLevel)
     makeSubDirectoriesFromList(direct, "Direct_Geometry", HigherLevel)
     makeSubDirectoriesFromList(indirect, "Indirect", HigherLevel)
+    makeSubDirectoriesFromList(inelastic, "Inelastic", HigherLevel)
     makeSubDirectoriesFromList(muon, "Muon", HigherLevel)
 
 
@@ -220,18 +226,27 @@ def makeSubDirectoriesFromList(directoryList, upperDirectory, HigherLevel):
         makeReleaseNoteSubfolders(combinedDirectory, HigherLevel)
 
 
-def makeReleaseNoteSubfolders(directory, HigherLevel):
+def subfolder_creation(directory, HigherLevel, folder):
+    subfolderName = HigherLevel / directory / folder
+    subfolderName.mkdir(parents=True, exist_ok=True)
+    makeGitkeep(subfolderName)
+
+
+def getSubfoldersForDirectory(directory):
     directoryStr = str(directory)
-    for folder in subfolders:
-        if "Muon" in directoryStr:
-            for single_folder in muon_subfolders:
-                subfolderName = HigherLevel / directory / single_folder
-                subfolderName.mkdir(parents=True, exist_ok=True)
-                makeGitkeep(subfolderName)
-        else:
-            subfolderName = HigherLevel / directory / folder
-            subfolderName.mkdir(parents=True, exist_ok=True)
-            makeGitkeep(subfolderName)
+
+    if "Muon" in directoryStr:
+        return muon_subfolders
+
+    if "Framework" in directoryStr and ("Algorithm" in directoryStr or "Fit_Functions" in directoryStr):
+        return deprecated_subfolders
+
+    return subfolders
+
+
+def makeReleaseNoteSubfolders(directory, HigherLevel):
+    for folder in getSubfoldersForDirectory(directory):
+        subfolder_creation(directory, HigherLevel, folder)
 
 
 def makeGitkeep(subfolderName):

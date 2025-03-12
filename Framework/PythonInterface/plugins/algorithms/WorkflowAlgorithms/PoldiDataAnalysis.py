@@ -5,11 +5,26 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name,attribute-defined-outside-init,too-many-instance-attributes
-from mantid.simpleapi import *
-from mantid.api import *
-
-# the mantid.kernel import is required for Direction.Input and Direction.Output calls
-from mantid.kernel import *
+from mantid.api import AlgorithmFactory, AnalysisDataService, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import (
+    Direction,
+    StringListValidator,
+)
+from mantid.simpleapi import (
+    plotSpectrum,
+    DeleteWorkspace,
+    Integration,
+    GroupWorkspaces,
+    Plus,
+    PoldiAnalyseResiduals,
+    PoldiFitPeaks1D,
+    PoldiFitPeaks2D,
+    PoldiIndexKnownCompounds,
+    PoldiPeakSearch,
+    PoldiAutoCorrelation,
+    RenameWorkspace,
+    SumSpectra,
+)
 
 
 class PoldiDataAnalysis(PythonAlgorithm):
@@ -67,7 +82,7 @@ class PoldiDataAnalysis(PythonAlgorithm):
             "MinimumPeakHeight",
             0.0,
             direction=Direction.Input,
-            doc=("Minimum height of peaks. If it is left at 0, the minimum peak height is calculated" "from background noise."),
+            doc=("Minimum height of peaks. If it is left at 0, the minimum peak height is calculated from background noise."),
         )
 
         self.declareProperty(
@@ -130,9 +145,7 @@ class PoldiDataAnalysis(PythonAlgorithm):
             "MultipleRuns",
             False,
             direction=Direction.Input,
-            doc=(
-                "If this is activated, peaks are searched again in the" "residuals and the 1D- and 2D-fit is repeated " "with these data."
-            ),
+            doc=("If this is activated, peaks are searched again in the residuals and the 1D- and 2D-fit is repeated with these data."),
         )
 
         self.declareProperty(
@@ -159,7 +172,7 @@ class PoldiDataAnalysis(PythonAlgorithm):
             "OutputRawFitParameters",
             False,
             direction=Direction.Input,
-            doc=("Activating this option produces an output workspace which contains the raw " "fit parameters."),
+            doc=("Activating this option produces an output workspace which contains the raw fit parameters."),
         )
 
         self.declareProperty(
@@ -379,7 +392,6 @@ class PoldiDataAnalysis(PythonAlgorithm):
         plotResults = self.getProperty("PlotResult").value
 
         if plotResults:
-
             plotWindow = plotSpectrum(total, 0, type=1)
             plotWindow = plotSpectrum(spectrum1D, 0, type=0, window=plotWindow)
             plotWindow = plotSpectrum(residuals, 0, type=0, window=plotWindow)

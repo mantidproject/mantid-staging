@@ -7,7 +7,7 @@
 import matplotlib
 import unittest
 
-matplotlib.use("AGG")  # noqa
+matplotlib.use("AGG")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,6 +44,9 @@ class PlotFunctionsTest(unittest.TestCase):
             VerticalAxisUnit="DeltaE",
             VerticalAxisValues=[4, 6, 8],
             OutputWorkspace="ws2d_histo",
+        )
+        cls.ws2d_histo_negative_errors = CreateWorkspace(
+            DataX=[1, 2, 3, 4], DataY=[10, 20, 30, 40], DataE=[1, -2, 3, -4], OutputWorkspace="ws2d_histo_negative_errors"
         )
         cls.ws2d_histo_non_dist = CreateWorkspace(
             DataX=[10, 20, 30, 10, 20, 30],
@@ -94,7 +97,7 @@ class PlotFunctionsTest(unittest.TestCase):
             OutputWorkspace="ws_spec",
         )
         wp = CreateWorkspace(DataX=[15, 25, 35, 45], DataY=[1, 2, 3, 4], NSpec=1)
-        ConjoinWorkspaces(cls.ws2d_point_uneven, wp, CheckOverlapping=False)
+        ConjoinWorkspaces(cls.ws2d_point_uneven, wp, CheckOverlapping=False, CheckMatchingBins=False)
         cls.ws2d_point_uneven = mantid.mtd["ws2d_point_uneven"]
         cls.ws2d_histo_uneven = CreateWorkspace(DataX=[10, 20, 30, 40], DataY=[1, 2, 3], NSpec=1, OutputWorkspace="ws2d_histo_uneven")
         AddTimeSeriesLog(cls.ws2d_histo, Name="my_log", Time="2010-01-01T00:00:00", Value=100)
@@ -150,6 +153,10 @@ class PlotFunctionsTest(unittest.TestCase):
         funcs.errorbar(ax, self.ws2d_histo, "rs", specNum=1)
         funcs.errorbar(ax, self.ws2d_histo, specNum=2, linewidth=6)
         funcs.errorbar(ax, self.ws_MD_1d, "bo")
+
+    def test_1d_errorbars_with_negative_errors(self):
+        _, ax = plt.subplots()
+        funcs.errorbar(ax, self.ws2d_histo_negative_errors, specNum=1)
 
     def test_1d_scatter(self):
         fig, ax = plt.subplots()

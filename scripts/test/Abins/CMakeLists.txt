@@ -1,5 +1,6 @@
 # Tests for Abins INS simulation
 set(TEST_PY_FILES
+    AbinsAlgorithmTest.py
     AbinsAtomsDataTest.py
     AbinsBroadeningTest.py
     AbinsPowderCalculatorTest.py
@@ -15,6 +16,7 @@ set(TEST_PY_FILES
     AbinsLoadDMOL3Test.py
     AbinsLoadDMOL3InternalsTest.py
     AbinsLoadGAUSSIANTest.py
+    AbinsLoadJSONTest.py
     AbinsLoadPhonopyTest.py
     AbinsLoadVASPTest.py
     AbinsPowderDataTest.py

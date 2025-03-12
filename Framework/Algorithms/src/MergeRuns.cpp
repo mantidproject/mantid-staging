@@ -432,7 +432,7 @@ bool MergeRuns::validateInputsForEventWorkspaces(const std::vector<std::string> 
  *  @return :: An optional object containing the rebinning params or none
  *  if rebinning is not needed.
  */
-boost::optional<std::vector<double>> MergeRuns::checkRebinning() {
+std::optional<std::vector<double>> MergeRuns::checkRebinning() {
   const std::string rebinBehaviour = getProperty("RebinBehaviour");
   const std::string sampleLogsFailBehaviour = getProperty("FailBehaviour");
   // To properly cover all X spans of the input workspaces, one needs to
@@ -444,10 +444,10 @@ boost::optional<std::vector<double>> MergeRuns::checkRebinning() {
             });
   auto it = inputsSortedByX.cbegin();
   g_log.notice() << "Using run '" << (*it)->getName() << "' as a reference to determine possible rebinning.\n";
-  boost::optional<std::vector<double>> rebinParams{boost::none};
+  std::optional<std::vector<double>> rebinParams{std::nullopt};
   std::vector<double> bins{(*it)->x(0).rawData()};
   for (++it; it != inputsSortedByX.cend(); ++it) {
-    if (!WorkspaceHelpers::matchingBins(*inputsSortedByX.front(), **it, true)) {
+    if (!WorkspaceHelpers::matchingBins(inputsSortedByX.front(), *it, true)) {
       if (rebinBehaviour != REBIN_BEHAVIOUR) {
         if (sampleLogsFailBehaviour == SKIP_BEHAVIOUR) {
           g_log.error() << "Could not merge run: " << (*it)->getName()

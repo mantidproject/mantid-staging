@@ -55,7 +55,7 @@ enum EventSortType {
 
 class MANTID_DATAOBJECTS_DLL EventList : public Mantid::API::IEventList {
 public:
-  EventList();
+  EventList(const Mantid::API::EventType event_type = Mantid::API::EventType::TOF);
 
   EventList(EventWorkspaceMRU *mru, specnum_t specNo);
 
@@ -102,8 +102,9 @@ public:
    * @param event :: TofEvent to add at the end of the list.
    * */
   inline void addEventQuickly(const Types::Event::TofEvent &event) {
-    this->events.emplace_back(event);
-    this->order = UNSORTED;
+    this->events->emplace_back(event);
+    if (this->order != UNSORTED)
+      this->setSortOrder(UNSORTED);
   }
 
   // --------------------------------------------------------------------------
@@ -112,8 +113,9 @@ public:
    * @param event :: WeightedEvent to add at the end of the list.
    * */
   inline void addEventQuickly(const WeightedEvent &event) {
-    this->weightedEvents.emplace_back(event);
-    this->order = UNSORTED;
+    this->weightedEvents->emplace_back(event);
+    if (this->order != UNSORTED)
+      this->setSortOrder(UNSORTED);
   }
 
   // --------------------------------------------------------------------------
@@ -122,8 +124,9 @@ public:
    * @param event :: WeightedEventNoTime to add at the end of the list.
    * */
   inline void addEventQuickly(const WeightedEventNoTime &event) {
-    this->weightedEventsNoTime.emplace_back(event);
-    this->order = UNSORTED;
+    this->weightedEventsNoTime->emplace_back(event);
+    if (this->order != UNSORTED)
+      this->setSortOrder(UNSORTED);
   }
 
   Mantid::API::EventType getEventType() const override;
@@ -201,10 +204,14 @@ public:
   virtual size_t histogram_size() const;
 
   void compressEvents(double tolerance, EventList *destination);
+  void compressEvents(double tolerance, EventList *destination,
+                      const std::shared_ptr<std::vector<double>> histogram_bin_edges);
   void compressFatEvents(const double tolerance, const Types::Core::DateAndTime &timeStart, const double seconds,
                          EventList *destination);
   // get EventType declaration
   void generateHistogram(const MantidVec &X, MantidVec &Y, MantidVec &E, bool skipError = false) const override;
+  void generateHistogram(const double step, const MantidVec &X, MantidVec &Y, MantidVec &E,
+                         bool skipError = false) const;
   void generateHistogramPulseTime(const MantidVec &X, MantidVec &Y, MantidVec &E,
                                   bool skipError = false) const override;
 
@@ -265,9 +272,9 @@ public:
 
   void filterByPulseTime(Types::Core::DateAndTime start, Types::Core::DateAndTime stop, EventList &output) const;
 
-  void filterByPulseTime(Kernel::TimeROI *timeRoi, EventList *output) const;
+  void filterByPulseTime(Kernel::TimeROI const *timeRoi, EventList *output) const;
 
-  void filterInPlace(Kernel::TimeROI *timeRoi);
+  void filterInPlace(const Kernel::TimeROI *timeRoi);
 
   /// Initialize the detector ID's and event type of the destination event lists when splitting this list
   void initializePartials(std::map<int, EventList *> partials) const;
@@ -282,7 +289,7 @@ public:
 
   void divide(const MantidVec &X, const MantidVec &Y, const MantidVec &E) override;
 
-  void convertUnitsViaTof(Mantid::Kernel::Unit *fromUnit, Mantid::Kernel::Unit *toUnit);
+  void convertUnitsViaTof(Mantid::Kernel::Unit const *fromUnit, Mantid::Kernel::Unit const *toUnit);
   void convertUnitsQuickly(const double &factor, const double &power);
 
   /// Returns a copy of the Histogram associated with this spectrum.
@@ -322,13 +329,13 @@ private:
   HistogramData::Histogram m_histogram;
 
   /// List of TofEvent (no weights).
-  mutable std::vector<Types::Event::TofEvent> events;
+  mutable std::unique_ptr<std::vector<Types::Event::TofEvent>> events;
 
   /// List of WeightedEvent's
-  mutable std::vector<WeightedEvent> weightedEvents;
+  mutable std::unique_ptr<std::vector<WeightedEvent>> weightedEvents;
 
   /// List of WeightedEvent's
-  mutable std::vector<WeightedEventNoTime> weightedEventsNoTime;
+  mutable std::unique_ptr<std::vector<WeightedEventNoTime>> weightedEventsNoTime;
 
   /// What type of event is in our list.
   Mantid::API::EventType eventType;
@@ -352,6 +359,16 @@ private:
                                                                      const double &tofOffset) const;
 
   void generateCountsHistogram(const MantidVec &X, MantidVec &Y) const;
+  void generateCountsHistogram(const double step, const MantidVec &X, MantidVec &Y) const;
+
+public:
+  static std::optional<size_t> findLinearBin(const MantidVec &X, const double tof, const double divisor,
+                                             const double offset, const bool findExact = true);
+  static std::optional<size_t> findLogBin(const MantidVec &X, const double tof, const double divisor,
+                                          const double offset, const bool findExact = true);
+
+private:
+  static std::optional<size_t> findExactBin(const MantidVec &X, const double tof, size_t n_bin);
 
   void generateCountsHistogramPulseTime(const MantidVec &X, MantidVec &Y) const;
 
@@ -372,12 +389,24 @@ private:
                                    double tolerance);
 
   template <class T>
+  static void createWeightedEvents(std::vector<WeightedEventNoTime> &out, const std::vector<double> &tof,
+                                   const std::vector<T> &weight, const std::vector<T> &error);
+
+  template <class T>
+  static void processWeightedEvents(const std::vector<T> &events, std::vector<WeightedEventNoTime> &out,
+                                    const std::shared_ptr<std::vector<double>> histogram_bin_edges,
+                                    struct FindBin findBin);
+
+  template <class T>
   static void compressFatEventsHelper(const std::vector<T> &events, std::vector<WeightedEvent> &out,
                                       const double tolerance, const Mantid::Types::Core::DateAndTime &timeStart,
                                       const double seconds);
 
   template <class T>
   static void histogramForWeightsHelper(const std::vector<T> &events, const MantidVec &X, MantidVec &Y, MantidVec &E);
+  template <class T>
+  static void histogramForWeightsHelper(const std::vector<T> &events, const double step, const MantidVec &X,
+                                        MantidVec &Y, MantidVec &E);
   template <class T>
   static void integrateHelper(std::vector<T> &events, const double minX, const double maxX, const bool entireRange,
                               double &sum, double &error);
@@ -406,7 +435,7 @@ private:
   static void filterByTimeROIHelper(std::vector<T> &events, const std::vector<Kernel::TimeInterval> &intervals,
                                     EventList *output);
 
-  template <class T> void filterInPlaceHelper(Kernel::TimeROI *timeRoi, typename std::vector<T> &events);
+  template <class T> void filterInPlaceHelper(Kernel::TimeROI const *timeRoi, typename std::vector<T> &events);
 
   template <class T> static void multiplyHelper(std::vector<T> &events, const double value, const double error = 0.0);
   template <class T>
@@ -415,8 +444,8 @@ private:
   template <class T>
   static void divideHistogramHelper(std::vector<T> &events, const MantidVec &X, const MantidVec &Y, const MantidVec &E);
   template <class T>
-  void convertUnitsViaTofHelper(typename std::vector<T> &events, Mantid::Kernel::Unit *fromUnit,
-                                Mantid::Kernel::Unit *toUnit);
+  void convertUnitsViaTofHelper(typename std::vector<T> &events, Mantid::Kernel::Unit const *fromUnit,
+                                Mantid::Kernel::Unit const *toUnit);
   template <class T>
   void convertUnitsQuicklyHelper(typename std::vector<T> &events, const double &factor, const double &power);
 };

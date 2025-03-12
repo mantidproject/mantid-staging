@@ -41,7 +41,7 @@ if hasattr(Legend, "set_draggable"):
     SET_DRAGGABLE_METHOD = "set_draggable(True)"
 else:
     SET_DRAGGABLE_METHOD = "draggable()"
-FIT_DOCUMENTATION_STRING = "# Fit definition, see https://docs.mantidproject.org/algorithms/Fit-v1.html for more " "details"
+FIT_DOCUMENTATION_STRING = "# Fit definition, see https://docs.mantidproject.org/algorithms/Fit-v1.html for more details"
 TICKER_FORMATTER_IMPORT = "from matplotlib.ticker import NullFormatter, ScalarFormatter, LogFormatterSciNotation"
 
 
@@ -65,7 +65,9 @@ def generate_script(fig, exclude_headers=False):
         axes.legend().set_draggable(True)     (if legend present, or just draggable() for earlier matplotlib versions)
         <Legend title and label commands if non-default>
 
-        plt.show()
+        fig.show()
+        # Use plt.show() if running the script outside of Workbench
+        #plt.show()
 
     :param fig: A matplotlib.pyplot.Figure object you want to create a script from
     :param exclude_headers: Boolean. Set to True to ignore imports/headers
@@ -84,6 +86,8 @@ def generate_script(fig, exclude_headers=False):
             plot_headers.extend(colormap_headers)
         else:
             if not curve_in_ax(ax):
+                plot_commands.append(f"{ax_object_var}.axis('off')")
+                plot_commands.append("")
                 continue
             plot_commands.extend(get_plot_cmds(ax, ax_object_var))  # ax.plot
 
@@ -120,7 +124,9 @@ def generate_script(fig, exclude_headers=False):
     cmds.extend(generate_workspace_retrieval_commands(fig) + [""])
     cmds.append("{}, {} = {}".format(FIG_VARIABLE, AXES_VARIABLE, generate_subplots_command(fig)))
     cmds.extend(plot_commands)
-    cmds.append("plt.show()")
+    cmds.append("fig.show()")
+    cmds.append("# Use plt.show() if running the script outside of Workbench")
+    cmds.append("#plt.show()")
     cmds.append("# Scripting Plots in Mantid:")
     cmds.append("# https://docs.mantidproject.org/tutorials/python_in_mantid/plotting/02_scripting_plots.html")
 
@@ -212,7 +218,7 @@ def get_axes_object_variable(ax):
     # plotted otherwise it returns a list
     ax_object_var = AXES_VARIABLE
 
-    if hasattr(ax, "get_gridspec") and hasattr(ax.get_gridspec(), "nrows") and hasattr(ax.get_gridspec(), "ncols"):
+    if ax.get_gridspec() and hasattr(ax.get_gridspec(), "nrows") and hasattr(ax.get_gridspec(), "ncols"):
         num_rows = ax.get_gridspec().nrows
         num_cols = ax.get_gridspec().ncols
     else:

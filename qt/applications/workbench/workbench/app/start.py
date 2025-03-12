@@ -7,7 +7,6 @@
 #  This file is part of the mantid workbench.
 import argparse
 import atexit
-import importlib
 import os
 import sys
 from sys import setswitchinterval
@@ -17,22 +16,20 @@ import multiprocessing
 from mantid.api import FrameworkManagerImpl
 from mantid.kernel import ConfigService, UsageService, version_str as mantid_version_str
 from mantidqt.utils.qt import plugins
-from mantidqt.dialogs.errorreports import main as errorreports_main
 import mantidqt.utils.qt as qtutils
 
 # Find Qt plugins for development builds on some platforms
 plugins.setup_library_paths()
 
-from qtpy.QtGui import QIcon, QSurfaceFormat
-from qtpy.QtWidgets import QApplication
-from qtpy.QtCore import QCoreApplication, Qt
+from qtpy.QtGui import QIcon, QSurfaceFormat  # noqa: E402
+from qtpy.QtWidgets import QApplication  # noqa: E402
+from qtpy.QtCore import QCoreApplication, Qt  # noqa: E402
 
 # Importing resources loads the data in. This must be imported before the
 # QApplication is created or paths to Qt's resources will not be set up correctly
-from workbench.app.resources import qCleanupResources
-from workbench.config import APPNAME, ORG_DOMAIN, ORGANIZATION
-from workbench.plugins.exception_handler import exception_logger
-from workbench.widgets.about.presenter import AboutPresenter
+from workbench.app.resources import qCleanupResources  # noqa: E402
+from workbench.config import APPNAME, ORG_DOMAIN, ORGANIZATION  # noqa: E402
+from workbench.widgets.about.presenter import AboutPresenter  # noqa: E402
 
 # Constants
 SYSCHECK_INTERVAL = 50
@@ -62,13 +59,6 @@ def qapplication():
 
         argv = sys.argv[:]
         argv[0] = APPNAME  # replace application name
-        # Workaround a segfault importing readline with PyQt5
-        # This is because PyQt5 messes up pystate (internal) modules_by_index
-        # so PyState_FindModule will return null instead of the module address.
-        # Readline (so far) is the only module that falls over during init as it blindly uses FindModules result
-        # The workaround mentioned in https://groups.google.com/forum/#!topic/leo-editor/ghiIN7irzY0
-        if sys.platform == "linux" or sys.platform == "linux2" or sys.platform == "darwin":
-            importlib.import_module("readline")
 
         app = QApplication(argv)
         app.setOrganizationName(ORGANIZATION)
@@ -144,6 +134,7 @@ def start_error_reporter():
     """
     Used to start the error reporter if the program has segfaulted.
     """
+    from mantidqt.dialogs.errorreports import main as errorreports_main
 
     errorreports_main.main(["--application", APPNAME, "--orgname", ORGANIZATION, "--orgdomain", ORG_DOMAIN])
 
@@ -169,6 +160,8 @@ def create_and_launch_workbench(app, command_line_options):
 
         # decorates the excepthook callback with the reference to the main window
         # this is used in case the user wants to terminate the workbench from the error window shown
+        from workbench.plugins.exception_handler import exception_logger
+
         sys.excepthook = partial(exception_logger, main_window)
 
         # Load matplotlib as early as possible and set our defaults
@@ -259,6 +252,24 @@ def start(options: argparse.ArgumentParser):
         workbench_process.start()
         workbench_process.join()
 
+        # handle exit information
         exit_code = workbench_process.exitcode if workbench_process.exitcode is not None else 1
-        if not options.no_error_reporter and exit_code != 0:
-            start_error_reporter()
+        if exit_code != 0:
+            # start error reporter if requested
+            if not options.no_error_reporter:
+                start_error_reporter()
+
+            # a signal was emited so raise the signal from the application
+            if exit_code < 0:
+                import signal
+
+                try:
+                    sig_code = signal.Signals(abs(exit_code))
+                    name = sig_code.name
+                    print("Received signal:", name)
+                except ValueError:
+                    pass
+                signal.raise_signal(sig_code)  # this will exit the mainloop
+
+            # application returned non-zero that wasn't interpreted as a signal, return it as an exit code
+            sys.exit(exit_code)

@@ -5,6 +5,8 @@
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
 #include "MantidAPI/AnalysisDataService.h"
+#include "MantidAPI/IPeaksWorkspace.h"
+#include "MantidAPI/WorkspaceGroup.h"
 #include "MantidKernel/WarningSuppressions.h"
 #include "MantidPythonInterface/core/Converters/PySequenceToVector.h"
 #include "MantidPythonInterface/core/Converters/ToPyList.h"
@@ -38,9 +40,13 @@ AnalysisDataServiceImpl &instance() {
   // start the framework (if necessary)
   auto &ads = AnalysisDataService::Instance();
   std::call_once(INIT_FLAG, []() {
+    // Passing True as an argument suppresses a warning that is normally
+    // displayed when calling AnalysisDataService.clear()
     PyRun_SimpleString("import atexit\n"
-                       "from mantid.api import AnalysisDataService\n"
-                       "atexit.register(lambda: AnalysisDataService.clear())");
+                       "def cleanup_ADS():\n"
+                       "    from mantid.api import AnalysisDataService\n"
+                       "    AnalysisDataService.clear(True)\n"
+                       "atexit.register(cleanup_ADS)");
   });
   return ads;
 }
@@ -63,6 +69,28 @@ list retrieveWorkspaces(AnalysisDataServiceImpl const *const self, const list &n
   return Converters::ToPyList<WeakPtr>()(wsWeakPtrs);
 }
 
+list retrieveGroupPeaksWorkspaces(AnalysisDataServiceImpl const *const self, const list &names) {
+  using WeakPtr = std::weak_ptr<Workspace>;
+
+  auto wsSharedPtrs = self->retrieveWorkspaces(Converters::PySequenceToVector<std::string>(names)(), false);
+
+  auto isNotGroupPeakWorkspace = [](const Workspace_sptr &wksp) {
+    if (auto gws = dynamic_cast<WorkspaceGroup *>(wksp.get())) {
+      return !gws->isGroupPeaksWorkspaces();
+    }
+    return true;
+  };
+  auto end = std::remove_if(wsSharedPtrs.begin(), wsSharedPtrs.end(), isNotGroupPeakWorkspace);
+  wsSharedPtrs.erase(end, wsSharedPtrs.end());
+
+  std::vector<WeakPtr> wsWeakPtrs;
+  wsWeakPtrs.reserve(wsSharedPtrs.size());
+  std::transform(wsSharedPtrs.cbegin(), wsSharedPtrs.cend(), std::back_inserter(wsWeakPtrs),
+                 [](const Workspace_sptr &wksp) -> WeakPtr { return WeakPtr(wksp); });
+
+  return Converters::ToPyList<WeakPtr>()(wsWeakPtrs);
+}
+
 GNU_DIAG_OFF("unused-local-typedef")
 // Ignore -Wconversion warnings coming from boost::python
 // Seen with GCC 7.1.1 and Boost 1.63.0
@@ -82,8 +110,20 @@ void export_AnalysisDataService() {
       .def("retrieveWorkspaces", retrieveWorkspaces,
            AdsRetrieveWorkspacesOverloads("Retrieve a list of workspaces by name",
                                           (arg("self"), arg("names"), arg("unrollGroups") = false)))
+      .def("retrieveGroupPeaksWorkspaces", retrieveGroupPeaksWorkspaces, (arg("self"), arg("names")))
       .def("addToGroup", &AnalysisDataServiceImpl::addToGroup, (arg("groupName"), arg("wsName")),
            "Add a workspace in the ADS to a group in the ADS")
       .def("removeFromGroup", &AnalysisDataServiceImpl::removeFromGroup, (arg("groupName"), arg("wsName")),
-           "Remove a workspace from a group in the ADS");
+           "Remove a workspace from a group in the ADS")
+      .def("unique_name", &AnalysisDataServiceImpl::uniqueName,
+           (arg("self"), arg("n") = 5, arg("prefix") = "", arg("suffix") = ""),
+           "Return a randomly generated unique name for a workspace\n"
+           "\n"
+           ":param str n: length of string of random numbers\n"
+           ":param str prefix: String to be prepended to the generated string\n"
+           ":param str suffix: String to be appended to the generated string\n"
+           ":return: prefix + n*random characters + suffix\n"
+           ":rtype: str\n")
+      .def("unique_hidden_name", &AnalysisDataServiceImpl::uniqueHiddenName, arg("self"),
+           "Return a randomly generated unique hidden workspace name.");
 }

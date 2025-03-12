@@ -5,7 +5,6 @@
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
 #include "MantidKernel/ISaveable.h"
-//#include "MantidKernel/INode.h"
 
 namespace Mantid::Kernel {
 
@@ -68,7 +67,7 @@ void ISaveable::saveAt(uint64_t newPos, uint64_t newSize) {
  */
 size_t ISaveable::setBufferPosition(std::list<ISaveable *>::iterator bufPosition) {
   std::lock_guard<std::mutex> lock(m_setter);
-  m_BufPosition = boost::optional<std::list<ISaveable *>::iterator>(bufPosition);
+  m_BufPosition = std::optional<std::list<ISaveable *>::iterator>(bufPosition);
   m_BufMemorySize = this->getDataMemorySize();
 
   return m_BufMemorySize;
@@ -80,7 +79,7 @@ void ISaveable::clearBufferState() {
   std::lock_guard<std::mutex> lock(m_setter);
 
   m_BufMemorySize = 0;
-  m_BufPosition = boost::optional<std::list<ISaveable *>::iterator>();
+  m_BufPosition = std::optional<std::list<ISaveable *>::iterator>();
 }
 
 } // namespace Mantid::Kernel

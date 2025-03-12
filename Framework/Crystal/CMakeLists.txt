@@ -17,12 +17,12 @@ set(SRC_FILES
     src/DisjointElement.cpp
     src/FilterPeaks.cpp
     src/FindClusterFaces.cpp
+    src/FindGoniometerAngles.cpp
     src/FindSXPeaks.cpp
     src/FindSXPeaksHelper.cpp
     src/FindUBUsingFFT.cpp
     src/FindUBUsingIndexedPeaks.cpp
     src/FindUBUsingLatticeParameters.cpp
-    src/FindUBUsingMinMaxD.cpp
     src/GoniometerAnglesFromPhiRotation.cpp
     src/HardThresholdBackground.cpp
     src/HasUB.cpp
@@ -74,7 +74,6 @@ set(SRC_FILES
     src/TransformHKL.cpp
 )
 
-set(SRC_UNITY_IGNORE_FILES)
 set(INC_FILES
     inc/MantidCrystal/AddPeakHKL.h
     inc/MantidCrystal/AnvredCorrection.h
@@ -95,12 +94,12 @@ set(INC_FILES
     inc/MantidCrystal/DisjointElement.h
     inc/MantidCrystal/FilterPeaks.h
     inc/MantidCrystal/FindClusterFaces.h
+    inc/MantidCrystal/FindGoniometerAngles.h
     inc/MantidCrystal/FindSXPeaks.h
     inc/MantidCrystal/FindSXPeaksHelper.h
     inc/MantidCrystal/FindUBUsingFFT.h
     inc/MantidCrystal/FindUBUsingIndexedPeaks.h
     inc/MantidCrystal/FindUBUsingLatticeParameters.h
-    inc/MantidCrystal/FindUBUsingMinMaxD.h
     inc/MantidCrystal/GSLFunctions.h
     inc/MantidCrystal/GoniometerAnglesFromPhiRotation.h
     inc/MantidCrystal/HardThresholdBackground.h
@@ -172,12 +171,12 @@ set(TEST_FILES
     DisjointElementTest.h
     FilterPeaksTest.h
     FindClusterFacesTest.h
+    FindGoniometerAnglesTest.h
     FindSXPeaksHelperTest.h
     FindSXPeaksTest.h
     FindUBUsingFFTTest.h
     FindUBUsingIndexedPeaksTest.h
     FindUBUsingLatticeParametersTest.h
-    FindUBUsingMinMaxDTest.h
     GoniometerAnglesFromPhiRotationTest.h
     HardThresholdBackgroundTest.h
     HasUBTest.h
@@ -226,11 +225,6 @@ set(TEST_FILES
     TransformHKLTest.h
 )
 
-if(UNITY_BUILD)
-  include(UnityBuild)
-  enable_unity_build(Crystal SRC_FILES SRC_UNITY_IGNORE_FILES 10)
-endif(UNITY_BUILD)
-
 if(COVERAGE)
   foreach(loop_var ${SRC_FILES} ${INC_FILES})
     set_property(GLOBAL APPEND PROPERTY COVERAGE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/${loop_var}")
@@ -264,7 +258,7 @@ include_directories(inc)
 target_link_libraries(
   Crystal
   PUBLIC Mantid::API Mantid::Geometry Mantid::Kernel
-  PRIVATE Mantid::DataObjects Mantid::Indexing Boost::filesystem
+  PRIVATE Mantid::DataObjects Mantid::Indexing
 )
 
 # Add the unit tests directory

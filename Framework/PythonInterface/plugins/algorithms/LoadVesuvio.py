@@ -4,8 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, WorkspaceFactory, WorkspaceProperty
+from mantid.kernel import config, logger, Direction, IntArrayProperty, StringListValidator, StringMandatoryValidator
 import mantid.simpleapi as ms
 
 from LoadEmptyVesuvio import LoadEmptyVesuvio
@@ -43,7 +43,6 @@ _LOGGING_ = False
 
 
 class LoadVesuvio(LoadEmptyVesuvio):
-
     _ws_index = None
     _spectrum_no = None
     foil_map = None
@@ -124,7 +123,7 @@ class LoadVesuvio(LoadEmptyVesuvio):
             SPECTRA_PROP,
             "",
             StringMandatoryValidator(),
-            doc="The spectrum numbers to load. " "A dash will load a range and a semicolon delimits spectra to sum",
+            doc="The spectrum numbers to load. A dash will load a range and a semicolon delimits spectra to sum",
         )
 
         self.declareProperty(
@@ -147,7 +146,7 @@ class LoadVesuvio(LoadEmptyVesuvio):
         )
 
         self.declareProperty(
-            LOAD_MON, False, doc="If true then the monitor data is loaded and will be output by the " "algorithm into a separate workspace."
+            LOAD_MON, False, doc="If true then the monitor data is loaded and will be output by the algorithm into a separate workspace."
         )
 
         self.declareProperty(LOAD_LOG_FILES, True, doc="If true, then the log files for the specified runs will be loaded.")
@@ -170,10 +169,13 @@ class LoadVesuvio(LoadEmptyVesuvio):
         # Validate run number ranges
         user_input = self.getProperty(RUN_PROP).value
         run_str = os.path.basename(user_input)
-        # String could be a full file path
-        if "-" in run_str:
-            lower, upper = run_str.split("-")
-            issues = self._validate_range_formatting(lower, upper, RUN_PROP, issues)
+
+        if "-" in run_str or "," in run_str:
+            run_ranges = [run_range.split("-") for run_range in run_str.replace(" ", "").split(",")]
+            for run_pair in run_ranges:
+                lower = run_pair[0]
+                upper = run_pair[1] if len(run_pair) == 2 else run_pair[0]
+                issues = self._validate_range_formatting(lower, upper, RUN_PROP, issues)
 
         # Validate SpectrumList
         grp_spectra_list = self.getProperty(SPECTRA_PROP).value
@@ -209,8 +211,13 @@ class LoadVesuvio(LoadEmptyVesuvio):
         """
         Validates is a range style input is in the correct form of lower-upper
         """
-        upper = int(upper)
-        lower = int(lower)
+        try:
+            upper = int(upper)
+            lower = int(lower)
+        except:
+            issues[property_name] = "Runs must be integers"
+            return issues
+
         if upper < lower:
             issues[property_name] = "Range must be in format lower-upper"
         return issues
@@ -276,7 +283,7 @@ class LoadVesuvio(LoadEmptyVesuvio):
         all_back = self._is_back_scattering(spectra[0])
         for spec_no in spectra[1:]:
             if all_back and self._is_fwd_scattering(spec_no):
-                raise RuntimeError("Mixing backward and forward spectra is not permitted. " "Please correct the SpectrumList property.")
+                raise RuntimeError("Mixing backward and forward spectra is not permitted. Please correct the SpectrumList property.")
         self._back_scattering = all_back
 
     def _raise_error_period_scatter(self, run_str, back_scattering):
@@ -671,17 +678,17 @@ class LoadVesuvio(LoadEmptyVesuvio):
         user_input = self.getProperty(RUN_PROP).value
         run_str = os.path.basename(user_input)
         # Load is not doing the right thing when summing. The numbers don't look correct
-        if "-" in run_str:
-            lower, upper = run_str.split("-")
-            # Range goes lower to up-1 but we want to include the last number
-            runs = list(range(int(lower), int(upper) + 1))
-        elif "," in run_str:
-            runs = run_str.split(",")
-        else:
-            # Leave it as it is
-            runs = [user_input]
+        if "," not in run_str and "-" not in run_str:
+            return [user_input]
 
-        return runs
+        run_ranges = [run_range.split("-") for run_range in run_str.replace(" ", "").split(",")]
+        runs_list = []
+        for run_pair in run_ranges:
+            lower = run_pair[0]
+            upper = run_pair[1] if len(run_pair) == 2 else run_pair[0]
+            runs_list.extend(list(range(int(lower), int(upper) + 1)))
+
+        return runs_list
 
     def _set_spectra_type(self, spectrum_no):
         """
@@ -1175,11 +1182,11 @@ class SpectraToFoilPeriodMap(object):
 
     def _validate_foil_number(self, foil_number):
         if foil_number < 1 or foil_number > 6:
-            raise ValueError("Invalid foil state given, expected a number between " "1 and 6. number=%d" % foil_number)
+            raise ValueError("Invalid foil state given, expected a number between 1 and 6. number=%d" % foil_number)
 
     def _validate_spectrum_number(self, spectrum_no):
         if spectrum_no < 1 or spectrum_no > 198:
-            raise ValueError("Invalid spectrum given, expected a number between 3 " "and 198. spectrum=%d" % spectrum_no)
+            raise ValueError("Invalid spectrum given, expected a number between 3 and 198. spectrum=%d" % spectrum_no)
 
 
 #########################################################################################

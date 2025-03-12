@@ -8,6 +8,7 @@ set(EXPORT_FILES
     src/Exports/IAlgorithm.cpp
     src/Exports/AlgorithmObserver.cpp
     src/Exports/AlgorithmHistory.cpp
+    src/Exports/AlgoTimeRegister.cpp
     src/Exports/CatalogManager.cpp
     src/Exports/CatalogSession.cpp
     src/Exports/DeprecatedAlgorithmChecker.cpp

@@ -7,7 +7,7 @@
 import matplotlib
 from matplotlib.backend_bases import MouseEvent
 
-matplotlib.use("AGG")  # noqa
+matplotlib.use("AGG")
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.container import ErrorbarContainer
@@ -173,9 +173,7 @@ class MantidAxesTest(unittest.TestCase):
 
     def test_replace_workspace_data_plot_with_fewer_spectra(self):
         plot_data = CreateWorkspace(DataX=[10, 20, 30, 10, 20, 30, 10, 20, 30], DataY=[3, 4, 5, 3, 4, 5], DataE=[1, 2, 3, 4, 1, 1], NSpec=3)
-        line_ws2d_histo_spec_1 = self.ax.plot(plot_data, specNum=1, color="r")[0]
         line_ws2d_histo_spec_2 = self.ax.plot(plot_data, specNum=2, color="r")[0]
-        line_ws2d_histo_spec_3 = self.ax.plot(plot_data, specNum=3, color="r")[0]
 
         plot_data = CreateWorkspace(DataX=[20, 30, 40, 20, 30, 40], DataY=[3, 4, 3, 4], DataE=[1, 2, 1, 2], NSpec=2)
         self.ax.replace_workspace_artists(plot_data)
@@ -416,7 +414,7 @@ class MantidAxesTest(unittest.TestCase):
 
     def test_check_axes_distribution_consistency_mixed_normalization(self):
         mock_logger = self._run_check_axes_distribution_consistency([True, False, True])
-        mock_logger.assert_called_once_with("You are overlaying distribution and " "non-distribution data!")
+        mock_logger.assert_called_once_with("You are overlaying distribution and non-distribution data!")
 
     def test_check_axes_distribution_consistency_all_normalized(self):
         mock_logger = self._run_check_axes_distribution_consistency([True, True, True])
@@ -672,6 +670,62 @@ class MantidAxesTest(unittest.TestCase):
         # There should still be only two filled areas (one for each line)
         self.assertEqual(len(datafunctions.get_waterfall_fills(ax)), 2)
 
+    def test_increasing_waterfall_x_offset_will_autoscale_x_axis(self):
+        fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+        ax.plot([0, 1], [0, 1])
+        ax.plot([0, 1], [0, 1])
+
+        # Make a waterfall plot
+        ax.set_waterfall(True, x_offset=20)
+        x_high = ax.get_xlim()[1]
+
+        # Increase x offset
+        ax.update_waterfall(x_offset=40, y_offset=ax.waterfall_y_offset)
+
+        self.assertGreater(ax.get_xlim()[1], x_high)
+
+    def test_decreasing_waterfall_x_offset_will_autoscale_x_axis(self):
+        fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+        ax.plot([0, 1], [0, 1])
+        ax.plot([0, 1], [0, 1])
+
+        # Make a waterfall plot
+        ax.set_waterfall(True, x_offset=40)
+        x_high = ax.get_xlim()[1]
+
+        # Decrease x offset
+        ax.update_waterfall(x_offset=20, y_offset=ax.waterfall_y_offset)
+
+        self.assertLess(ax.get_xlim()[1], x_high)
+
+    def test_increasing_waterfall_y_offset_will_autoscale_y_axis(self):
+        fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+        ax.plot([0, 1], [0, 1])
+        ax.plot([0, 1], [0, 1])
+
+        # Make a waterfall plot
+        ax.set_waterfall(True, y_offset=20)
+        y_high = ax.get_ylim()[1]
+
+        # Increase y off set
+        ax.update_waterfall(x_offset=ax.waterfall_x_offset, y_offset=40)
+
+        self.assertGreater(ax.get_ylim()[1], y_high)
+
+    def test_decreasing_waterfall_y_offset_will_autoscale_y_axis(self):
+        fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+        ax.plot([0, 1], [0, 1])
+        ax.plot([0, 1], [0, 1])
+
+        # Make a waterfall plot
+        ax.set_waterfall(True, y_offset=40)
+        y_high = ax.get_ylim()[1]
+
+        # Decrease y off set
+        ax.update_waterfall(x_offset=ax.waterfall_x_offset, y_offset=20)
+
+        self.assertLess(ax.get_ylim()[1], y_high)
+
     def test_imshow_with_origin_upper(self):
         image = self.ax.imshow(self.ws2d_histo, origin="upper")
 
@@ -679,7 +733,7 @@ class MantidAxesTest(unittest.TestCase):
         xy_pixels = self.ax.transAxes.transform((0, 0)) + (0.5, 0.5)
         bottom_left_corner = MouseEvent("motion_notify_event", self.fig.canvas, x=xy_pixels[0], y=xy_pixels[1])
 
-        self.assertEqual(image.get_extent(), (10.0, 30.0, 9.0, 3.0))
+        self.assertEqual(image.get_extent(), [10.0, 30.0, 9.0, 3.0])
         self.assertEqual(image.get_cursor_data(bottom_left_corner), 3.0)
 
     def test_imshow_with_origin_lower(self):
@@ -689,7 +743,7 @@ class MantidAxesTest(unittest.TestCase):
         xy_pixels = self.ax.transAxes.transform((0, 0)) + (0.5, 0.5)
         bottom_left_corner = MouseEvent("motion_notify_event", self.fig.canvas, x=xy_pixels[0], y=xy_pixels[1])
 
-        self.assertEqual(image.get_extent(), (10.0, 30.0, 3.0, 9.0))
+        self.assertEqual(image.get_extent(), [10.0, 30.0, 3.0, 9.0])
         self.assertEqual(image.get_cursor_data(bottom_left_corner), 2.0)
 
     def test_rename_workspace_relabels_curve_if_default_label(self):

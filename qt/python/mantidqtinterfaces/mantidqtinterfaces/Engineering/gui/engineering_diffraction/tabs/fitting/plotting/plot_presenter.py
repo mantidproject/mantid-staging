@@ -36,16 +36,21 @@ class FittingPlotPresenter(object):
         self.all_workspaces_removed_observer = GenericObserver(self.clear_plot)
         self.fit_all_started_notifier = GenericObservable()
         self.fit_all_done_notifier = GenericObservable()
-
+        self.find_peaks_convolve_started_notifier = GenericObservable()
+        self.find_peaks_convolve_done_notifier = GenericObservable()
         self.setup_toolbar()
         self.worker = None
         self.fitprop_list = None
+        self.is_waiting_convolve_peaks = False
+        self.view.set_subscriber_for_function_changed(self.handle_convolve_peaks_added)
 
     def setup_toolbar(self):
         self.view.set_slot_for_display_all()
         self.view.set_slot_for_fit_toggled(self.fit_toggle)
         self.view.set_slot_for_serial_fit(self.do_serial_fit)
         self.view.set_slot_for_seq_fit(self.do_seq_fit)
+        self.view.set_slot_for_legend_toggled()
+        self.view.set_slot_for_find_peaks_convolve(self.run_find_peaks_convolve)
 
     def add_workspace_to_plot(self, ws):
         axes = self.view.get_axes()
@@ -60,6 +65,8 @@ class FittingPlotPresenter(object):
             self.view.remove_ws_from_fitbrowser(ws)
         self.view.update_figure()
         self.set_progress_bar_zero()
+        if len(self.model.get_plotted_workspaces()) == 0:
+            self.view.set_find_peaks_convolve_button_status(False)
 
     def clear_plot(self):
         for ax in self.view.get_axes():
@@ -67,6 +74,7 @@ class FittingPlotPresenter(object):
         self.view.clear_figure()
         self.view.update_fitbrowser()
         self.set_progress_bar_zero()
+        self.view.set_find_peaks_convolve_button_status(False)
 
     def on_cancel_clicked(self):
         if self.worker:
@@ -101,6 +109,24 @@ class FittingPlotPresenter(object):
 
     def do_seq_fit(self):
         self.fit_all_started_notifier.notify_subscribers(True)
+
+    def run_find_peaks_convolve(self):
+        self.is_waiting_convolve_peaks = False
+        self.find_peaks_convolve_started_notifier.notify_subscribers()
+        try:
+            input_ws_name = self.view.fit_browser.workspaceName()
+            func_wrapper_str = self.model.run_find_peaks_convolve(
+                input_ws_name, self.view.fit_browser.defaultPeakType(), (self.view.fit_browser.startX(), self.view.fit_browser.endX())
+            )
+            if func_wrapper_str is not None:
+                self.is_waiting_convolve_peaks = True
+                self.view.fit_browser.loadFunction(func_wrapper_str)
+            else:
+                self.is_waiting_convolve_peaks = False
+                self.find_peaks_convolve_done_notifier.notify_subscribers(False)
+        except RuntimeError as err:
+            logger.error(f"Failed to run FindPeaksConvolve for workspace:{input_ws_name}! Error:{err}")
+            self.find_peaks_convolve_done_notifier.notify_subscribers(False)
 
     def do_fit_all_async(self, ws_names_list, do_sequential=True):
         previous_fit_browser = self.view.read_fitprop_from_browser()
@@ -153,7 +179,7 @@ class FittingPlotPresenter(object):
             # append a deep copy to output list (will be initial parameters if not successful)
             fitprop_list.append(fitprop)
 
-        logger.notice(f'{"Serial" if not do_sequential else "Sequential"} fitting finished.')
+        logger.notice(f"{'Serial' if not do_sequential else 'Sequential'} fitting finished.")
         return fitprop_list
 
     # ==============================
@@ -165,10 +191,12 @@ class FittingPlotPresenter(object):
         if self.view.is_fit_browser_visible():
             self.view.hide_fit_browser()
             self.view.hide_fit_progress_bar()
+            self.view.set_find_peaks_convolve_button_status(False)
         else:
             self.view.show_fit_browser()  # if no data is plotted, the fit browser will fail to show
             if self.view.is_fit_browser_visible():
                 self.view.show_fit_progress_bar()
+                self.view.set_find_peaks_convolve_button_status(True)
         self.set_progress_bar_zero()
 
     def update_progress_bar(self):
@@ -197,3 +225,8 @@ class FittingPlotPresenter(object):
 
     def set_progress_bar_zero(self):
         self.view.set_progress_bar(status="", minimum=0, maximum=100, value=0, style_sheet=EMPTY_STYLE_SHEET)
+
+    def handle_convolve_peaks_added(self):
+        if self.is_waiting_convolve_peaks:
+            self.is_waiting_convolve_peaks = False
+            self.find_peaks_convolve_done_notifier.notify_subscribers(True)

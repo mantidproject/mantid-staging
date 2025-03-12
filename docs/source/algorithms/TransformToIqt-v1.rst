@@ -88,6 +88,12 @@ Workflow
 
 .. diagram:: TransformToIqt-v1_wkflw.dot
 
+By default, the above workflow is executed.
+If EnforceNormalization is set to False,
+the LHSWorkspace from the output from :ref:`algm-ExtractFFTSpectrum` is used in both branches
+to perform the final workspace division and the two intermediate workspace divisions
+are skipped.
+
 Usage
 -----
 
@@ -102,7 +108,8 @@ Usage
                                  ResolutionWorkspace=can,
                                  EnergyMin=-0.5,
                                  EnergyMax=0.5,
-                                 BinReductionFactor=10)
+                                 BinReductionFactor=10,
+                                 EnableLogging=True)
 
     print('Number of output bins: %d' % (params.cell('SampleOutputBins', 0)))
     print('Resolution bins: %d' % (params.cell('ResolutionBins', 0)))

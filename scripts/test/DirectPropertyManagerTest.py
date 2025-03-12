@@ -7,13 +7,24 @@
 import unittest
 from sys import platform
 import numpy as np
-from Direct.AbsorptionShapes import *
+import os
+from Direct.AbsorptionShapes import Cylinder
 from Direct.PropertyManager import PropertyManager
 from Direct.RunDescriptor import RunDescriptor
 
 
 from mantid import api
-from mantid.simpleapi import *
+from mantid.api import mtd
+from mantid.simpleapi import (
+    config,
+    AddSampleLog,
+    AddTimeSeriesLog,
+    CloneWorkspace,
+    ConvertUnits,
+    CreateSampleWorkspace,
+    LoadEmptyInstrument,
+    SetInstrumentParameter,
+)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
@@ -26,7 +37,7 @@ class DirectPropertyManagerTest(unittest.TestCase):
         return super(DirectPropertyManagerTest, self).__init__(methodName)
 
     def setUp(self):
-        if self.prop_man is None or type(self.prop_man) != type(PropertyManager):
+        if self.prop_man is None or type(self.prop_man) is not type(PropertyManager):
             self.prop_man = PropertyManager("MAR")
 
     def tearDown(self):
@@ -150,10 +161,10 @@ class DirectPropertyManagerTest(unittest.TestCase):
 
         range = propman.norm_mon_integration_range
         self.assertAlmostEqual(
-            range[0], 1000.0, 7, " Default integration min range on MARI should be as described in MARI_Parameters.xml " "file"
+            range[0], 1000.0, 7, " Default integration min range on MARI should be as described in MARI_Parameters.xml file"
         )
         self.assertAlmostEqual(
-            range[1], 2000.0, 7, " Default integration max range on MAPS should be as described in MARI_Parameters.xml " "file"
+            range[1], 2000.0, 7, " Default integration max range on MAPS should be as described in MARI_Parameters.xml file"
         )
 
         self.assertEqual(propman.ei_mon_spectra, (2, 3), " Default ei monitors on MARI should be as described in MARI_Parameters.xml file")
@@ -986,12 +997,12 @@ class DirectPropertyManagerTest(unittest.TestCase):
         self.assertAlmostEqual(range[0], 9.5)
         self.assertAlmostEqual(range[1], 10.5)
 
-        PropertyManager.incident_energy.next()
+        next(PropertyManager.incident_energy)
         range = propman.mon2_norm_energy_range
         self.assertAlmostEqual(range[0], 2 * 9.5)
         self.assertAlmostEqual(range[1], 2 * 10.5)
 
-        PropertyManager.incident_energy.next()
+        next(PropertyManager.incident_energy)
         range = propman.mon2_norm_energy_range
         self.assertAlmostEqual(range[0], 3 * 9.5)
         self.assertAlmostEqual(range[1], 3 * 10.5)
@@ -1027,7 +1038,7 @@ class DirectPropertyManagerTest(unittest.TestCase):
         PropertyManager.mono_correction_factor.set_val_to_cash(propman, 100)
         self.assertAlmostEqual(PropertyManager.mono_correction_factor.get_val_from_cash(propman), 100)
 
-        PropertyManager.incident_energy.next()
+        next(PropertyManager.incident_energy)
         self.assertEqual(PropertyManager.mono_correction_factor.get_val_from_cash(propman), None)
         PropertyManager.mono_correction_factor.set_val_to_cash(propman, 50)
         self.assertAlmostEqual(PropertyManager.mono_correction_factor.get_val_from_cash(propman), 50)
@@ -1184,7 +1195,7 @@ class DirectPropertyManagerTest(unittest.TestCase):
         self.assertTrue(defaults["is_mc"])
         # the algorithm sets up the properties but does not verifis if the prperties
         # are acceptable by the corrections algorithm
-        propman.abs_corr_info = "{is_mc: True, NumberOfWavelengthPoints: 200; MaxScatterPtAttempts=20, " "SparseInstrument=True}"
+        propman.abs_corr_info = "{is_mc: True, NumberOfWavelengthPoints: 200; MaxScatterPtAttempts=20, SparseInstrument=True}"
 
         propss = propman.abs_corr_info
         self.assertTrue(propss["is_mc"])
@@ -1307,6 +1318,24 @@ class DirectPropertyManagerTest(unittest.TestCase):
 
         propman.empty_bg_run = 1024
         self.assertEqual(p1.run_number(), 1024)
+
+    #
+    def test_set_psi_directly_works(self):
+        propman = self.prop_man
+
+        propman.psi = 10
+        self.assertEqual(propman.psi, 10)
+
+    def test_default_psi_is_nan(self):
+        propman = self.prop_man
+
+        self.assertTrue(np.isnan(propman.psi))
+
+    def test_psi_set_to0_works(self):
+        propman = self.prop_man
+
+        propman.psi = 0
+        self.assertEqual(propman.psi, 0)
 
 
 if __name__ == "__main__":

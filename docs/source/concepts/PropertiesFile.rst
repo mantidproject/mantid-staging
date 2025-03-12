@@ -54,6 +54,8 @@ General properties
 |                                  | will use one thread per logical core available.  |                        |
 +----------------------------------+--------------------------------------------------+------------------------+
 
+.. _Facility Properties:
+
 Facility and instrument properties
 **********************************
 
@@ -75,6 +77,8 @@ Facility and instrument properties
 |                              | ``Crystallography`` the convention is kf-ki.       |                     |
 +------------------------------+----------------------------------------------------+---------------------+
 
+.. _Directory Properties:
+
 Directory Properties
 ********************
 
@@ -85,6 +89,8 @@ Directory Properties
 +--------------------------------------+---------------------------------------------------+-------------------------------------+
 | ``datasearch.directories``           | A semi-colon(``;``) separated list of directories | ``../data;\\\\isis\\isis$\\ndxgem`` |
 |                                      | to use to search for data.                        |                                     |
++--------------------------------------+---------------------------------------------------+-------------------------------------+
+| ``datacachesearch.directory``        | The directory where data cache is located         | ``/data/instrument``                |
 +--------------------------------------+---------------------------------------------------+-------------------------------------+
 | ``datasearch.searcharchive``         | ``on`` (only the default facility), ``off``       | ``on`` or ``hfir,sns``              |
 |                                      | (none), ``all`` (all archives), or a list of      |                                     |
@@ -172,26 +178,34 @@ The logging priority levels for the file logging and console logging can also be
   # Set the log to information and do not log that it was changed
   ConfigService.setLogLevel("information", True)
 
+More details on logging can be found in the :ref:`developer docs <mantid-dev:Logging>` .
 
 
 Mantid Graphical User Interface Properties
 ******************************************
 
-+--------------------------------------------+---------------------------------------------------+-----------------+
-|Property                                    |Description                                        |Example value    |
-+============================================+===================================================+=================+
-| ``Notifications.Enabled``                  |Should Mantid use System Notifications for         | ``On``, ``Off`` |
-|                                            |important messages?                                |                 |
-+--------------------------------------------+---------------------------------------------------+-----------------+
-| ``cluster.submission``                     |Enable cluster submission elements in GUIs         | ``On``, ``Off`` |
-+--------------------------------------------+---------------------------------------------------+-----------------+
-| ``MantidOptions.InstrumentView.UseOpenGL`` |Controls the use of OpenGL in rendering the        | ``On``, ``Off`` |
-|                                            |"unwrapped" (flat) instrument views.               |                 |
-+--------------------------------------------+---------------------------------------------------+-----------------+
-| ``MantidOptions.InvisibleWorkspaces``      |Do not show 'invisible' workspaces                 | ``0``, ``1``    |
-+--------------------------------------------+---------------------------------------------------+-----------------+
-| ``PeakColumn.hklPrec``                     |Precision of hkl values shown in tables            | ``2``           |
-+--------------------------------------------+---------------------------------------------------+-----------------+
++----------------------------------------------------+----------------------------------------------------+-----------------+
+|Property                                            |Description                                         |Example value    |
++====================================================+====================================================+=================+
+| ``Notifications.Enabled``                          |Should Mantid use System Notifications for          | ``On``, ``Off`` |
+|                                                    |important messages?                                 |                 |
++----------------------------------------------------+----------------------------------------------------+-----------------+
+| ``cluster.submission``                             |Enable cluster submission elements in GUIs          | ``On``, ``Off`` |
++----------------------------------------------------+----------------------------------------------------+-----------------+
+| ``MantidOptions.InstrumentView.UseOpenGL``         |Controls the use of OpenGL in rendering the         | ``On``, ``Off`` |
+|                                                    |"unwrapped" (flat) instrument views.                |                 |
++----------------------------------------------------+----------------------------------------------------+-----------------+
+| ``MantidOptions.InstrumentView.MesaBugWorkaround`` |Will reduce the size of the OpenGL display lists    | ``On``, ``Off`` |
+|                                                    |used when drawing the Instrument View. By doing     |                 |
+|                                                    |this we reduce the chance that we will hit a memory |                 |
+|                                                    |allocation bug in the Mesa graphics library. This   |                 |
+|                                                    |is only relevant if you using both Linux and a      |                 |
+|                                                    |broken version of Mesa.                             |                 |
++----------------------------------------------------+----------------------------------------------------+-----------------+
+| ``MantidOptions.InvisibleWorkspaces``              |Do not show 'invisible' workspaces                  | ``0``, ``1``    |
++----------------------------------------------------+----------------------------------------------------+-----------------+
+| ``PeakColumn.hklPrec``                             |Precision of hkl values shown in tables             | ``2``           |
++----------------------------------------------------+----------------------------------------------------+-----------------+
 
 
 Network Properties
@@ -281,84 +295,128 @@ Project Saving
 Plotting Settings
 *****************
 
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|Property                             |Description                                                       |Example value         |
++=====================================+==================================================================+======================+
+|``plots.ShowTitle``                  |Whether to show titles on plots                                   | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ShowLegend``                 |Whether to show legend on plots                                   | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.font``                       |The default font for labels and titles on plots.                  |``Helvetica``         |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.xAxesScale``                 |The default x scale on 1d plots                                   |``Linear``, ``Log``   |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.yAxesScale``                 |The default y scale on 1d plots                                   |``Linear``, ``Log``   |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.x_min``                      |The default minimum x range                                       |``10``                |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.x_max``                      |The default maximum x range                                       |``1000``              |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.y_min``                      |The default minimum y range                                       |``10``                |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.y_max``                      |The default maximum y range                                       |``1000``              |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.axesLineWidth``              |The default width of the lines that make the axes                 |``1``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.enableGrid``                 |The default y scale on 1d plots                                   |``Linear``, ``Log``   |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ShowMinorTicks``             |Whether to show minor ticks on plots                              | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ShowMinorGridlines``         |Whether to show minor gridlines on plots                          | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showTicksLeft``              |Whether to show ticks on the left side of the plot                | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showTicksBottom``            |Whether to show ticks on the bottom of the plot                   | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showTicksRight``             |Whether to show ticks on the right side of the plot               | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showTicksTop``               |Whether to show ticks on the top side of the plot                 | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showLabelsLeft``             |Whether to show labels on the left side of the plot               | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showLabelsBottom``           |Whether to show labels on the bottom of the plot                  | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showLabelsRight``            |Whether to show labels on the right side of the plot              | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.showLabelsTop``              |Whether to show labels on the top side of the plot                | ``On``, ``Off``      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.major.length``         |The default length of the major ticks                             |``6``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.major.width``          |The default width of the major ticks                              |``1``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.major.direction``      |The default direction of the major ticks                          |``In``, ``Out``,      |
+|                                     |                                                                  |``InOut``             |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.minor.length``         |The default length of the minor ticks                             |``3``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.minor.width``          |The default width of the minor ticks                              |``1``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.ticks.minor.direction``      |The default direction of the minor ticks                          |``In``, ``Out``,      |
+|                                     |                                                                  |``InOut``             |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.line.Style``                 |Default Line style on 1d plots                                    |``solid``, ``dashed`` |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.line.DrawStyle``             |Default Draw style on 1d plots                                    |``default``, ``steps``|
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.line.Width``                 |Default Line width on 1d plots                                    |``1.5``               |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.marker.Style``               |Default marker style on 1d plots                                  |``point``             |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.marker.Size``                |Default maker size on 1d plots                                    |``6``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.Capsize``           |Default cap size on error bars in 1d plots                        |``1.0``               |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.CapThickness``      |Default cap thickness on error bars in 1d plots                   |``1.0``               |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.errorEvery``        |Default number of error bars for every data point                 |``1``                 |
+|                                     |in 1d plots. Must be an integer                                   |                      |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.Width``             |Default width of error bars in 1d plots                           |``1.0``               |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.MarkerStyle``       |Default style for errorbar matrix workspace                       |``circle``            |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.errorbar.MarkerSize``        |Default size for markers in the errorbar matrix workspace         |``4``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.markerworkspace.MarkerStyle``|Default marker style for the marker matrix workspace              |``vline``             |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.markerworkspace.MarkerSize`` |Default marker size for the marker matrix workspace               |``6``                 |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.legend.FontSize``            |Default legend font size                                          |``8.0``               |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.legend.Location``            |Default legend location                                           |``best``              |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.images.Colormap``            |Default colormap for image plots                                  |``viridis``           |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+|``plots.images.ColorBarScale``       |Default colorbar scale for image plots                            |``Linear``            |
++-------------------------------------+------------------------------------------------------------------+----------------------+
+
+ISIS SANS Interface GUI Settings
+*********************************
+
 +---------------------------------+------------------------------------------------------------------+---------------------+
 |Property                         |Description                                                       |Example value        |
 +=================================+==================================================================+=====================+
-|``plots.ShowTitle``              |Whether to show titles on plots                                   | ``On``, ``Off``     |
+|``sans.isis_sans.plotResults``   |Whether to show or hide plot results checkbox                     | ``On``, ``Off``     |
 +---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ShowLegend``             |Whether to show legend on plots                                   | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.font``                   |The default font for labels and titles on plots.                  |``Helvetica``        |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.xAxesScale``             |The default x scale on 1d plots                                   |``Linear``, ``Log``  |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.yAxesScale``             |The default y scale on 1d plots                                   |``Linear``, ``Log``  |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.axesLineWidth``          |The default width of the lines that make the axes                 |``1``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.enableGrid``             |The default y scale on 1d plots                                   |``Linear``, ``Log``  |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ShowMinorTicks``         |Whether to show minor ticks on plots                              | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ShowMinorGridlines``     |Whether to show minor gridlines on plots                          | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showTicksLeft``          |Whether to show ticks on the left side of the plot                | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showTicksBottom``        |Whether to show ticks on the bottom of the plot                   | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showTicksRight``         |Whether to show ticks on the right side of the plot               | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showTicksTop``           |Whether to show ticks on the top side of the plot                 | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showLabelsLeft``         |Whether to show labels on the left side of the plot               | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showLabelsBottom``       |Whether to show labels on the bottom of the plot                  | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showLabelsRight``        |Whether to show labels on the right side of the plot              | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.showLabelsTop``          |Whether to show labels on the top side of the plot                | ``On``, ``Off``     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.major.length``     |The default length of the major ticks                             |``6``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.major.width``      |The default width of the major ticks                              |``1``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.major.direction``  |The default direction of the major ticks                          |``In``, ``Out``,     |
-|                                 |                                                                  |``InOut``            |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.minor.length``     |The default length of the minor ticks                             |``3``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.minor.width``      |The default width of the minor ticks                              |``1``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.ticks.minor.direction``  |The default direction of the minor ticks                          |``In``, ``Out``,     |
-|                                 |                                                                  |``InOut``            |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.line.Style``             |Default Line style on 1d plots                                    |``solid``, ``dashed``|
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.line.DrawStyle``         |Default Draw style on 1d plots                                    |``default``,``steps``|
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.line.Width``             |Default Line width on 1d plots                                    |``1.5``              |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.marker.Style``           |Default marker style on 1d plots                                  |``point``            |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.marker.Size``            |Default maker size on 1d plots                                    |``6``                |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.errorbar.Capsize``       |Default cap size on error bars in 1d plots                        |``1.0``              |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.errorbar.CapThickness``  |Default cap thickness on error bars in 1d plots                   |``1.0``              |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.errorbar.errorEvery``    |Default number of error bars for every data point                 |``1``                |
-|                                 |in 1d plots. Must be an integer                                   |                     |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.errorbar.Width``         |Default width of error bars in 1d plots                           |``1.0``              |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.legend.FontSize``        |Default legend font size                                          |``8.0``              |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.legend.Location``        |Default legend location                                           |``best``             |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.images.Colormap``        |Default colormap for image plots                                  |``viridis``          |
-+---------------------------------+------------------------------------------------------------------+---------------------+
-|``plots.images.ColorBarScale``   |Default colorbar scale for image plots                            |``Linear``           |
-+---------------------------------+------------------------------------------------------------------+---------------------+
+
+Algorithm Profiling Settings
+****************************
+
+.. _Algorithm_Profiling:
+
+See :doc:`algorithm profiling <mantid-dev:AlgorithmProfiler>` for more details on using mantid profiler.
+
++---------------------------------+------------------------------------------------------------------+---------------------------+
+|Property                         |Description                                                       |Example value              |
++=================================+==================================================================+===========================+
+|``performancelog.filename``      |The filename for saving the log file. This can be the absolute    | ``algotimeregister.out``  |
+|                                 |or relative path. This file is overwritten each session. Default  |                           |
+|                                 |is ``algotimeregister.out``                                       |                           |
++---------------------------------+------------------------------------------------------------------+---------------------------+
+|``performancelog.write``         |Enable or disable writing the performance log. Write is disabled  | ``On``, ``True``, ``1``,  |
+|                                 |by default.                                                       | ``Off``, ``False``, ``0`` |
++---------------------------------+------------------------------------------------------------------+---------------------------+
+
 
 Getting access to Mantid properties
 ***********************************
@@ -369,5 +427,14 @@ To get access to, e.g. data saving path property from a C++ program one has to i
 .. testcode:: properties
 
   path = ConfigService.getString("defaultsave.directory")
+
+
+Modifying User Properties at Run Time
+**************************************
+
+:ref:`amend_config <Amend Config>` is a context manager that allows you to temporarily modify configuration settings
+related to a facility, instrument, data directory, or any additional keyword arguments. It ensures that the changes are
+only applied temporarily within the context and then restored to their original state when the context exits.
+
 
 .. categories:: Concepts

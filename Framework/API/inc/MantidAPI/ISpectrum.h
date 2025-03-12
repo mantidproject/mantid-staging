@@ -9,7 +9,6 @@
 #include "MantidAPI/DllConfig.h"
 #include "MantidGeometry/IDTypes.h"
 #include "MantidHistogramData/Histogram.h"
-#include "MantidKernel/System.h"
 #include "MantidKernel/cow_ptr.h"
 
 #include <set>
@@ -198,6 +197,9 @@ public:
     mutableHistogramRef().setSharedE(e);
   }
 
+  void resize(size_t n) { mutableHistogramRef().resize(n); }
+  size_t size() const { return histogramRef().size(); }
+
   void setMatrixWorkspace(MatrixWorkspace *matrixWorkspace, const size_t index);
 
   virtual void copyDataInto(DataObjects::EventList &) const;
@@ -205,7 +207,7 @@ public:
   virtual void copyDataInto(SpectrumTester &) const;
 
 protected:
-  virtual void checkAndSanitizeHistogram(HistogramData::Histogram &){};
+  virtual void checkAndSanitizeHistogram(HistogramData::Histogram &) {};
   virtual void checkWorksWithPoints() const {}
   virtual void checkIsYAndEWritable() const {}
 

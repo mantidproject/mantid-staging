@@ -7,8 +7,16 @@
 # pylint: disable=no-init,too-many-locals,too-many-instance-attributes,too-many-arguments,invalid-name
 import math
 import numpy as np
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    AddSampleLogMultiple,
+    CreateWorkspace,
+    DeleteWorkspace,
+    ExtractSingleSpectrum,
+    GroupWorkspaces,
+    SplineInterpolation,
+)
 from mantid.api import (
+    mtd,
     PythonAlgorithm,
     AlgorithmFactory,
     PropertyMode,
@@ -31,7 +39,6 @@ def set_material_density(set_material_alg, density_type, density, number_density
 
 
 class CylinderPaalmanPingsCorrection(PythonAlgorithm):
-
     # Sample variables
     _sample_ws_name = None
     _use_sample_mass_density = None
@@ -92,21 +99,21 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
             name="SampleCoherentXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The coherent cross-section for the sample material in barns. To be used instead of " "Chemical Formula.",
+            doc="The coherent cross-section for the sample material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
             name="SampleIncoherentXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The incoherent cross-section for the sample material in barns. To be used instead of " "Chemical Formula.",
+            doc="The incoherent cross-section for the sample material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
             name="SampleAttenuationXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The absorption cross-section for the sample material in barns. To be used instead of " "Chemical Formula.",
+            doc="The absorption cross-section for the sample material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
@@ -142,21 +149,21 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
             name="CanCoherentXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The coherent cross-section for the can material in barns. To be used instead of " "Chemical Formula.",
+            doc="The coherent cross-section for the can material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
             name="CanIncoherentXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The incoherent cross-section for the can material in barns. To be used instead of " "Chemical Formula.",
+            doc="The incoherent cross-section for the can material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
             name="CanAttenuationXSection",
             defaultValue=0.0,
             validator=FloatBoundedValidator(0.0),
-            doc="The absorption cross-section for the can material in barns. To be used instead of " "Chemical Formula.",
+            doc="The absorption cross-section for the can material in barns. To be used instead of Chemical Formula.",
         )
 
         self.declareProperty(
@@ -241,7 +248,7 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
             if can_chemical_formula == "" and (
                 can_coherent_cross_section == 0.0 and can_incoherent_cross_section == 0.0 and can_attenuation_cross_section == 0.0
             ):
-                issues["CanChemicalFormula"] = "Must provide a chemical formula or cross sections when providing a " "can workspace."
+                issues["CanChemicalFormula"] = "Must provide a chemical formula or cross sections when providing a can workspace."
 
         # Ensure there are enough steps
         number_steps = int((self._sample_outer_radius - self._sample_inner_radius) / self._step_size)
@@ -447,7 +454,7 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
                 self._efixed = self._getEfixed()
                 logger.information("Found Efixed = {0}".format(self._efixed))
             except ValueError:
-                raise RuntimeError("Could not find the Efixed parameter in the instrument. " "Please specify manually.")
+                raise RuntimeError("Could not find the Efixed parameter in the instrument. Please specify manually.")
 
         self._set_sample_method = "Chemical Formula" if self._sample_chemical_formula != "" else "Cross Sections"
         self._set_can_method = "Chemical Formula" if self._can_chemical_formula != "" else "Cross Sections"
@@ -570,7 +577,6 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
     # ------------------------------------------------------------------------------
 
     def _wave_range(self):
-
         if self._emode != "Elastic":
             self._fixed = math.sqrt(81.787 / self._efixed)
 
@@ -767,10 +773,10 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
             Area_y = r * r_step * omega_ster * amu_scat[n_scat]
             sum_1 = 0.0
             sum_2 = 0.0
-            I = 1
+            i = 1
             Area_sum = 0.0
             for _ in range(1, number_omega + 1):
-                omega = I * omega_ster + omega_deg
+                omega = i * omega_ster + omega_deg
                 distance = r * math.sin(omega)
 
                 skip = True
@@ -784,11 +790,11 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
                         LIS.append(LISN - LIST)
                     #
                     # CALCULATE DISTANCE SCATTERED NEUTRON PASSES THROUGH EACH ANNULUS
-                    O = omega + theta_deg
+                    omega_scattered = omega + theta_deg
                     LSS = []
                     for j in range(0, nan):
-                        LSST = self._distance(r, self._radii[j], O)
-                        LSSN = self._distance(r, self._radii[j + 1], O)
+                        LSST = self._distance(r, self._radii[j], omega_scattered)
+                        LSSN = self._distance(r, self._radii[j + 1], omega_scattered)
                         LSS.append(LSSN - LSST)
                     #
                     # CALCULATE ABSORPTION FOR PATH THROUGH ALL ANNULI,AND THROUGH INNER ANNULI
@@ -804,9 +810,9 @@ class CylinderPaalmanPingsCorrection(PythonAlgorithm):
                     skip = False
 
                 if skip:
-                    I = number_omega - I + 2
+                    i = number_omega - i + 2
                 else:
-                    I += 1
+                    i += 1
         AAA += sum_1 * Area_y
         BBB += sum_2 * Area_y
         Area += Area_sum * Area_y

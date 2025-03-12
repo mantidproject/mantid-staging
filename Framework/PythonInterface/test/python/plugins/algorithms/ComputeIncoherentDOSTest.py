@@ -13,15 +13,12 @@ from mantid.simpleapi import (
     LoadInstrument,
     ScaleX,
     Scale,
-    SetInstrumentParameter,
     SetSampleMaterial,
     SofQW3,
     Transpose,
 )
 import numpy as np
-from numpy import testing
 from scipy import constants
-import testhelpers
 
 
 class ComputeIncoherentDOSTest(unittest.TestCase):
@@ -32,9 +29,10 @@ class ComputeIncoherentDOSTest(unittest.TestCase):
         LoadInstrument(ws, InstrumentName="MARI", RewriteSpectraMap=True)
         with self.assertRaisesRegex(
             RuntimeError,
-            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) \[scattering angle and energy transfer.\]",
+            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) "
+            r"\[scattering angle and energy transfer.\]",
         ):
-            ws_DOS = ComputeIncoherentDOS(ws)
+            ComputeIncoherentDOS(ws, OutputWorkspace="ws_DOS")
         ws = SofQW3(ws, [0, 0.05, 8], "Direct", 25)
         qq = np.arange(0, 8, 0.05) + 0.025
         for i in range(ws.getNumberHistograms()):
@@ -46,7 +44,7 @@ class ComputeIncoherentDOSTest(unittest.TestCase):
         ws = (energyBins[1:] + energyBins[:-1]) / 2.0
         if len(qs) > 1:
             qs = (qs[:-1] + qs[1:]) / 2.0
-        g = qs**-2 * np.exp(2 * msd * qs**2) * (1.0 - np.exp(-ws * constants.e * 1e-3 / constants.k / temperature)) * ws
+        g = qs**-2 * np.exp(msd * qs**2) * (1.0 - np.exp(-ws * constants.e * 1e-3 / constants.k / temperature)) * ws
         return g
 
     def computeFromTwoTheta(self, twoThetas, energyBins, msd=0.0, temperature=300.0):
@@ -58,7 +56,7 @@ class ComputeIncoherentDOSTest(unittest.TestCase):
         Ei = EFixed * constants.e * 1e-3
         Ef = (EFixed - ws) * constants.e * 1e-3
         qs = np.sqrt(2.0 * constants.m_n / constants.hbar**2 * ((Ei + Ef) - 2.0 * np.sqrt(Ei * Ef) * np.cos(twoTheta))) * 1e-10
-        g = qs**-2 * np.exp(2 * msd * qs**2) * (1.0 - np.exp(-ws * constants.e * 1e-3 / constants.k / temperature)) * ws
+        g = qs**-2 * np.exp(msd * qs**2) * (1.0 - np.exp(-ws * constants.e * 1e-3 / constants.k / temperature)) * ws
         return g
 
     def convertToWavenumber(self, ws):
@@ -104,13 +102,15 @@ class ComputeIncoherentDOSTest(unittest.TestCase):
         # Will fail unless the input workspace has Q and DeltaE axes.
         with self.assertRaisesRegex(
             RuntimeError,
-            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) \[scattering angle and energy transfer.\]",
+            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) "
+            r"\[scattering angle and energy transfer.\]",
         ):
             ws_DOS = ComputeIncoherentDOS(ws)
         ws = CreateSampleWorkspace(XUnit="DeltaE")
         with self.assertRaisesRegex(
             RuntimeError,
-            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) \[scattering angle and energy transfer.\]",
+            r"Input workspace must be in \(Q,E\) \[momentum and energy transfer\] or \(2theta, E\) "
+            r"\[scattering angle and energy transfer.\]",
         ):
             ws_DOS = ComputeIncoherentDOS(ws)
         # Creates a workspace with two optic phonon modes at +E and -E with Q^2 dependence and population correct for T=300K

@@ -20,20 +20,11 @@ ALCPeakFittingPresenter::ALCPeakFittingPresenter(IALCPeakFittingView *view, IALC
 void ALCPeakFittingPresenter::initialize() {
   m_view->initialize();
 
-  connect(m_view, SIGNAL(fitRequested()), SLOT(fit()));
-  connect(m_view, SIGNAL(currentFunctionChanged()), SLOT(onCurrentFunctionChanged()));
-  connect(m_view, SIGNAL(peakPickerChanged()), SLOT(onPeakPickerChanged()));
-
-  // We are updating the whole function anyway, so paramName if left out
-  connect(m_view, SIGNAL(parameterChanged(QString, QString)), SLOT(onParameterChanged(QString)));
-
-  connect(m_model, SIGNAL(fittedPeaksChanged()), SLOT(onFittedPeaksChanged()));
-  connect(m_model, SIGNAL(dataChanged()), SLOT(onDataChanged()));
-  connect(m_view, SIGNAL(plotGuessClicked()), SLOT(onPlotGuessClicked()));
-  connect(m_model, SIGNAL(errorInModel(const QString &)), m_view, SLOT(displayError(const QString &)));
+  m_model->subscribe(this);
+  m_view->subscribe(this);
 }
 
-void ALCPeakFittingPresenter::fit() {
+void ALCPeakFittingPresenter::onFitRequested() {
   IFunction_const_sptr func = m_view->function("");
   auto dataWS = m_model->data();
   if (func && dataWS) {
@@ -74,12 +65,12 @@ void ALCPeakFittingPresenter::onPeakPickerChanged() {
 
   // Update all the defined parameters of the peak function
   for (size_t i = 0; i < peakFunc->nParams(); ++i) {
-    QString paramName = QString::fromStdString(peakFunc->parameterName(i));
-    m_view->setParameter(*index, paramName, peakFunc->getParameter(paramName.toStdString()));
+    auto const paramName = peakFunc->parameterName(i);
+    m_view->setParameter(*index, paramName, peakFunc->getParameter(paramName));
   }
 }
 
-void ALCPeakFittingPresenter::onParameterChanged(const QString &funcIndex) {
+void ALCPeakFittingPresenter::onParameterChanged(std::string const &funcIndex, std::string const & /*unused*/) {
   auto currentIndex = m_view->currentFunctionIndex();
 
   // We are interested in parameter changed of the currently selected function
@@ -92,7 +83,13 @@ void ALCPeakFittingPresenter::onParameterChanged(const QString &funcIndex) {
   }
 }
 
-void ALCPeakFittingPresenter::onFittedPeaksChanged() {
+void ALCPeakFittingPresenter::dataChanged() const {
+  auto dataWS = m_model->data();
+  if (dataWS)
+    m_view->setDataCurve(dataWS);
+}
+
+void ALCPeakFittingPresenter::fittedPeaksChanged() const {
   IFunction_const_sptr fitted = m_model->fittedPeaks();
   auto dataWS = m_model->data();
   if (fitted && dataWS) {
@@ -104,11 +101,7 @@ void ALCPeakFittingPresenter::onFittedPeaksChanged() {
   }
 }
 
-void ALCPeakFittingPresenter::onDataChanged() {
-  auto dataWS = m_model->data();
-  if (dataWS)
-    m_view->setDataCurve(dataWS);
-}
+void ALCPeakFittingPresenter::errorInModel(const std::string &message) const { m_view->displayError(message); }
 
 /**
  * Called when user clicks "Plot/Remove guess" on the view.
@@ -148,7 +141,7 @@ bool ALCPeakFittingPresenter::plotGuessOnGraph() {
  * Removes any fit function from the graph.
  */
 void ALCPeakFittingPresenter::removePlot(std::string const &plotName) {
-  m_view->removePlot(QString::fromStdString(plotName));
+  m_view->removePlot(plotName);
   m_view->changePlotGuessState(false);
   m_guessPlotted = false;
 }

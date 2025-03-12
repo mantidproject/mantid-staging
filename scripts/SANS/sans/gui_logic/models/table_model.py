@@ -4,11 +4,12 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The table  model contains all the reduction information which is provided via the data table
+"""The table  model contains all the reduction information which is provided via the data table
 
 The main information in the table model are the run numbers and the selected periods. However it also contains
 information regarding the custom output name and the information in the options tab.
 """
+
 import copy
 from typing import List
 
@@ -172,8 +173,8 @@ class TableModel(object):
             {
                 "WavelengthMin": "The min value of the wavelength when converting from TOF.",
                 "WavelengthMax": "The max value of the wavelength when converting from TOF.",
-                "PhiMin": "The min angle of the detector to accept." " Anti-clockwise from horizontal.",
-                "PhiMax": "The max angle of the detector to accept." " Anti-clockwise from horizontal.",
+                "PhiMin": "The min angle of the detector to accept. Anti-clockwise from horizontal.",
+                "PhiMax": "The max angle of the detector to accept. Anti-clockwise from horizontal.",
                 "UseMirror": "True or False. Whether or not to accept phi angle in opposing quadrant",
                 "MergeScale": "The scale applied to the HAB when merging",
                 "MergeShift": "The shift applied to the HAB when merging",

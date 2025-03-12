@@ -74,10 +74,10 @@ Do the following tests with an EventWorkspace (e.g. ``CNCS_7860_event.nxs``) and
 
         * In Log scale bins with 0 counts should appear white
         * When you zoom in to a region comprising only of bins with 0 counts it will set the color axis limits to (0.1,1) and force the scale to be linear
-        * Zoom in to a region outside the extent of the data, check the Log colorscale option is disabled.
 
     c. Change colormap
     d. Reverse colormap
+    e. Change auto-scale option from default `Min/Max`  to another e.g. `3-sigma`
 
 6. Test transposing axes: click the Y button to the right of the Time-of-flight label (top left corner) - the image should be transposed and the axes labels updated.
 
@@ -85,7 +85,7 @@ Do the following tests with an EventWorkspace (e.g. ``CNCS_7860_event.nxs``) and
 
     a. Confirm it tracks with the cursor when Track Cursor is checked
     b. Uncheck the track cursor and confirm it updates when the cursor is clicked.
-    c. Transpose the axes (as in step 6) and confirm the cursor position displayed is still correct.
+    c. Transpose the axes (as in step 6) and confirm the cursor position displayed is still correct (note if Track Cursor is checked you will need to click on the colorfill plot again).
 
 8. Resize the sliceviewer window, check the widgets, buttons etc. are still visible and clear for reasonable aspect ratios.
 
@@ -95,6 +95,8 @@ MD Workspaces
 MD workspaces hold multi-dimensional data (typically 2-4D) and come in two forms: :ref:`MDEventWorkspace <MDWorkspace>`, :ref:`MDHistoWorkspace <MDHistoWorkspace>`.
 In terms of sliceviewer functionality, the key difference is that MDHistoWorkspace have binned the events onto a regular grid and cannot be dynamically rebinned unless the original MDWorkspace
 (that holds the events) exists in the ADS (and the MDHistoWorkspace has not been altered by a binary operation e.g. ``MinusMD``).
+
+.. _md_event_tests:
 
 MDWorkspace (with events)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,7 +138,7 @@ MDWorkspace (with events)
 
     a. Confirm the slider moves when the spinbox value is updated.
     b. Confirm moving the slider updates the spinbox.
-    c. Check the slicepoint is updated in the cursor info table.
+    c. Check the slicepoint is updated in the cursor info table (note if Track Cursor is checked you will need to click on the colorfill plot again).
 
 Test the :ref:`Nonorthogonal view<mantid:sliceviewer_nonortho>`
 
@@ -155,11 +157,19 @@ Test the :ref:`Nonorthogonal view<mantid:sliceviewer_nonortho>`
 
     - Confirm the autoscaling of the colorbar works in non-orthogonal view
 
-3. Change one of the viewing axes to be `L` (e.g. click `X` button next to L in top left of window)
+3. Note the range of data in `X` and `Y` axes to be `0 to 2` for `H` and `-1 to +1` for `K` respectively. Swap the viewing axes by clicking `Y` button next to `H` in the top left of the window
+
+    - `X` and `Y` axes should now display data for `K` and `H` respectively preserving their original ranges.
+
+4. Click on `X` button next to the `H` button to swap the axes again
+
+    - Now `X` and `Y` axes should display data for `H` and `K` respectively preserving their original ranges.
+
+5. Change one of the viewing axes to be `L` (e.g. click `X` button next to L in top left of window)
 
     - Gridlines should now appear to be orthogonal
 
-4. For ``md_4D`` only change one of the viewing axes to be `E` (e.g. click `Y` button next to `E` in top left of window)
+6. For ``md_4D`` only change one of the viewing axes to be `E` (e.g. click `Y` button next to `E` in top left of window)
 
     - Nonorthogonal view should be disabled (only enabled for momentum axes)
     - Line plots and ROI should be enabled
@@ -181,9 +191,9 @@ Test the :ref:`Peak Overlay<mantid:sliceviewer_peaks_overlay>`
 3. Double click a row
 
     - It should change the slicepoint along the integrated momentum axis and zoom into the peak - e.g. in (X,Y) = (H,K) then the slicepoint along L will be set to 1 and there will be a cross at (0,0).
-    - Note for ``md_4D`` the cross should be plotted at all E (obviously a Bragg peak will only be on the elastic line but the peak object has no elastic/inelastic logic and the sliceviewer only knows that `E` is not a momentum axis, it could be temperature etc.).
+    - Note for ``md_4D`` a peak will not be plotted if a non-Q axis is viewed, if both axes are Q-dimensions then the cross should be plotted at all E (obviously a Bragg peak will only be on the elastic line but the peak object has no elastic/inelastic logic and the sliceviewer only knows that `E` is not a momentum axis, it could be temperature etc.).
 
-4. Click Add Peaks in the Peak Actions section at the top of the peak viewer
+4. Click Add Peaks in the Peak Actions section at the top of the peak viewer (note for 4D workspaces the peak overlay won't work for non_Q dimensions).
 
 5. Click somewhere in the colorfill plot
 
@@ -274,7 +284,6 @@ It should only be enabled for the `ws_3D` and `ws_3D_QLab` workspaces (see comme
 
 4. Open the cut tool and check that:
 
-    - Disabled non-ortho view
     - Disabled ROI tool
     - Disabled line plots
     - Sliceviewer should look like
@@ -305,7 +314,7 @@ It should only be enabled for the `ws_3D` and `ws_3D_QLab` workspaces (see comme
 15. Try to change the a* column of the u1 to 1 (this would take u1 out of the plane of the slice, i.e. not orthogonal to u3) - it should reset to 0 - i.e. u1 = [0,1,0].
 16. Click and hold down on one of the red markers with white face on the colorfill plot and drag, release at ~K=1.
 
-    - This should reset the vectors int he table such that the cut is along u1 = [0,0,1] - i.e. u1 <-> u2
+    - This should reset the vectors in the table such that the cut is along u1 = [0,0,1] - i.e. u1 and u2 are swapped
     - The thickness along u2 should be adjusted to ~2
 
 17. Set the step of u2 = 2 in the table, check that it sets (start,stop) = (-1,1)
@@ -314,7 +323,7 @@ It should only be enabled for the `ws_3D` and `ws_3D_QLab` workspaces (see comme
     - u1 ~ [0,0,1]  and u2 ~ [0,1,0]
     - There should be a peak in the 1D plot at x~1
 
-19. For u1 change c* = -1 and b* = 0 - check that u2 = [0,-1,0] and there is a peak at x~-1
+19. For u1 set b*=0 and c* = -1 and start=-2 - check that u2 = [0,-1,0] and there is a peak at x~-1
 20. To change the centre of the cut move the central white marker of the cut representation to (K,L) ~ (2,0),
 
     - The entire cut representation should move
@@ -342,7 +351,7 @@ Specific Tests
 1. Representation of integrated peaks
 #####################################
 
-1. Run the code below to generate fake data and integrate peaks in the 3D MDWorkspace ``md_3D``
+1. Run the code below to generate fake data and integrate peaks in the 3D MDWorkspace ``md_3D`` from :ref:`md_event_tests`
 
 .. code-block:: python
 

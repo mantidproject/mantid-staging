@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The elements of this module coordinate file access and information extraction from files."""
+"""The elements of this module coordinate file access and information extraction from files."""
 
 # pylint: disable=too-few-public-methods, invalid-name
 
@@ -128,7 +128,7 @@ def get_extension_for_file_type(file_info):
     elif file_info.get_type() is FileType.ISIS_RAW:
         extension = RAW_EXTENSION
     else:
-        raise RuntimeError("The file extension type for a file of type {0} is unknown" "".format(str(file_info.get_type())))
+        raise RuntimeError("The file extension type for a file of type {0} is unknown".format(str(file_info.get_type())))
     return extension
 
 
@@ -244,7 +244,7 @@ def get_instrument_paths_for_sans_file(file_name=None, file_information=None):
     idf_path = os.path.normpath(idf_path)
 
     if not os.path.exists(idf_path):
-        raise RuntimeError("SANSFileInformation: The instrument definition file {0} does not seem to " "exist.".format(str(idf_path)))
+        raise RuntimeError("SANSFileInformation: The instrument definition file {0} does not seem to exist.".format(str(idf_path)))
 
     # Get the ipf path. This is slightly more complicated. See the Mantid documentation for the naming rules. Currently
     # they are:
@@ -264,8 +264,7 @@ def get_instrument_paths_for_sans_file(file_name=None, file_information=None):
         return idf_path, ipf_rule2
 
     raise RuntimeError(
-        "SANSFileInformation: There does not seem to be a corresponding instrument parameter file "
-        "available for {0}".format(str(idf_path))
+        f"SANSFileInformation: There does not seem to be a corresponding instrument parameter file available for {str(idf_path)}"
     )
 
 
@@ -282,6 +281,24 @@ def convert_to_shape(shape_flag):
         shape = SampleShape.FLAT_PLATE
     elif shape_flag == 3:
         shape = SampleShape.DISC
+    else:
+        shape = None
+    return shape
+
+
+def convert_to_flag(shape_string):
+    """
+    Converts a shape flag to a shape object.
+
+    :param shape_flag: a geometry flag which can be 1, 2 or 3
+    :return: a shape object
+    """
+    if shape_string == SampleShape.CYLINDER:
+        shape = 1
+    elif shape_string == SampleShape.FLAT_PLATE:
+        shape = 2
+    elif shape_string == SampleShape.DISC:
+        shape = 3
     else:
         shape = None
     return shape

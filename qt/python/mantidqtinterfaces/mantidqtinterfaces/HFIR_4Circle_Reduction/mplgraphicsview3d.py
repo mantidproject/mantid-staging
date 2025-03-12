@@ -62,7 +62,7 @@ class MplPlot3dCanvas(FigureCanvas):
         """
         for plt in self._currPlotList:
             # del plt
-            self._myAxes.collections.remove(plt)
+            plt.remove()
         self._currPlotList = []
 
         return
@@ -232,7 +232,13 @@ class MplPlot3dCanvas(FigureCanvas):
         print("Number of surf = ", len(self._currSurfaceList))
         for surf in self._currSurfaceList:
             plt = self._myAxes.plot_surface(
-                surf["xx"], surf["yy"], surf["val"], rstride=5, cstride=5, linewidth=1, antialiased=True  # color map??? cmap=cm.jet,
+                surf["xx"],
+                surf["yy"],
+                surf["val"],
+                rstride=5,
+                cstride=5,
+                linewidth=1,
+                antialiased=True,  # color map??? cmap=cm.jet,
             )
             self._currPlotList.append(plt)
         # END-FOR

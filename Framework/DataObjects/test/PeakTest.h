@@ -8,7 +8,6 @@
 
 #include "MantidGeometry/Instrument/ReferenceFrame.h"
 #include "MantidKernel/PhysicalConstants.h"
-#include "MantidKernel/System.h"
 #include "MantidKernel/Timer.h"
 #include "MantidKernel/Unit.h"
 #include "MantidKernel/UnitFactory.h"
@@ -28,7 +27,7 @@ using namespace Mantid::Kernel;
 namespace boost {
 template <class CharType, class CharTrait>
 std::basic_ostream<CharType, CharTrait> &operator<<(std::basic_ostream<CharType, CharTrait> &out,
-                                                    optional<double> const &maybe) {
+                                                    std::optional<double> const &maybe) {
   if (maybe)
     out << maybe;
   return out;
@@ -396,7 +395,7 @@ public:
   /** Can't have Q = 0,0,0 or 0 in the Z direction when creating */
   void test_setQLabFrame_ThrowsIfQIsNull() {
     Peak p1(inst, 10000, 2.0);
-    const boost::optional<double> distance = 1.0;
+    const std::optional<double> distance = 1.0;
     TS_ASSERT_THROWS_ANYTHING(Peak p2(inst, V3D(0, 0, 0), distance));
     TS_ASSERT_THROWS_ANYTHING(Peak p2(inst, V3D(1, 2, 0), distance));
   }
@@ -425,7 +424,7 @@ public:
     V3D detPos1 = p1.getDetPos();
 
     // Construct using just Q
-    Peak p2(inst, Qlab1, boost::optional<double>(detPos1.norm()));
+    Peak p2(inst, Qlab1, std::optional<double>(detPos1.norm()));
     comparePeaks(p1, p2);
     TS_ASSERT_EQUALS(p2.getBankName(), "None");
     TS_ASSERT_EQUALS(p2.getRow(), -1);
@@ -605,7 +604,7 @@ public:
     V3D detPos1 = p1.getDetPos();
 
     // Construct using just Q
-    Peak p2(inst, Qlab1, boost::optional<double>(detPos1.norm()));
+    Peak p2(inst, Qlab1, std::optional<double>(detPos1.norm()));
     TS_ASSERT(p2.findDetector());
     comparePeaks(p1, p2);
     TS_ASSERT_EQUALS(p2.getBankName(), "bank1");

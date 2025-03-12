@@ -4,8 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-"""Test suite for the crystal field calculations in the Inelastic/CrystalField package
-"""
+"""Test suite for the crystal field calculations in the Inelastic/CrystalField package"""
+
 import re
 import unittest
 from unittest import mock
@@ -40,10 +40,10 @@ class CrystalFieldTests(unittest.TestCase):
     def _do_test_eigensystem(self, en, wf, ham):
         n = len(en)
         wf_ctr = np.conj(wf.transpose())
-        I = np.tensordot(wf_ctr, wf, axes=1)
+        product = np.tensordot(wf_ctr, wf, axes=1)
         for i in range(n):
-            re = np.real(I[i, i])
-            im = np.imag(I[i, i])
+            re = np.real(product[i, i])
+            im = np.imag(product[i, i])
             self.assertAlmostEqual(re, 1.0, 10)
             self.assertAlmostEqual(im, 0.0, 10)
         tmp = np.tensordot(wf_ctr, ham, axes=1)
@@ -674,6 +674,16 @@ class CrystalFieldTests(unittest.TestCase):
         self.assertAlmostEqual(chi_powder[5] * 10, 1 / invmt_powder_SI[5], 2)
         self.assertAlmostEqual(chi_powder[10] * 10, 1 / invmt_powder_SI[10], 2)
         self.assertAlmostEqual(chi_powder[15] * 10, 1 / invmt_powder_SI[15], 2)
+
+        # Test different Hmag
+        _, h_mag_10 = cf.getMagneticMoment(Hmag=10, Temperature=np.linspace(1, 300, 50), Hdir="powder", Unit="bohr")
+        self.assertAlmostEqual(h_mag_10[5], 0.323607, 5)
+        self.assertAlmostEqual(h_mag_10[10], 0.182484, 5)
+        self.assertAlmostEqual(h_mag_10[15], 0.129909, 5)
+        _, h_mag_5 = cf.getMagneticMoment(Hmag=5, Temperature=np.linspace(1, 300, 50), Hdir="powder", Unit="bohr")
+        self.assertAlmostEqual(h_mag_5[5], 0.16923426, 6)
+        self.assertAlmostEqual(h_mag_5[10], 0.09228022, 6)
+        self.assertAlmostEqual(h_mag_5[15], 0.06525625, 6)
 
         # Test M(H) calculations
         Hmag_SI, mag_SI = cf.getMagneticMoment(np.linspace(0, 30, 15), Temperature=10, Hdir=[0, 1, -1], Unit="SI")

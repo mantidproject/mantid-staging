@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The elements of this module define typed enums which are used in the SANS reduction framework."""
+"""The elements of this module define typed enums which are used in the SANS reduction framework."""
 
 from enum import Enum
 from sans.state.JsonSerializable import json_serializable
@@ -18,6 +18,16 @@ class SANSInstrument(Enum):
     LOQ = "LOQ"
     SANS2D = "SANS2D"
     ZOOM = "ZOOM"
+
+
+@json_serializable
+class SANSDetector(Enum):
+    SANS2D_HAB = "front-detector"
+    SANS2D_LAB = "rear-detector"
+    LOQ_HAB = "HAB"
+    LOQ_LAB = "main-detector-bank"
+    LARMOR_LAB = "DetectorBench"
+    ZOOM_LAB = "rear-detector"
 
 
 @json_serializable

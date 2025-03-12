@@ -9,9 +9,8 @@ import unittest
 from testhelpers import assertRaisesNothing
 from testhelpers.tempfile_wrapper import TemporaryFileHelper
 
-from mantid.kernel import *
-from mantid.api import *
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory, AlgorithmManager, AnalysisDataService
+from mantid.simpleapi import DeleteWorkspace, PoldiCreatePeaksFromCell, PoldiCreatePeaksFromFile
 
 
 class PoldiCreatePeaksFromFileTest(unittest.TestCase):
@@ -129,9 +128,9 @@ class PoldiCreatePeaksFromFileTest(unittest.TestCase):
                                                   }"""
         )
 
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhLatticeMissing.getName(), 0.7, 10.0, "ws"))
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhNoLattice.getName(), 0.7, 10.0, "ws"))
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhInvalidLattice.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhLatticeMissing.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhNoLattice.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhInvalidLattice.getName(), 0.7, 10.0, "ws"))
 
     def test_FileFaultySpaceGroupStrings(self):
         fhSgMissing = TemporaryFileHelper(
@@ -153,8 +152,8 @@ class PoldiCreatePeaksFromFileTest(unittest.TestCase):
                                                   }"""
         )
 
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhSgMissing.getName(), 0.7, 10.0, "ws"))
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhSgInvalid.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhSgMissing.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhSgInvalid.getName(), 0.7, 10.0, "ws"))
 
     def test_FileFaultyAtomStrings(self):
         fhAtomsMissing = TemporaryFileHelper(
@@ -180,9 +179,9 @@ class PoldiCreatePeaksFromFileTest(unittest.TestCase):
                                                   }"""
         )
 
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhAtomsMissing.getName(), 0.7, 10.0, "ws"))
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhAtomsNoBraces.getName(), 0.7, 10.0, "ws"))
-        self.assertRaises(RuntimeError, PoldiCreatePeaksFromFile, *(fhAtomsEmpty.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhAtomsMissing.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhAtomsNoBraces.getName(), 0.7, 10.0, "ws"))
+        self.assertRaises(TypeError, PoldiCreatePeaksFromFile, *(fhAtomsEmpty.getName(), 0.7, 10.0, "ws"))
 
     def _tablesAreEqual(self, lhs, rhs):
         self.assertEqual(lhs.rowCount(), rhs.rowCount(), msg="Row count of tables is different")

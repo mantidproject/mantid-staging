@@ -10,8 +10,8 @@
 #include "MantidCurveFitting/Algorithms/Fit.h"
 #include "MantidCurveFitting/Constraints/BoundaryConstraint.h"
 #include "MantidHistogramData/HistogramX.h"
+
 #include "MantidHistogramData/HistogramY.h"
-#include "MantidKernel/System.h"
 
 #include <sstream>
 #include <utility>
@@ -477,13 +477,9 @@ bool LeBailFunction::calculateGroupPeakIntensities(vector<pair<double, IPowderDi
     peak->function(localpeakvalue, datax);
 
     // check data
-    size_t numbadpts(0);
-    vector<double>::const_iterator localpeakvalue_end = localpeakvalue.end();
-    for (auto it = localpeakvalue.begin(); it != localpeakvalue_end; ++it) {
-      if ((*it != 0.) && (*it < NEG_DBL_MAX || *it > DBL_MAX)) {
-        numbadpts++;
-      }
-    }
+    const auto numbadpts = std::count_if(localpeakvalue.cbegin(), localpeakvalue.cend(), [&](const auto &pt) {
+      return (pt != 0.) && (pt < NEG_DBL_MAX || pt > DBL_MAX);
+    });
 
     // report the problem and/or integrate data
     if (numbadpts == 0) {
@@ -780,7 +776,7 @@ void LeBailFunction::groupPeaks(vector<vector<pair<double, IPowderDiffPeakFuncti
         peakgroupvec.emplace_back(peakgroup);
       }
     } // FIRST out of boundary
-  }   // ENDWHILE
+  } // ENDWHILE
 
   while (ipk < m_numPeaks) {
     // Group peaks out of uppper boundary to a separate vector of peaks

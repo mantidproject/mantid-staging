@@ -9,18 +9,26 @@
 #include "MantidAPI/Jacobian.h"
 #include "MantidAPI/MatrixWorkspace.h"
 #include "MantidCurveFitting/Jacobian.h"
+#include "MantidKernel/IPropertyManager.h"
+#include "MantidKernel/PropertyWithValue.h"
 #include "MantidKernel/WarningSuppressions.h"
 #include "MantidPythonInterface/api/FitFunctions/IFunctionAdapter.h"
 #include "MantidPythonInterface/core/GetPointer.h"
+#include "MantidPythonInterface/core/IsNone.h"
+#include "MantidPythonInterface/kernel/Registry/PropertyValueHandler.h"
 #include "MantidPythonInterface/kernel/Registry/TypeRegistry.h"
 #include "MantidPythonInterface/kernel/Registry/TypedPropertyValueHandler.h"
 
 #include <boost/python/class.hpp>
 #include <boost/python/def.hpp>
+#include <boost/python/extract.hpp>
 #include <boost/python/manage_new_object.hpp>
 #include <boost/python/overloads.hpp>
 #include <boost/python/register_ptr_to_python.hpp>
 #include <boost/python/to_python_value.hpp>
+
+#include <memory>
+#include <string>
 
 using Mantid::API::IFunction;
 using Mantid::API::IFunction_sptr;
@@ -32,6 +40,58 @@ GET_POINTER_SPECIALIZATION(IFunction)
 
 namespace {
 ///@cond
+
+/**
+ * Extracts a pointer to the C++ IFunction from the python object, and then clones the IFunction. The clone is necessary
+ * to force a separation from the python object to avoid GIL issues.
+ * @param value :: A boost python object that stores the value
+ * @returns A clone of the extracted IFunction C++ object.
+ */
+template <typename T> inline T extractValueAndClone(const boost::python::object &value) {
+  return boost::python::extract<T>(value)()->clone();
+}
+
+struct FunctionPropertyValueHandler : public PropertyValueHandler {
+
+  /// Type required by TypeRegistry framework
+  using HeldType = std::shared_ptr<IFunction>;
+
+  /**
+   * Set function to handle Python -> C++ calls and get the correct type
+   * @param alg :: A pointer to an IPropertyManager
+   * @param name :: The name of the property
+   * @param value :: A boost python object that stores the value
+   */
+  void set(Mantid::Kernel::IPropertyManager *alg, const std::string &name,
+           const boost::python::object &value) const override {
+    alg->setProperty<HeldType>(name, extractValueAndClone<HeldType>(value));
+  }
+
+  /**
+   * Create a PropertyWithValue from the given python object value
+   * @param name :: The name of the property
+   * @param defaultValue :: The defaultValue of the property. The object
+   * attempts to extract
+   * a value of type ValueType from the python object
+   * @param validator :: A python object pointing to a validator instance, which
+   * can be None.
+   * @param direction :: The direction of the property
+   * @returns A pointer to a newly constructed property instance
+   */
+  std::unique_ptr<Mantid::Kernel::Property> create(const std::string &name, const boost::python::object &defaultValue,
+                                                   const boost::python::object &validator,
+                                                   const unsigned int direction) const override {
+    using Mantid::Kernel::IValidator;
+    using Mantid::Kernel::PropertyWithValue;
+    if (Mantid::PythonInterface::isNone(validator)) {
+      return std::make_unique<PropertyWithValue<HeldType>>(name, extractValueAndClone<HeldType>(defaultValue),
+                                                           direction);
+    }
+    const IValidator *propValidator = boost::python::extract<IValidator *>(validator);
+    return std::make_unique<PropertyWithValue<HeldType>>(name, extractValueAndClone<HeldType>(defaultValue),
+                                                         propValidator->clone(), direction);
+  }
+};
 
 //------------------------------------------------------------------------------------------------------
 /**
@@ -153,13 +213,13 @@ void export_IFunction() {
       .def("isExplicitlySet", &IFunction::isExplicitlySet, (arg("self"), arg("i")),
            "Return whether the ith parameter needs to be explicitely set")
 
-      .def("getParameterValue", (double (IFunction::*)(size_t) const) & IFunction::getParameter,
-           (arg("self"), arg("i")), "Get the value of the ith parameter")
+      .def("getParameterValue", (double(IFunction::*)(size_t) const) & IFunction::getParameter, (arg("self"), arg("i")),
+           "Get the value of the ith parameter")
 
-      .def("getParameterValue", (double (IFunction::*)(const std::string &) const) & IFunction::getParameter,
+      .def("getParameterValue", (double(IFunction::*)(const std::string &) const) & IFunction::getParameter,
            (arg("self"), arg("name")), "Get the value of the named parameter")
 
-      .def("__getitem__", (double (IFunction::*)(const std::string &) const) & IFunction::getParameter,
+      .def("__getitem__", (double(IFunction::*)(const std::string &) const) & IFunction::getParameter,
            (arg("self"), arg("name")), "Get the value of the named parameter")
 
       .def("setParameter", (setParameterType1)&IFunction::setParameter,
@@ -236,10 +296,10 @@ void export_IFunction() {
       .def("addTies", &IFunction::addTies,
            addTies_Overloads((arg("self"), arg("ties"), arg("isDefault")), "Add several ties to an IFunction."))
 
-      .def("removeTie", (bool (IFunction::*)(size_t)) & IFunction::removeTie, (arg("self"), arg("i")),
+      .def("removeTie", (bool(IFunction::*)(size_t)) & IFunction::removeTie, (arg("self"), arg("i")),
            "Remove the tie of the ith parameter")
 
-      .def("removeTie", (void (IFunction::*)(const std::string &)) & IFunction::removeTie, (arg("self"), arg("name")),
+      .def("removeTie", (void(IFunction::*)(const std::string &)) & IFunction::removeTie, (arg("self"), arg("name")),
            "Remove the tie of the named parameter")
 
       .def("getTies", &IFunction::writeTies, arg("self"), "Returns the list of current ties as a string")
@@ -283,7 +343,7 @@ void export_IFunction() {
            "Return a description of the ith parameter")
       .def("getParamExplicit", &IFunction::isExplicitlySet, (arg("self"), arg("i")),
            "Return whether the ith parameter needs to be explicitely set")
-      .def("getParamValue", (double (IFunction::*)(std::size_t) const) & IFunction::getParameter,
+      .def("getParamValue", (double(IFunction::*)(std::size_t) const) & IFunction::getParameter,
            (arg("self"), arg("i")), "Get the value of the ith parameter")
       .def("getParameterIndex", &IFunction::parameterIndex, (arg("self"), arg("name")),
            "Returns the index of the provided parameter.")
@@ -291,5 +351,5 @@ void export_IFunction() {
       //-- Python special methods --
       .def("__repr__", &IFunction::asString, arg("self"), "Return a string representation of the function");
 
-  TypeRegistry::subscribe<TypedPropertyValueHandler<IFunction_sptr>>();
+  TypeRegistry::subscribe<FunctionPropertyValueHandler>();
 }

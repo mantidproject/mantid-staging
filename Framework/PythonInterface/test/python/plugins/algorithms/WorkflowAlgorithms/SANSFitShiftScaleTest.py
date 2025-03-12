@@ -5,7 +5,7 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
-from mantid.api import AlgorithmManager
+from mantid.api import AlgorithmManager, FrameworkManager
 import numpy as np
 from SANSFitShiftScale import ErrorTransferFromModelToData
 
@@ -197,11 +197,6 @@ class SANSFitShiftScaleTest(unittest.TestCase):
         create_alg.execute()
         lab_workspace = create_alg.getProperty("OutputWorkspace").value
 
-        # FLAT NORM
-        create_alg.setProperty("DataY", [1] * 9)
-        create_alg.execute()
-        flat_norm = create_alg.getProperty("OutputWorkspace").value
-
         alg = AlgorithmManager.create("SANSFitShiftScale")
         alg.setChild(True)
         alg.initialize()
@@ -293,4 +288,5 @@ class TestErrorTransferFromModelToData(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    FrameworkManager.Instance()
     unittest.main()

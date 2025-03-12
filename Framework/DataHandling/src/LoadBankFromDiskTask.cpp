@@ -8,17 +8,22 @@
 #include "MantidDataHandling/BankPulseTimes.h"
 #include "MantidDataHandling/DefaultEventLoader.h"
 #include "MantidDataHandling/LoadEventNexus.h"
+#include "MantidDataHandling/ProcessBankCompressed.h"
 #include "MantidDataHandling/ProcessBankData.h"
+#include "MantidKernel/Timer.h"
 #include "MantidKernel/Unit.h"
+#include "MantidKernel/VectorHelper.h"
 #include "MantidNexus/NexusIOHelper.h"
-
-// clang-format off
-#include <nexus/NeXusFile.hpp>
-#include <nexus/NeXusException.hpp>
-// clang-format on
+#include "MantidNexusCpp/NeXusException.hpp"
+#include "MantidNexusCpp/NeXusFile.hpp"
 
 #include <algorithm>
 #include <utility>
+
+namespace {
+// this is used for unit conversion to correct units
+const std::string MICROSEC("microseconds");
+} // namespace
 
 namespace Mantid::DataHandling {
 
@@ -39,10 +44,16 @@ LoadBankFromDiskTask::LoadBankFromDiskTask(DefaultEventLoader &loader, std::stri
                                            API::Progress *prog, std::shared_ptr<std::mutex> ioMutex,
                                            Kernel::ThreadScheduler &scheduler, std::vector<int> framePeriodNumbers)
     : m_loader(loader), entry_name(std::move(entry_name)), entry_type(std::move(entry_type)), prog(prog),
-      scheduler(scheduler), m_loadError(false), m_oldNexusFileNames(oldNeXusFileNames), m_have_weight(false),
+      scheduler(scheduler), m_loadError(false), m_have_weight(false),
       m_framePeriodNumbers(std::move(framePeriodNumbers)) {
   setMutex(ioMutex);
   m_cost = static_cast<double>(numEvents);
+
+  // some field names changed over time
+  m_timeOfFlightFieldName = oldNeXusFileNames ? "event_time_of_flight" : "event_time_offset";
+  m_detIdFieldName = oldNeXusFileNames ? "event_pixel_id" : "event_id";
+
+  // detector id range
   m_min_id = std::numeric_limits<uint32_t>::max();
   m_max_id = 0;
 }
@@ -72,7 +83,7 @@ void LoadBankFromDiskTask::loadPulseTimes(::NeXus::File &file) {
   }
 
   if (!file.getInfo().dims.empty())
-    thispulseTimes = file.getInfo().dims[0];
+    thispulseTimes = static_cast<size_t>(file.getInfo().dims[0]);
   file.closeData();
 
   // Now, we look through existing ones to see if it is already loaded
@@ -94,21 +105,23 @@ void LoadBankFromDiskTask::loadPulseTimes(::NeXus::File &file) {
     pulse)
  * @param file :: File handle for the NeXus file
  */
-std::vector<uint64_t> LoadBankFromDiskTask::loadEventIndex(::NeXus::File &file) {
+std::unique_ptr<std::vector<uint64_t>> LoadBankFromDiskTask::loadEventIndex(::NeXus::File &file) {
   // Get the event_index (a list of size of # of pulses giving the index in
   // the event list for that pulse) as a uint64 vector.
   // The Nexus standard does not specify if this is to be 32-bit or 64-bit
   // integers, so we use the NeXusIOHelper to do the conversion on the fly.
-  auto event_index = Mantid::NeXus::NeXusIOHelper::readNexusVector<uint64_t>(file, "event_index");
+  auto event_index = std::make_unique<std::vector<uint64_t>>(
+      Mantid::NeXus::NeXusIOHelper::readNexusVector<uint64_t>(file, "event_index"));
 
   // Look for the sign that the bank is empty
-  if (event_index.size() == 1) {
-    if (event_index[0] == 0) {
+  if (event_index->size() == 1) {
+    if (event_index->at(0) == 0) {
       // One entry, only zero. This means NO events in this bank.
       m_loadError = true;
       m_loader.alg->getLogger().debug() << "Bank " << entry_name << " is empty.\n";
     }
   }
+
   return event_index;
 }
 
@@ -117,19 +130,16 @@ std::vector<uint64_t> LoadBankFromDiskTask::loadEventIndex(::NeXus::File &file) 
  * @param file :: File handle for the NeXus file
  * @param start_event :: set to the index of the first event
  * @param stop_event :: set to the index of the last event + 1
- * @param event_index ::  (a list of size of # of pulses giving the index in
- *the event list for that pulse)
+ * @param start_event_index ::  (a list of size of # of pulses giving the index in
+ * the event list for that pulse)
  */
 void LoadBankFromDiskTask::prepareEventId(::NeXus::File &file, int64_t &start_event, int64_t &stop_event,
-                                          const std::vector<uint64_t> &event_index) {
+                                          const uint64_t &start_event_index) {
   // Get the list of pixel ID's
-  if (m_oldNexusFileNames)
-    file.openData("event_pixel_id");
-  else
-    file.openData("event_id");
+  file.openData(m_detIdFieldName);
 
   // By default, use all available indices
-  start_event = event_index[0];
+  start_event = static_cast<int64_t>(start_event_index);
   ::NeXus::Info id_info = file.getInfo();
   // dims[0] can be negative in ISIS meaning 2^32 + dims[0]. Take that into
   // account
@@ -160,10 +170,7 @@ void LoadBankFromDiskTask::prepareEventId(::NeXus::File &file, int64_t &start_ev
 std::unique_ptr<std::vector<uint32_t>> LoadBankFromDiskTask::loadEventId(::NeXus::File &file) {
   // This is the data size
   ::NeXus::Info id_info = file.getInfo();
-  int64_t dim0 = recalculateDataSize(id_info.dims[0]);
-
-  // Now we allocate the required arrays
-  auto event_id = std::make_unique<std::vector<uint32_t>>(m_loadSize[0]);
+  const int64_t dim0 = recalculateDataSize(id_info.dims[0]);
 
   // Check that the required space is there in the file.
   if (dim0 < m_loadSize[0] + m_loadStart[0]) {
@@ -173,23 +180,20 @@ std::unique_ptr<std::vector<uint32_t>> LoadBankFromDiskTask::loadEventId(::NeXus
     m_loadError = true;
   }
 
-  if (m_loader.alg->getCancel())
-    m_loadError = true; // To allow cancelling the algorithm
+  // Now we allocate the required arrays
+  auto event_id = std::make_unique<std::vector<uint32_t>>(dim0);
 
   if (!m_loadError) {
-    // Must be uint32
-    if (id_info.type == ::NeXus::UINT32)
-      file.getSlab(event_id->data(), m_loadStart, m_loadSize);
-    else {
-      m_loader.alg->getLogger().warning()
-          << "Entry " << entry_name << "'s event_id field is not UINT32! It will be skipped.\n";
-      m_loadError = true;
-    }
+    Mantid::NeXus::NeXusIOHelper::readNexusSlab<uint32_t, Mantid::NeXus::NeXusIOHelper::PreventNarrowing>(
+        *event_id, file, m_detIdFieldName, m_loadStart, m_loadSize);
     file.closeData();
 
     // determine the range of pixel ids
-    m_min_id = *(std::min_element(event_id->data(), event_id->data() + m_loadSize[0]));
-    m_max_id = *(std::max_element(event_id->data(), event_id->data() + m_loadSize[0]));
+    {
+      const auto [min_id, max_id] = std::minmax_element(event_id->cbegin(), event_id->cend());
+      m_min_id = *min_id;
+      m_max_id = *max_id;
+    }
 
     if (m_min_id > static_cast<uint32_t>(m_loader.eventid_max)) {
       // All the detector IDs in the bank are higher than the highest 'known'
@@ -218,16 +222,12 @@ std::unique_ptr<std::vector<uint32_t>> LoadBankFromDiskTask::loadEventId(::NeXus
  * @returns A new array containing the time of flights for this bank
  */
 std::unique_ptr<std::vector<float>> LoadBankFromDiskTask::loadTof(::NeXus::File &file) {
-  // Allocate the array
-  auto event_time_of_flight = std::make_unique<std::vector<float>>(m_loadSize[0]);
-
   // Get the list of event_time_of_flight's
-  std::string key, tof_unit;
-  if (!m_oldNexusFileNames)
-    key = "event_time_offset";
-  else
-    key = "event_time_of_flight";
-  file.openData(key);
+  file.openData(m_timeOfFlightFieldName);
+
+  // This is the data size
+  ::NeXus::Info id_info = file.getInfo();
+  const int64_t dim0 = recalculateDataSize(id_info.dims[0]);
 
   // Check that the required space is there in the file.
   ::NeXus::Info tof_info = file.getInfo();
@@ -239,18 +239,24 @@ std::unique_ptr<std::vector<float>> LoadBankFromDiskTask::loadTof(::NeXus::File 
     m_loadError = true;
   }
 
+  // Allocate the array
+  auto event_time_of_flight = std::make_unique<std::vector<float>>(dim0);
+
   // Mantid assumes event_time_offset to be float.
   // Nexus only requires event_time_offset to be a NXNumber.
   // We thus have to consider 32-bit or 64-bit options, and we
   // explicitly allow downcasting using the additional AllowDowncasting
   // template argument.
-  auto vec = Mantid::NeXus::NeXusIOHelper::readNexusSlab<float, Mantid::NeXus::NeXusIOHelper::AllowNarrowing>(
-      file, key, m_loadStart, m_loadSize);
+  // the memory is allocated earlier in the function
+  Mantid::NeXus::NeXusIOHelper::readNexusSlab<float, Mantid::NeXus::NeXusIOHelper::AllowNarrowing>(
+      *event_time_of_flight, file, m_timeOfFlightFieldName, m_loadStart, m_loadSize);
+  std::string tof_unit;
   file.getAttr("units", tof_unit);
   file.closeData();
+
   // Convert Tof to microseconds
-  Kernel::Units::timeConversionVector(vec, tof_unit, "microseconds");
-  std::copy(vec.begin(), vec.end(), event_time_of_flight->data());
+  if (tof_unit != MICROSEC)
+    Kernel::Units::timeConversionVector(*event_time_of_flight, tof_unit, MICROSEC);
 
   return event_time_of_flight;
 }
@@ -299,6 +305,9 @@ std::unique_ptr<std::vector<float>> LoadBankFromDiskTask::loadEventWeights(::NeX
 }
 
 void LoadBankFromDiskTask::run() {
+  // timer for performance
+  Mantid::Kernel::Timer timer;
+
   // These give the limits in each file as to which events we actually load
   // (when filtering by time).
   m_loadStart.resize(1, 0);
@@ -313,7 +322,7 @@ void LoadBankFromDiskTask::run() {
   std::unique_ptr<std::vector<uint32_t>> event_id;
   std::unique_ptr<std::vector<float>> event_time_of_flight;
   std::unique_ptr<std::vector<float>> event_weight;
-  std::vector<uint64_t> event_index;
+  std::unique_ptr<std::vector<uint64_t>> event_index;
 
   // Open the file
   ::NeXus::File file(m_loader.alg->m_filename);
@@ -323,32 +332,54 @@ void LoadBankFromDiskTask::run() {
     // Open the bankN_event group
     file.openGroup(entry_name, entry_type);
 
+    const bool needPulseInfo = (!m_loader.alg->compressEvents) || m_loader.alg->compressTolerance == 0 ||
+                               m_loader.m_ws.nPeriods() > 1 || m_loader.alg->m_is_time_filtered ||
+                               m_loader.alg->filter_bad_pulses || m_have_weight;
+
     // Load the event_index field.
-    event_index = this->loadEventIndex(file);
+    if (needPulseInfo)
+      event_index = this->loadEventIndex(file);
+    else
+      event_index = nullptr;
 
     if (!m_loadError) {
       // Load and validate the pulse times
-      this->loadPulseTimes(file);
-
+      if (needPulseInfo)
+        this->loadPulseTimes(file);
+      else
+        thisBankPulseTimes = nullptr;
       // The event_index should be the same length as the pulse times from DAS
       // logs.
-      if (event_index.size() != thisBankPulseTimes->pulseTimes.size())
+      if (event_index && event_index->size() != thisBankPulseTimes->numberOfPulses())
         m_loader.alg->getLogger().warning() << "Bank " << entry_name
                                             << " has a mismatch between the number of event_index entries "
                                                "and the number of pulse times in event_time_zero.\n";
-
       // Open and validate event_id field.
       int64_t start_event = 0;
       int64_t stop_event = 0;
-      this->prepareEventId(file, start_event, stop_event, event_index);
+      if (event_index)
+        this->prepareEventId(file, start_event, stop_event, event_index->operator[](0));
+      else
+        this->prepareEventId(file, start_event, stop_event, 0);
 
       // These are the arguments to getSlab()
       m_loadStart[0] = start_event;
       m_loadSize[0] = stop_event - start_event;
 
-      if ((m_loadSize[0] > 0) && (m_loadStart[0] >= 0)) {
+      if ((m_loader.alg->compressEvents) || ((m_loadSize[0] > 0) && (m_loadStart[0] >= 0))) {
+        if (m_loader.alg->getCancel()) {
+          m_loader.alg->getLogger().error() << "Loading bank " << entry_name << " is cancelled.\n";
+          m_loadError = true; // To allow cancelling the algorithm
+        }
+
         // Load pixel IDs
-        event_id = this->loadEventId(file);
+        if (!m_loadError)
+          event_id = this->loadEventId(file);
+
+        // for compression the number of events needs to come from elsewhere
+        if (!event_index)
+          m_loadSize[0] = static_cast<int64_t>(event_id->size());
+
         if (m_loader.alg->getCancel()) {
           m_loader.alg->getLogger().error() << "Loading bank " << entry_name << " is cancelled.\n";
           m_loadError = true; // To allow cancelling the algorithm
@@ -371,7 +402,6 @@ void LoadBankFromDiskTask::run() {
       }
 
     } // no error
-
   } // try block
   catch (std::exception &e) {
     m_loader.alg->getLogger().error() << "Error while loading bank " << entry_name << ":\n";
@@ -427,25 +457,91 @@ void LoadBankFromDiskTask::run() {
     mid_id = (m_max_id + m_min_id) / 2;
 
   // No error? Launch a new task to process that data.
-  auto numEvents = static_cast<size_t>(m_loadSize[0]);
-  auto startAt = static_cast<size_t>(m_loadStart[0]);
+  const auto numEvents = static_cast<size_t>(m_loadSize[0]);
+  const auto startAt = static_cast<size_t>(m_loadStart[0]);
 
   // convert things to shared_arrays to share between tasks
-  std::shared_ptr<std::vector<uint32_t>> event_id_shrd(event_id.release());
-  std::shared_ptr<std::vector<float>> event_time_of_flight_shrd(event_time_of_flight.release());
-  std::shared_ptr<std::vector<float>> event_weight_shrd(event_weight.release());
-  auto event_index_shrd = std::make_shared<std::vector<uint64_t>>(std::move(event_index));
+  std::shared_ptr<std::vector<uint32_t>> event_id_shrd(std::move(event_id));
+  std::shared_ptr<std::vector<float>> event_time_of_flight_shrd(std::move(event_time_of_flight));
+  std::shared_ptr<std::vector<float>> event_weight_shrd(std::move(event_weight));
+  std::shared_ptr<std::vector<uint64_t>> event_index_shrd(std::move(event_index));
 
-  std::shared_ptr<Task> newTask1 = std::make_shared<ProcessBankData>(
-      m_loader, entry_name, prog, event_id_shrd, event_time_of_flight_shrd, numEvents, startAt, event_index_shrd,
-      thisBankPulseTimes, m_have_weight, event_weight_shrd, m_min_id, mid_id);
-  scheduler.push(newTask1);
-  if (m_loader.splitProcessing && (mid_id < m_max_id)) {
-    std::shared_ptr<Task> newTask2 = std::make_shared<ProcessBankData>(
+  if ((m_loader.alg->compressEvents) && (!event_weight_shrd) && (m_loader.alg->compressTolerance != 0)) {
+    // this method is for unweighted events that the user wants compressed on load
+
+    // TODO should this be created elsewhere?
+    const auto [tof_min, tof_max] =
+        std::minmax_element(event_time_of_flight_shrd->cbegin(), event_time_of_flight_shrd->cend());
+
+    const bool log_compression = (m_loader.alg->compressTolerance < 0);
+
+    // reduce tof range if filtering was requested
+    auto tof_min_fixed = *tof_min;
+    auto tof_max_fixed = *tof_max;
+    if (m_loader.alg->filter_tof_range) {
+      if (m_loader.alg->filter_tof_max != EMPTY_DBL())
+        tof_max_fixed = std::min<float>(tof_max_fixed, static_cast<float>(m_loader.alg->filter_tof_max));
+      if (m_loader.alg->filter_tof_min != EMPTY_DBL())
+        tof_min_fixed = std::max<float>(tof_min_fixed, static_cast<float>(m_loader.alg->filter_tof_min));
+    }
+
+    // fixup the minimum tof for log binning since it cannot be <= 0
+    if (log_compression && tof_min_fixed <= 0.) {
+      tof_min_fixed = std::abs(static_cast<float>(m_loader.alg->compressTolerance));
+    }
+
+    // Join back up the tof limits to the global ones
+    // This is not thread safe, so only one thread at a time runs this.
+    {
+      std::lock_guard<std::mutex> _lock(m_loader.alg->m_tofMutex);
+      if (tof_min_fixed < m_loader.alg->shortest_tof) {
+        m_loader.alg->shortest_tof = tof_min_fixed;
+      }
+      if (tof_max_fixed > m_loader.alg->longest_tof) {
+        m_loader.alg->longest_tof = tof_max_fixed;
+      }
+      // TODO
+      // m_loader.alg->bad_tofs += badTofs;
+      // m_loader.alg->discarded_events += my_discarded_events;
+    }
+
+    // delta >= 0 is linear, < 0 is log
+    double delta = m_loader.alg->compressTolerance;
+
+    // make a vector of logorithmic bins
+    auto histogram_bin_edges = std::make_shared<std::vector<double>>();
+    Mantid::Kernel::VectorHelper::createAxisFromRebinParams({tof_min_fixed, delta, (tof_max_fixed + std::abs(delta))},
+                                                            *histogram_bin_edges);
+
+    // create the tasks
+    std::shared_ptr<Task> newTask1 = std::make_shared<ProcessBankCompressed>(
+        m_loader, entry_name, prog, event_id_shrd, event_time_of_flight_shrd, startAt, event_index_shrd,
+        thisBankPulseTimes, m_min_id, mid_id, histogram_bin_edges, m_loader.alg->compressTolerance);
+    scheduler.push(newTask1);
+    if (m_loader.splitProcessing && (mid_id < m_max_id)) {
+      std::shared_ptr<Task> newTask2 = std::make_shared<ProcessBankCompressed>(
+          m_loader, entry_name, prog, event_id_shrd, event_time_of_flight_shrd, startAt, event_index_shrd,
+          thisBankPulseTimes, (mid_id + 1), m_max_id, histogram_bin_edges, m_loader.alg->compressTolerance);
+      scheduler.push(newTask2);
+    }
+  } else {
+    // create all events using traditional method
+    std::shared_ptr<Task> newTask1 = std::make_shared<ProcessBankData>(
         m_loader, entry_name, prog, event_id_shrd, event_time_of_flight_shrd, numEvents, startAt, event_index_shrd,
-        thisBankPulseTimes, m_have_weight, event_weight_shrd, (mid_id + 1), m_max_id);
-    scheduler.push(newTask2);
+        thisBankPulseTimes, m_have_weight, event_weight_shrd, m_min_id, mid_id);
+    scheduler.push(newTask1);
+    if (m_loader.splitProcessing && (mid_id < m_max_id)) {
+      std::shared_ptr<Task> newTask2 = std::make_shared<ProcessBankData>(
+          m_loader, entry_name, prog, event_id_shrd, event_time_of_flight_shrd, numEvents, startAt, event_index_shrd,
+          thisBankPulseTimes, m_have_weight, event_weight_shrd, (mid_id + 1), m_max_id);
+      scheduler.push(newTask2);
+    }
   }
+
+#ifndef _WIN32
+  if (m_loader.alg->getLogger().isDebug())
+    m_loader.alg->getLogger().debug() << "Time to LoadBankFromDisk " << entry_name << " " << timer << "\n";
+#endif
 }
 
 /**
@@ -454,7 +550,7 @@ void LoadBankFromDiskTask::run() {
  * If the value is negative (can happen at ISIS) add 2^32 to it.
  * @param size :: The size of events value.
  */
-int64_t LoadBankFromDiskTask::recalculateDataSize(const int64_t &size) {
+int64_t LoadBankFromDiskTask::recalculateDataSize(const int64_t size) {
   if (size < 0) {
     const int64_t shift = int64_t(1) << 32;
     return shift + size;

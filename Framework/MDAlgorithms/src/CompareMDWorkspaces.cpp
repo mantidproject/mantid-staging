@@ -11,7 +11,6 @@
 #include "MantidDataObjects/MDHistoWorkspace.h"
 #include "MantidGeometry/MDGeometry/IMDDimension.h"
 #include "MantidKernel/Strings.h"
-#include "MantidKernel/System.h"
 #include <sstream>
 #include <utility>
 
@@ -459,7 +458,7 @@ void CompareMDWorkspaces::compare2Boxes(API::IMDNode *box1, API::IMDNode *box2, 
       mdbox1->releaseEvents();
       mdbox2->releaseEvents();
     } // if check events
-  }   // if-else for MDGridBox or MDBox
+  } // if-else for MDGridBox or MDBox
 }
 
 //----------------------------------------------------------------------------------------------

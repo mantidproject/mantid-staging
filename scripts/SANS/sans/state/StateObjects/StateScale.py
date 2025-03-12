@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Defines the state of the geometry and unit scaling."""
+"""Defines the state of the geometry and unit scaling."""
 
 import copy
 
@@ -81,5 +81,5 @@ def get_scale_builder(data_info, file_information=None):
         return StateScaleBuilder(file_information)
     else:
         raise NotImplementedError(
-            "StateScaleBuilder: Could not find any valid scale builder for the " "specified StateData object {0}".format(str(data_info))
+            "StateScaleBuilder: Could not find any valid scale builder for the specified StateData object {0}".format(str(data_info))
         )

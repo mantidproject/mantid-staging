@@ -34,7 +34,6 @@
 #include "MantidKernel/EnabledWhenProperty.h"
 #include "MantidKernel/ListValidator.h"
 #include "MantidKernel/SetValueWhenProperty.h"
-#include "MantidKernel/System.h"
 #include "MantidKernel/Utils.h"
 #include "MantidKernel/VisibleWhenProperty.h"
 #include "MantidMDAlgorithms/GSLFunctions.h"
@@ -1142,8 +1141,7 @@ void IntegratePeaksMD2::calcCovar(const std::vector<std::pair<V3D, double>> &pea
   eigenvals = evals.Diagonal();
   // set min eigenval to be small but non-zero (1e-6)
   // when no discernible peak above background
-  std::replace_if(
-      eigenvals.begin(), eigenvals.end(), [&](auto x) { return x < 1e-6; }, 1e-6);
+  std::replace_if(eigenvals.begin(), eigenvals.end(), [&](auto x) { return x < 1e-6; }, 1e-6);
 
   // populate V3D vector of eigenvects (needed for ellipsoid shape)
   eigenvects = std::vector<V3D>(nd);

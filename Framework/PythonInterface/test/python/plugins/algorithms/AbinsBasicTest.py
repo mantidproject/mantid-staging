@@ -5,11 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
-import numpy as np
 from numpy.testing import assert_array_almost_equal
 
-from mantid import logger
-from mantid.simpleapi import mtd, Abins, Scale, CompareWorkspaces, Load, DeleteWorkspace
+from mantid.simpleapi import mtd, Abins, Scale, CompareWorkspaces, Load
 import abins
 from abins.constants import ATOM_PREFIX, FUNDAMENTALS
 
@@ -80,7 +78,7 @@ class AbinsBasicTest(unittest.TestCase):
         )
 
         # no name for workspace
-        self.assertRaises(RuntimeError, Abins, VibrationalOrPhononFile=self._si2 + ".phonon", TemperatureInKelvin=self._temperature)
+        self.assertRaises(TypeError, Abins, VibrationalOrPhononFile=self._si2 + ".phonon", TemperatureInKelvin=self._temperature)
 
         # keyword total in the name of the workspace
         self.assertRaisesRegex(
@@ -185,7 +183,7 @@ class AbinsBasicTest(unittest.TestCase):
         )
 
     def test_atom_index_invalid(self):
-        """If the atoms field includes an unmatched entry (i.e. containing the prefix but not matching the '\d+' regex,
+        r"""If the atoms field includes an unmatched entry (i.e. containing the prefix but not matching the '\d+' regex,
         Abins should terminate with a useful error message.
         """
         self.assertRaisesRegex(

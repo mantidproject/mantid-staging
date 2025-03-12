@@ -23,18 +23,16 @@
 #include "MantidKernel/Exception.h"
 #include "MantidKernel/NexusHDF5Descriptor.h"
 #include "MantidKernel/OptionalBool.h"
+
 #include "MantidKernel/TimeSeriesProperty.h"
 
+#include "MantidNexusCpp/NeXusException.hpp"
+#include "MantidNexusCpp/NeXusFile.hpp"
+
 #include <Poco/Path.h>
+#include <algorithm>
 #include <boost/lexical_cast.hpp>
 #include <boost/scoped_array.hpp>
-
-// clang-format off
-#include <nexus/NeXusFile.hpp>
-#include <nexus/NeXusException.hpp>
-// clang-format on
-
-#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -107,9 +105,9 @@ public:
                    int &nPeriods, std::unique_ptr<const Kernel::TimeSeriesProperty<int>> &periodLog,
                    const std::vector<std::string> &allow_list, const std::vector<std::string> &block_list);
 
-  static void checkForCorruptedPeriods(std::unique_ptr<Kernel::TimeSeriesProperty<int>> tempPeriodLog,
-                                       std::unique_ptr<const Kernel::TimeSeriesProperty<int>> &periodLog,
-                                       const int &nPeriods, const std::string &nexusfilename);
+  static int checkForCorruptedPeriods(std::unique_ptr<Kernel::TimeSeriesProperty<int>> tempPeriodLog,
+                                      std::unique_ptr<const Kernel::TimeSeriesProperty<int>> &periodLog,
+                                      const int &nPeriods, const std::string &nexusfilename, std::string &status);
 
   template <typename T>
   static void loadEntryMetadata(const std::string &nexusfilename, T WS, const std::string &entry_name,
@@ -147,6 +145,8 @@ public:
   double filter_tof_min;
   /// Filter by a maximum time-of-flight
   double filter_tof_max;
+  /// Tof range is being filtered
+  bool filter_tof_range;
 
   /// Minimum spectrum to load
   int32_t m_specMin;
@@ -157,6 +157,11 @@ public:
   Mantid::Types::Core::DateAndTime filter_time_start;
   /// Filter by stop time
   Mantid::Types::Core::DateAndTime filter_time_stop;
+  /// if wall-clock filtering was requested
+  bool m_is_time_filtered{false};
+
+  bool filter_bad_pulses{false};
+  std::shared_ptr<Mantid::Kernel::TimeROI> bad_pulses_timeroi;
 
   /// Mutex protecting tof limits
   std::mutex m_tofMutex;
@@ -174,6 +179,7 @@ public:
 
   /// Tolerance for CompressEvents; use -1 to mean don't compress.
   double compressTolerance;
+  bool compressEvents;
 
   /// Pulse times for ALL banks, taken from proton_charge log.
   std::shared_ptr<BankPulseTimes> m_allBanksPulseTimes;
@@ -191,6 +197,8 @@ private:
 
   /// Execution code
   void execLoader() override;
+
+  std::map<std::string, std::string> validateInputs() override;
 
   LoadEventNexus::LoaderType defineLoaderType(const bool haveWeights, const bool oldNeXusFileNames,
                                               const std::string &classType) const;
@@ -379,9 +387,9 @@ void adjustTimeOfFlightISISLegacy(::NeXus::File &file, T localWorkspace, const s
   if (classType == "NXmonitor") {
     std::vector<std::string> bankNames;
     for (string_map_t::const_iterator it = entries.begin(); it != entries.end(); ++it) {
-      std::string entryName(it->first);
-      std::string entry_class(it->second);
+      const std::string entry_class(it->second);
       if (entry_class == classType) {
+        const std::string entryName(it->first);
         bankNames.emplace_back(entryName);
       }
     }
@@ -663,21 +671,21 @@ void LoadEventNexus::loadEntryMetadata(const std::string &nexusfilename, T WS, c
       if (descriptor.isEntry("/" + entry_name + "/sample/name", "SDS")) {
         file.openData("name");
         const auto info = file.getInfo();
-        std::string name;
+        std::string sampleName;
         if (info.type == ::NeXus::CHAR) {
           if (info.dims.size() == 1) {
-            name = file.getStrData();
+            sampleName = file.getStrData();
           } else { // something special for 2-d array
             const int64_t total_length = std::accumulate(info.dims.begin(), info.dims.end(), static_cast<int64_t>(1),
                                                          std::multiplies<int64_t>());
             boost::scoped_array<char> val_array(new char[total_length]);
             file.getData(val_array.get());
-            name = std::string(val_array.get(), total_length);
+            sampleName = std::string(val_array.get(), total_length);
           }
         }
         file.closeData();
-        if (!name.empty()) {
-          WS->mutableSample().setName(name);
+        if (!sampleName.empty()) {
+          WS->mutableSample().setName(sampleName);
         }
       }
     } catch (::NeXus::Exception &) {
@@ -693,17 +701,15 @@ void LoadEventNexus::loadEntryMetadata(const std::string &nexusfilename, T WS, c
     file.getDataCoerce(duration);
     if (duration.size() == 1) {
       // get the units
-      // clang-format off
-    std::vector< ::NeXus::AttrInfo> infos = file.getAttrInfos();
-    std::string units;
-    for (std::vector< ::NeXus::AttrInfo>::const_iterator it = infos.begin();
-         it != infos.end(); ++it) {
-      if (it->name == "units") {
-        units = file.getStrAttr(*it);
-        break;
+      std::vector<::NeXus::AttrInfo> infos = file.getAttrInfos();
+      std::string units;
+      for (auto it = infos.begin(); it != infos.end(); ++it) {
+        // cppcheck-suppress useStlAlgorithm
+        if (it->name == "units") {
+          units = file.getStrAttr(*it);
+          break;
+        }
       }
-    }
-      // clang-format on
 
       // set the property
       WS->mutableRun().addProperty("duration", duration[0], units, true);

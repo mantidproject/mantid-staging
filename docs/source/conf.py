@@ -12,24 +12,11 @@ import sys
 # dangling references in the notification centre that cause a segfault
 import qtpy.QtCore  # noqa: F401
 
-from distutils.version import LooseVersion
 import os
 
 import mantid
 from mantid.kernel import ConfigService
-from sphinx import __version__ as sphinx_version
 import sphinx_bootstrap_theme
-
-# Workaround a segfault importing readline with doctests and PyQt5.
-# doctest.py initializes a custom pdb to be able to redirect stdout:
-#   https://github.com/python/cpython/blob/750c5abf43b7b1627ab59ead237bef4c2314d29e/Lib/doctest.py#L367
-# and in turn this attempts to import readline:
-#   https://github.com/python/cpython/blob/750c5abf43b7b1627ab59ead237bef4c2314d29e/Lib/pdb.py#L157
-# The workaround is discussed in https://groups.google.com/forum/#!topic/leo-editor/ghiIN7irzY0
-# and simply amounts to importing readline before a QApplication is created in the screenshots
-# directive
-if sys.platform.startswith("linux") or sys.platform == "darwin":
-    import readline  # noqa: F401
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -38,14 +25,10 @@ sys.path.insert(0, os.path.abspath(os.path.join("..", "sphinxext")))
 
 # -- General configuration ------------------------------------------------
 
-if LooseVersion(sphinx_version) > LooseVersion("1.6"):
 
-    def setup(app):
-        """Called automatically by Sphinx when starting the build process"""
-        if hasattr(app, "add_css_file"):  # >=v1.8
-            app.add_css_file("custom.css")
-        else:
-            app.add_stylesheet("custom.css")  # v1.6-1.8
+def setup(app):
+    """Called automatically by Sphinx when starting the build process"""
+    app.add_css_file("custom.css")
 
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -72,12 +55,8 @@ extensions = [
     "mantiddoc.doctest",
 ]
 # Deal with math extension. Can be overridden with MATH_EXT environment variable
-# If set to imgmath we deal with the fact that < 1.8 is was called pngmath
 mathext = os.environ.get("MATH_EXT", "sphinx.ext.imgmath")
-if mathext.endswith("imgmath") and LooseVersion(sphinx_version) <= LooseVersion("1.8"):
-    extensions.append("sphinx.ext.pngmath")
-else:
-    extensions.append(mathext)
+extensions.append(mathext)
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -85,22 +64,17 @@ templates_path = ["_templates"]
 # The suffix of source filenames.
 source_suffix = ".rst"
 
-# The master toctree document.
-master_doc = "index"
+# The root toctree document.
+root_doc = "index"
 
 # General information about the project.
 project = "MantidProject"
 copyright = "2015, Mantid"
 
-# The version info for the project you're documenting, acts as replacement for
-# |version| and |release|, also used in various other places throughout the
-# built documents.
-#
-version_str = mantid.__version__
-# The short X.Y version.
-version = ".".join(version_str.split(".")[:2])
 # The full version, including alpha/beta/rc tags.
-release = version_str
+release = mantid.__version__
+# The short X.Y version.
+version = ".".join(release.split(".")[:2])
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -134,18 +108,7 @@ try:
     del unicode_literals
 except NameError:
     pass
-
-# Use legacy numpy printing. This fix is made to keep doctests functional.
-# TODO: remove this workaround once minimal required numpy is set to 1.14.0
-import numpy as np
-
-try:
-    np.set_printoptions(legacy='1.13')
-except TypeError:
-    pass
-""".format(
-    mantid_config_reset
-)
+""".format(mantid_config_reset)
 
 # Run this after each test group has executed
 doctest_global_cleanup = """
@@ -198,10 +161,7 @@ html_static_path = ["_static"]
 
 # If true, Smart Quotes will be used to convert quotes and dashes to
 # typographically correct entities.
-if sphinx_version < "1.7":
-    html_use_smartypants = True
-else:
-    smartquotes = True
+smartquotes = True
 
 # Hide the Sphinx usage as we reference it on github instead.
 html_show_sphinx = False
@@ -211,6 +171,9 @@ html_show_copyright = False
 
 # Do not show last updated information in the HTML footer.
 html_last_updated_fmt = None
+
+# Hide the navigation sidebar, we use a table of contents instead.
+html_sidebars = {"**": []}
 
 # -- Options for Epub output ---------------------------------------------------
 # This flag determines if a toc entry is inserted again at the beginning of its nested toc listing.
@@ -243,7 +206,8 @@ epub_uid = "Mantid Reference: " + version
 
 # -- Options for selected builder output ---------------------------------------
 # Default is to use standard HTML theme unless the qthelp tag is specified
-html_theme_cfg = "conf-qthelp.py" if "qthelp" in [k.strip() for k in tags.tags] else "conf-html.py"
+# 'tags' is a special object available in config files, which exposes the project tags
+html_theme_cfg = "conf-qthelp.py" if "qthelp" in [k.strip() for k in tags] else "conf-html.py"  # noqa: F821
 # Python 3 removed execfile...
 exec(compile(open(html_theme_cfg).read(), html_theme_cfg, "exec"))
 
@@ -263,4 +227,11 @@ intersphinx_mapping = {
 # Suppress build warnings of the type:
 # "WARNING: document isn't included in any toctree"
 # for individual release notes files.
-exclude_patterns = ["release/templates/*.rst", "release/**/Bugfixes/*.rst", "release/**/New_features/*.rst", "release/**/Used/*.rst"]
+exclude_patterns = [
+    "release/templates/*.rst",
+    "release/**/Bugfixes/*.rst",
+    "release/**/New_features/*.rst",
+    "release/**/Used/*.rst",
+    "release/**/Removed/*.rst",
+    "release/**/Deprecated/*.rst",
+]

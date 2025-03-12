@@ -4,10 +4,34 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.simpleapi import *
-from mantid.api import *
-from mantid.kernel import *
-from mantid import config
+from mantid.api import (
+    mtd,
+    AlgorithmFactory,
+    AnalysisDataService,
+    DataProcessorAlgorithm,
+    FileAction,
+    FileProperty,
+    Progress,
+    WorkspaceGroup,
+    WorkspaceGroupProperty,
+)
+from mantid.kernel import config, logger, Direction, IntArrayProperty, StringArrayProperty, StringListValidator
+from mantid.simpleapi import ConvertUnits, DeleteWorkspace, GroupWorkspaces
+
+from IndirectReductionCommon import (
+    load_files,
+    get_multi_frame_rebin,
+    identify_bad_detectors,
+    unwrap_monitor,
+    process_monitor_efficiency,
+    scale_monitor,
+    scale_detectors,
+    rebin_reduction,
+    group_spectra,
+    fold_chopped,
+    rename_reduction,
+    mask_detectors,
+)
 
 import os
 import warnings
@@ -83,23 +107,7 @@ class VesuvioDiffractionReduction(DataProcessorAlgorithm):
         return issues
 
     def PyExec(self):
-
         warnings.warn("This algorithm is depreciated (April-2017). Please use ISISIndirectDiffractionReduction")
-
-        from IndirectReductionCommon import (
-            load_files,
-            get_multi_frame_rebin,
-            identify_bad_detectors,
-            unwrap_monitor,
-            process_monitor_efficiency,
-            scale_monitor,
-            scale_detectors,
-            rebin_reduction,
-            group_spectra,
-            fold_chopped,
-            rename_reduction,
-        )
-
         self._setup()
 
         load_opts = dict()
@@ -156,11 +164,16 @@ class VesuvioDiffractionReduction(DataProcessorAlgorithm):
                 # Convert to dSpacing
                 ConvertUnits(InputWorkspace=ws_name, OutputWorkspace=ws_name, Target="dSpacing", EMode="Elastic")
 
+                # Mask noisy detectors
+                if len(masked_detectors) > 0:
+                    mask_detectors(ws_name, masked_detectors)
+
                 # Handle rebinning
                 rebin_reduction(ws_name, self._rebin_string, rebin_string_2, num_bins)
 
                 # Group spectra
-                group_spectra(ws_name, masked_detectors, self._grouping_method)
+                grouped = group_spectra(ws_name, self._grouping_method)
+                AnalysisDataService.addOrReplace(ws_name, grouped)
 
             if is_multi_frame:
                 fold_chopped(c_ws_name)

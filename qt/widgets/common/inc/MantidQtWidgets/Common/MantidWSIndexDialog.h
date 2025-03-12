@@ -53,7 +53,7 @@ class IntervalList;
    to be typed, and what inputs allow the "OK" button to be pressed.
 
         TODO - perhaps the interval objects are useful elsewhere, in which
-   case those three classes are best in thier own header and source.
+   case those three classes are best in their own header and source.
 
         This dialog also enables one to choose how to do the plotting.
    One can choose between simple 1D plot, waterfall or tiled plot.
@@ -210,7 +210,7 @@ class EXPORT_OPT_MANTIDQT_COMMON MantidWSIndexWidget : public QWidget {
     /// label.
     explicit QLineEditWithErrorMark(QWidget *parent = nullptr);
     /// virtual destructor to allow Qt to deallocate all objects
-    ~QLineEditWithErrorMark() override{};
+    ~QLineEditWithErrorMark() override {};
     /// provide acess to the QLineEdit
     QLineEdit *lineEdit() { return _lineEdit; };
     /// if Error is not empty, it will make the * label visible and set the

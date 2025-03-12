@@ -81,17 +81,17 @@ public:
 
   void testParseTitleMatcherEmpty() {
     auto result = parseTitleMatcher("      \t  ");
-    TS_ASSERT(!result.is_initialized());
+    TS_ASSERT(!result.has_value());
   }
 
   void testParseTitleMatcher() {
     auto result = parseTitleMatcher(".*");
-    TS_ASSERT(result.is_initialized());
+    TS_ASSERT(result.has_value());
   }
 
   void testParseTitleMatcherHandlesInvalidRegex() {
     auto result = parseTitleMatcher("[");
-    TS_ASSERT(!result.is_initialized());
+    TS_ASSERT(!result.has_value());
   }
 
   void testParseOptions() {
@@ -171,6 +171,12 @@ public:
     auto result = parseQRange("0.05", "0.16", "0.02");
     TS_ASSERT_EQUALS(result.which(), asInt(Result::Value));
     TS_ASSERT_EQUALS(boost::get<RangeInQ>(result), RangeInQ(0.05, 0.02, 0.16));
+  }
+
+  void testParseQRangeNegativeQStep() {
+    auto result = parseQRange("0.05", "0.16", "-1");
+    TS_ASSERT_EQUALS(result.which(), asInt(Result::Value));
+    TS_ASSERT_EQUALS(boost::get<RangeInQ>(result), RangeInQ(0.05, -1, 0.16));
   }
 
   void testParseQRangeInvalidQMin() {
@@ -279,6 +285,34 @@ public:
     TransmissionRunPair expected = {"13463", "some workspace"};
     TS_ASSERT_EQUALS(result.which(), asInt(Result::Value));
     TS_ASSERT_EQUALS(boost::get<TransmissionRunPair>(result), expected);
+  }
+
+  void testParseTitleAndThetaFromRunTitle() {
+    auto runTitle = "ASF SM=0.75 th=0.8 ['SM2']=0.75";
+    auto result = parseTitleAndThetaFromRunTitle(runTitle);
+    std::vector<std::string> expected = {"ASF SM=0.75 ", "0.8"};
+    TS_ASSERT(result.is_initialized());
+    TS_ASSERT_EQUALS(result.get(), expected);
+  }
+
+  void testParseTitleAndThetaFromRunTitleReturnsNoneForEmptyString() {
+    auto runTitle = "";
+    auto result = parseTitleAndThetaFromRunTitle(runTitle);
+    TS_ASSERT(!result.is_initialized());
+  }
+
+  void testParseTitleAndThetaFromRunTitleWithThetaOnly() {
+    auto runTitle = "th=0.8";
+    auto result = parseTitleAndThetaFromRunTitle(runTitle);
+    std::vector<std::string> expected = {"", "0.8"};
+    TS_ASSERT(result.is_initialized());
+    TS_ASSERT_EQUALS(result.get(), expected);
+  }
+
+  void testParseTitleAndThetaFromRunTitleReturnsNoneForNoTheta() {
+    auto runTitle = "ASF SM=0.75";
+    auto result = parseTitleAndThetaFromRunTitle(runTitle);
+    TS_ASSERT(!result.is_initialized());
   }
 
 private:

@@ -49,8 +49,29 @@ import ReduceDictionary
 sys.path.append("/opt/mantidnightly/bin")
 # sys.path.append("/opt/Mantid/bin")
 
-from mantid.simpleapi import *
-from mantid.api import *
+from mantid.simpleapi import (
+    ConvertToMD,
+    FindPeaksMD,
+    FindUBUsingFFT,
+    FindUBUsingLatticeParameters,
+    IndexPeaks,
+    IntegrateEllipsoids,
+    IntegratePeaksMD,
+    Integration,
+    LoadEventNexus,
+    LoadIsawDetCal,
+    SaveIsawPeaks,
+    SelectCellOfType,
+    LoadIsawUB,
+    LoadNexusMonitors,
+    PeakIntegration,
+    PredictPeaks,
+    SaveNexus,
+    SaveIsawUB,
+    Rebin,
+)
+from mantid.api import AnalysisDataService
+from mantid import apiVersion, FileFinder
 
 print("API Version")
 print(apiVersion())
@@ -346,9 +367,6 @@ elif use_cylindrical_integration:
         IntegrateIfOnEdge=integrate_if_edge_peak,
         Cylinder=use_cylindrical_integration,
         CylinderLength=cylinder_length,
-        PercentBackground=cylinder_percent_bkg,
-        IntegrationOption=cylinder_int_option,
-        ProfileFunction=cylinder_profile_fit,
     )
 
 elif use_fit_peaks_integration:

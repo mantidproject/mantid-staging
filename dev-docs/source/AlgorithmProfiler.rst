@@ -1,30 +1,36 @@
+.. _AlgorithmProfiler:
+
 ==============================
 Work flows algorithm profiling
 ==============================
 
 .. contents:: Contents
-    :local:
+   :local:
+
+.. figure:: images/MantidProfiler.png
+   :alt: Example output after rendering
 
 Summary
 ^^^^^^^
 
-Due to the need of investigation of algorithms performance issues, the proper method
-is introduced. It consists two to parts: special mantid build and analytical tool.
-Available for Linux only.
+Due to the need of investigation of algorithms performance issues, the proper method is introduced.
+It consists two to parts: special mantid build and analytical tool.
+
+.. note::
+   Available for Linux only.
+
 
 Mantid build
 ^^^^^^^^^^^^
 
-To build mantid version with profiling functionality enabled run ``cmake`` with the additional option
-``-DPROFILE_ALGORITHM_LINUX=ON``. Built in such a way mantid creates a dump file ``algotimeregister.out``
-in the running directory. This file contains the time stamps for start and finish of executed algorithms with
-~nanosecond precision in a very simple text format.
+On linux the profiler is built by default but to enable profiling, the :ref:`properties <mantid:Algorithm_Profiling>` must be set.
+Enabling the profiler will create a file that contains the time stamps for start and finish of executed algorithms with ~nanosecond precision in a very simple text format.
 
 Adding more detailed information
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 More detailed information can be added to individual function calls in C++ with the help of ``std::chrono``.
-At the top of the fuction create a "start time"
+At the top of the function create a "start time"
 
 .. code-block:: c++
 
@@ -44,13 +50,21 @@ An example of this can be found in `FilterEvents.cpp <https://github.com/mantidp
 Analysing tool
 ^^^^^^^^^^^^^^
 
-The `mantid-profiler project <https://github.com/mantidproject/mantid-profiler>`_ provides the nice graphical
-tool to interpret the information contained in the dumped file.
+The `mantid-profiler project <https://github.com/mantidproject/mantid-profiler>`_ provides the nice graphical tool to interpret the information contained in the dumped file.
 The project has more detiled instructions, but in general
 
 .. code-block:: sh
 
-   python path/to/myscript.py & python path/to/mantid-profiler/mantid-profiler.py $!
+   python path/to/myscript.py & mantidprofiler $!
 
 The ``&`` puts the python process in the background.
 The ``$!`` is the process-id (PID) of the last process run and allows mantid-profiler to attach to the process.
+
+Related Documentation
+^^^^^^^^^^^^^^^^^^^^^
+
+- `mantid.api.AlgoTimeRegister <https://docs.mantidproject.org/api/python/mantid/api/AlgoTimeRegister.html>`_ discusses how timing is measured.
+
+- `The mantid-profiler README <https://github.com/mantidproject/mantid-profiler>`_ provides an overview of how to tool is used.
+
+- `Relevant properties file configurations <https://docs.mantidproject.org/concepts/PropertiesFile.html#algorithm-profiling-settings>`_.

@@ -9,6 +9,7 @@
 //----------------------------------------------------------------------
 #include "MantidAPI/NumericAxis.h"
 #include "MantidKernel/Exception.h"
+#include "MantidKernel/FloatingPointComparison.h"
 #include "MantidKernel/VectorHelper.h"
 
 #include <boost/format.hpp>
@@ -21,13 +22,18 @@ Mantid::Kernel::Logger g_log("NumericAxis");
 
 class EqualWithinTolerance {
 public:
-  explicit EqualWithinTolerance(double tolerance) : m_tolerance(tolerance){};
+  explicit EqualWithinTolerance(double tolerance) : m_tolerance(tolerance) {};
+  /**
+   * This handles NaNs and infs differently than the FloatingPointComparison operations.
+   * If this is not necessary, then this entire class may be replaced with
+   * Mantid::Kernel::withinAbsoluteDifference
+   */
   bool operator()(double a, double b) {
     if (std::isnan(a) && std::isnan(b))
       return true;
     if (std::isinf(a) && std::isinf(b))
       return true;
-    return std::abs(a - b) <= m_tolerance;
+    return Mantid::Kernel::withinAbsoluteDifference(a, b, m_tolerance);
   }
 
 private:
@@ -107,6 +113,12 @@ void NumericAxis::setValue(const std::size_t &index, const double &value) {
   m_values[index] = value;
 }
 
+/** Check if two NumericAxis are equivalent
+ *  @param axis2 :: Reference to the axis to compare to
+ *  @return true if self and second axis are equal
+ */
+bool NumericAxis::operator==(const NumericAxis &axis2) const { return equalWithinTolerance(axis2, 1e-15); }
+
 /** Check if two axis defined as spectra or numeric axis are equivalent
  *  @param axis2 :: Reference to the axis to compare to
  *  @return true if self and second axis are equal
@@ -151,7 +163,7 @@ std::string NumericAxis::formatLabel(const double value) const {
     if (*it == '0') {
       it = numberLabel.erase(it);
     } else if (*it == '.') {
-      it = numberLabel.erase(it);
+      numberLabel.erase(it);
       break;
     } else {
       break;

@@ -10,7 +10,7 @@ import unittest
 
 import matplotlib
 
-matplotlib.use("AGG")  # noqa
+matplotlib.use("AGG")
 from matplotlib.pyplot import figure
 import numpy as np
 
@@ -158,11 +158,11 @@ class DataFunctionsTest(unittest.TestCase):
             OutputWorkspace="ws2d_high_counting_detector",
         )
         wp = CreateWorkspace(DataX=[15, 25, 35, 45], DataY=[1, 2, 3, 4], NSpec=1)
-        ConjoinWorkspaces(cls.ws2d_point_uneven, wp, CheckOverlapping=False)
+        ConjoinWorkspaces(cls.ws2d_point_uneven, wp, CheckOverlapping=False, CheckMatchingBins=False)
         cls.ws2d_point_uneven = mantid.mtd["ws2d_point_uneven"]
         cls.ws2d_histo_uneven = CreateWorkspace(DataX=[10, 20, 30, 40], DataY=[1, 2, 3], NSpec=1, OutputWorkspace="ws2d_histo_uneven")
         wp = CreateWorkspace(DataX=[15, 25, 35, 45, 55], DataY=[1, 2, 3, 4], NSpec=1)
-        ConjoinWorkspaces(cls.ws2d_histo_uneven, wp, CheckOverlapping=False)
+        ConjoinWorkspaces(cls.ws2d_histo_uneven, wp, CheckOverlapping=False, CheckMatchingBins=False)
         cls.ws2d_histo_uneven = mantid.mtd["ws2d_histo_uneven"]
         newYAxis = mantid.api.NumericAxis.create(3)
         newYAxis.setValue(0, 10)
@@ -838,14 +838,14 @@ class DataFunctionsTest(unittest.TestCase):
         ax = fig.add_subplot(111)
         masked_errors = np.ma.masked_invalid([np.nan, 0.1])
         container = ax.errorbar([0, 1], [0, 1], xerr=masked_errors, yerr=masked_errors)
-        bounds = mantid.plots.datafunctions.get_errorbar_bounds(container)
+        mantid.plots.datafunctions.get_errorbar_bounds(container)
 
     def test_errorbar_bounds_if_all_errors_nan(self):
         fig = figure()
         ax = fig.add_subplot(111)
         masked_errors = np.ma.masked_invalid([np.nan, np.nan])
         container = ax.errorbar([0, 1], [0, 1], xerr=masked_errors, yerr=masked_errors)
-        bounds = mantid.plots.datafunctions.get_errorbar_bounds(container)
+        mantid.plots.datafunctions.get_errorbar_bounds(container)
 
 
 if __name__ == "__main__":

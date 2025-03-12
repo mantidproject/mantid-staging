@@ -6,15 +6,21 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 """
-    Main window for reduction UIs
+Main window for reduction UIs
 """
+
 import sys
 import os
 import traceback
+
 from mantidqt.gui_helper import get_qapplication
+from mantidqt.utils.qt import load_ui
+from mantidqtinterfaces.reduction_gui.instruments.instrument_factory import instrument_factory, INSTRUMENT_DICT
+from mantidqtinterfaces.reduction_gui.settings.application_settings import GeneralSettings
+
 from qtpy.QtWidgets import QAction, QDialog, QFileDialog, QMainWindow, QMessageBox
-from qtpy.QtCore import QFile, QFileInfo, QSettings
-from mantid.kernel import Logger
+from qtpy.QtCore import QCoreApplication, QFile, QFileInfo, QSettings
+
 
 # Check whether Mantid is available
 CAN_REDUCE = False
@@ -23,11 +29,6 @@ try:
     from mantid.kernel import ConfigService
 except ImportError:
     pass
-try:
-    from mantidqt.utils.qt import load_ui
-except ImportError:
-    Logger("ReductionGUI").information("Using legacy ui importer")
-    from mantidplot import load_ui
 
 unicode = str
 
@@ -48,9 +49,6 @@ if CAN_REDUCE:
         STARTUP_WARNING = "Please contact the Mantid team with the following message:\n\n\n"
         STARTUP_WARNING += unicode(traceback.format_exc())
 
-from mantidqtinterfaces.reduction_gui.instruments.instrument_factory import instrument_factory, INSTRUMENT_DICT
-from mantidqtinterfaces.reduction_gui.settings.application_settings import GeneralSettings
-
 
 class ReductionGUI(QMainWindow):
     def __init__(self, parent=None, window_flags=None, instrument=None, instrument_list=None):
@@ -65,7 +63,7 @@ class ReductionGUI(QMainWindow):
             QMessageBox.warning(self, "WARNING", message)
 
         # Application settings
-        settings = QSettings()
+        settings = QSettings(QCoreApplication.organizationName(), QCoreApplication.applicationName())
 
         # Name handle for the instrument
         if instrument is None:

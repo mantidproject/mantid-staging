@@ -592,6 +592,20 @@ public:
     getLine(text, line);
     TSM_ASSERT_EQUALS("Strings::getLine didn't return empty string after eof.", line, "");
   }
+
+  void test_randomString() {
+    for (size_t length = 0; length < 5; ++length) {
+      const auto text = randomString(length);
+      TS_ASSERT_EQUALS(text.length(), length);
+    }
+  }
+
+  void test_endsWith_when_the_suffix_is_smaller_than_the_str() {
+    TS_ASSERT(endsWith("ATestString", "String"));
+    TS_ASSERT(!endsWith("AStringTest", "String"));
+  }
+
+  void test_endsWith_when_the_suffix_is_too_large() { TS_ASSERT(!endsWith("SmallText", "AVeryLongSuffix")); }
 };
 
 class StringsTestPerformance : public CxxTest::TestSuite {

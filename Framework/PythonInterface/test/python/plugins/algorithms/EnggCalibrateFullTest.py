@@ -5,12 +5,10 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
-from mantid.simpleapi import *
-from mantid.api import *
+from mantid.simpleapi import EnggCalibrateFull, LoadNexus
 
 
 class EnggCalibrateFullTest(unittest.TestCase):
-
     _data_ws = None
 
     # Note not using @classmethod setUpClass / tearDownClass because that's not supported in the old
@@ -28,19 +26,19 @@ class EnggCalibrateFullTest(unittest.TestCase):
         """
 
         # No Filename property (required)
-        self.assertRaises(RuntimeError, EnggCalibrateFull, Input="foo", Bank="1")
+        self.assertRaises(TypeError, EnggCalibrateFull, Input="foo", Bank="1")
 
         # Wrong workspace name
         self.assertRaises(ValueError, EnggCalibrateFull, Workspace="this_ws_is_not_there.not", Bank="2")
 
         # mispelled ExpectedPeaks
-        self.assertRaises(RuntimeError, EnggCalibrateFull, Workspace=self.__class__._data_ws, Bank="2", Peaks="2")
+        self.assertRaises(TypeError, EnggCalibrateFull, Workspace=self.__class__._data_ws, Bank="2", Peaks="2")
 
         # mispelled OutDetPosFilename
-        self.assertRaises(RuntimeError, EnggCalibrateFull, OutDetPosFile="any.csv", Workspace=self.__class__._data_ws, Bank="2", Peaks="2")
+        self.assertRaises(TypeError, EnggCalibrateFull, OutDetPosFile="any.csv", Workspace=self.__class__._data_ws, Bank="2", Peaks="2")
 
         # all fine, except missing OutDetPosTable (output)
-        self.assertRaises(RuntimeError, EnggCalibrateFull, Workspace=self.__class__._data_ws, Bank="2")
+        self.assertRaises(TypeError, EnggCalibrateFull, Workspace=self.__class__._data_ws, Bank="2")
 
         # all fine, except Bank should be a string
         self.assertRaises(TypeError, EnggCalibrateFull, Workspace=self.__class__._data_ws, OutDetPosTable="det_pos_tbl", Bank=2)
@@ -58,7 +56,7 @@ class EnggCalibrateFullTest(unittest.TestCase):
         # This should produce fitting 'given peak center ... is outside of data range'
         # warnings and finally raise after a 'some peaks not found' error
         self.assertRaises(
-            RuntimeError,
+            TypeError,
             EnggCalibrateFull,
             Workspace=self.__class__._data_ws,
             ExpectedPeaks=[0.01],
@@ -76,7 +74,7 @@ class EnggCalibrateFullTest(unittest.TestCase):
         # a correct fit is included in system tests
         tbl_name = "det_peaks_tbl"
         self.assertRaises(
-            RuntimeError,
+            TypeError,
             EnggCalibrateFull,
             Workspace=self.__class__._data_ws,
             Bank="2",

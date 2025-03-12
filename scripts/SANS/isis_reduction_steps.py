@@ -7,21 +7,53 @@
 # pylint: disable=too-many-lines, too-many-branches, invalid-name, super-on-old-class, protected-access,
 # pylint: disable=too-few-public-methods,too-few-public-methods, too-many-arguments, too-many-instance-attributes
 """
-    This file defines what happens in each step in the data reduction, it's
-    the guts of the reduction. See ISISReducer for order the steps are run
-    in and the names they are given to identify them
+This file defines what happens in each step in the data reduction, it's
+the guts of the reduction. See ISISReducer for order the steps are run
+in and the names they are given to identify them
 
-    Most of this code is a copy-paste from SANSReduction.py, organized to be used with
-    ReductionStep objects. The guts needs refactoring.
+Most of this code is a copy-paste from SANSReduction.py, organized to be used with
+ReductionStep objects. The guts needs refactoring.
 """
+
 import os
 import re
 import math
 from collections import namedtuple
-from mantid.kernel import Logger
 
-from mantid.api import WorkspaceGroup, Workspace, IEventWorkspace
-from mantid.simpleapi import *
+from mantid.api import mtd, AlgorithmManager, FileFinder, IEventWorkspace, Workspace, WorkspaceGroup
+from mantid.kernel import logger, Logger
+from mantid.simpleapi import (
+    CalculateFlatBackground,
+    CloneWorkspace,
+    ConvertToHistogram,
+    ConvertUnits,
+    CropWorkspace,
+    DeleteWorkspace,
+    ExtractMask,
+    FindDeadDetectors,
+    GroupWorkspaces,
+    InterpolatingRebin,
+    Load,
+    LoadMask,
+    LoadNexusMonitors,
+    LoadRKH,
+    LoadSampleDetailsFromRaw,
+    MaskDetectors,
+    MaskDetectorsInShape,
+    Minus,
+    Multiply,
+    Rebin,
+    RebinToWorkspace,
+    RemoveBins,
+    RenameWorkspace,
+    ReplaceSpecialValues,
+    SANSWideAngleCorrection,
+    SumSpectra,
+    TOFSANSResolutionByPixel,
+    UnwrapMonitorsInTOF,
+    Qxy,
+    Q1D,
+)
 from SANSUtility import (
     GetInstrumentDetails,
     MaskByBinRange,
@@ -1290,7 +1322,7 @@ class DarkRunSubtraction(object):
         @param dark_run_setting
         """
         if not isinstance(dark_run_setting, UserFileParser.DarkRunSettings):
-            raise RuntimeError("DarkRunSubtraction: The provided settings " "object is not of type DarkRunSettings")
+            raise RuntimeError("DarkRunSubtraction: The provided settings object is not of type DarkRunSettings")
 
         # We only add entries where the run number has been specified
         if not dark_run_setting.run_number:
@@ -1742,6 +1774,7 @@ class DarkRunSubtraction(object):
         alg_conjoined.setChild(True)
         alg_conjoined.setProperty("InputWorkspace1", monitor)
         alg_conjoined.setProperty("InputWorkspace2", detector)
+        alg_conjoined.setProperty("CheckMatchingBins", False)
         alg_conjoined.execute()
         return alg_conjoined.getProperty("InputWorkspace1").value
 
@@ -2906,11 +2939,9 @@ class ConvertToQISIS(ReductionStep):
             else:
                 raise NotImplementedError("The type of Q reduction has not been set, e.g. 1D or 2D")
         except:
-            # when we are all up to Python 2.5 replace the duplicated code below with one finally:
-            reducer.deleteWorkspaces([wave_adj, pixel_adj, wavepixeladj])
             raise
-
-        reducer.deleteWorkspaces([wave_adj, pixel_adj, wavepixeladj])
+        finally:
+            reducer.deleteWorkspaces([wave_adj, pixel_adj, wavepixeladj])
 
     def _get_q_resolution_workspace(self, det_bank_workspace):
         """
@@ -4206,24 +4237,6 @@ class StripEndNans(ReductionStep):
     def __init__(self):
         super(StripEndNans, self).__init__()
 
-    def _isNan(self, val):
-        """
-        Can replaced by isNaN in Python 2.6
-        @param val: float to check
-        """
-        if val != val:
-            return True
-        else:
-            return False
-
-    def _isInf(self, val):
-        """
-        Check if the value is inf or not
-        @param val: float to check
-        @returns true if value is inf
-        """
-        return math.isinf(val)
-
     def execute(self, reducer, workspace):
         """
         Trips leading and trailing Nan values from workspace
@@ -4240,14 +4253,14 @@ class StripEndNans(ReductionStep):
         # Find the first non-zero value
         start = 0
         for i in range(0, length):
-            if not self._isNan(y_vals[i]) and not self._isInf(y_vals[i]):
+            if not math.isnan(y_vals[i]) and not math.isinf(y_vals[i]):
                 start = i
                 break
         # Now find the last non-zero value
         stop = 0
         length -= 1
         for j in range(length, 0, -1):
-            if not self._isNan(y_vals[j]) and not self._isInf(y_vals[j]):
+            if not math.isnan(y_vals[j]) and not math.isinf(y_vals[j]):
                 stop = j
                 break
         # Find the appropriate X values and call CropWorkspace

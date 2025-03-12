@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Defines the state of the background which should be subtracted after the main reduction."""
+"""Defines the state of the background which should be subtracted after the main reduction."""
 
 import json
 import copy
@@ -39,9 +39,7 @@ class StateBackgroundSubtraction(metaclass=JsonSerializable):
             is_invalid.update(entry)
 
         if is_invalid:
-            raise ValueError(
-                "StateBackgroundSubtraction: The provided inputs are illegal. " "Please see: {}".format(json.dumps(is_invalid))
-            )
+            raise ValueError("StateBackgroundSubtraction: The provided inputs are illegal. Please see: {}".format(json.dumps(is_invalid)))
 
 
 # ----------------------------------------------------------------------------------------------------------------------

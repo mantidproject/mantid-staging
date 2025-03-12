@@ -12,6 +12,7 @@
 #include "MantidAPI/HistoryItem.h"
 #include "MantidKernel/Logger.h"
 #include "MantidKernel/Property.h"
+#include "MantidKernel/WarningSuppressions.h"
 
 #include <boost/utility.hpp>
 #include <utility>
@@ -104,11 +105,10 @@ void NotebookBuilder::buildChildren(std::vector<HistoryItem>::const_iterator &it
 const std::string NotebookBuilder::buildAlgorithmString(const AlgorithmHistory_const_sptr &algHistory) {
   std::ostringstream properties;
   const std::string name = algHistory->name();
-  std::string prop;
 
   auto props = algHistory->getProperties();
-  for (auto &propIter : props) {
-    prop = buildPropertyString(propIter);
+  for (const auto &propIter : props) {
+    std::string prop = buildPropertyString(propIter);
     if (prop.length() > 0) {
       properties << prop << ", ";
     }
@@ -144,6 +144,8 @@ const std::string NotebookBuilder::buildAlgorithmString(const AlgorithmHistory_c
   return name + "(" + propStr + ")";
 }
 
+GNU_DIAG_OFF("maybe-uninitialized")
+
 /**
  * Build the script output for a single property
  *
@@ -153,12 +155,11 @@ const std::string NotebookBuilder::buildAlgorithmString(const AlgorithmHistory_c
 const std::string NotebookBuilder::buildPropertyString(const PropertyHistory_const_sptr &propHistory) {
   using Mantid::Kernel::Direction;
 
-  // Create a vector of all non workspace property type names
-  std::vector<std::string> nonWorkspaceTypes{"number", "boolean", "string"};
-
   std::string prop;
   // No need to specify value for default properties
   if (!propHistory->isDefault()) {
+    // Create a vector of all non workspace property type names
+    std::vector<std::string> nonWorkspaceTypes{"number", "boolean", "string"};
     // Do not give values to output properties other than workspace properties
     if (find(nonWorkspaceTypes.begin(), nonWorkspaceTypes.end(), propHistory->type()) != nonWorkspaceTypes.end() &&
         propHistory->direction() == Direction::Output) {
@@ -183,5 +184,7 @@ const std::string NotebookBuilder::buildPropertyString(const PropertyHistory_con
 
   return prop;
 }
+
+GNU_DIAG_ON("maybe-uninitialized")
 
 } // namespace Mantid::API

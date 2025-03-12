@@ -6,6 +6,8 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 from mantid.api import PythonAlgorithm, AlgorithmFactory, PropertyMode, WorkspaceProperty, Progress, IMDHistoWorkspaceProperty, mtd
 from mantid.kernel import Direction, FloatArrayProperty, FloatArrayLengthValidator, StringListValidator, FloatBoundedValidator
+from mantid.geometry import SpaceGroupFactory, PointGroupFactory, SymmetryOperationFactory
+from mantid.simpleapi import PlusMD
 from mantid import config
 from mantid import logger
 import numpy as np
@@ -35,6 +37,10 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
         self.declareProperty(
             WorkspaceProperty("UBWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
             "Workspace containing the UB matrix to use",
+        )
+        self.declareProperty(
+            IMDHistoWorkspaceProperty("BackgroundWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
+            "An optional Background Workspace",
         )
         self.declareProperty("Wavelength", 1.488, validator=FloatBoundedValidator(0.0), doc="Wavelength to set the workspace")
         self.declareProperty("S1Offset", 0.0, doc="Offset to apply (in degrees) to the s1 of the input workspace")
@@ -82,6 +88,58 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
             1.0,
             validator=FloatBoundedValidator(0.0),
             doc="Geometrical correction for shift in vertical beam position due to wide beam.",
+        )
+        self.declareProperty(
+            "SymmetryOperations",
+            "",
+            direction=Direction.Input,
+            doc="Space Group name, Point Group name, or list individual Symmetries used to perform the symmetrization",
+        )
+        self.declareProperty(
+            IMDHistoWorkspaceProperty("TemporaryDataWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
+            "An (optional) input MDHistoWorkspace used to accumulate data from multiple MDEventWorkspaces."
+            "If unspecified a blank MDHistoWorkspace will be created",
+        )
+        self.declareProperty(
+            IMDHistoWorkspaceProperty("TemporaryNormalizationWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
+            "An (optional) input MDHistoWorkspace used to accumulate normalization data from multiple MDEventWorkspaces."
+            "If unspecified a blank MDHistoWorkspace will be created",
+        )
+        self.declareProperty(
+            IMDHistoWorkspaceProperty("TemporaryBackgroundDataWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input),
+            "An (optional) input MDHistoWorkspace used to accumulate background data from multiple MDEventWorkspaces."
+            "If unspecified but BackgroundWorkspace is specified, a blank MDHistoWorkspace will be created",
+        )
+        self.declareProperty(
+            IMDHistoWorkspaceProperty(
+                "TemporaryBackgroundNormalizationWorkspace", "", optional=PropertyMode.Optional, direction=Direction.Input
+            ),
+            "An (optional) input MDHistoWorkspace used to accumulate background normalization data from multiple MDEventWorkspaces."
+            "If unspecified but BackgroundWorkspace is specified, a blank MDHistoWorkspace will be created",
+        )
+        self.declareProperty(
+            "OutputDataWorkspace",
+            "",
+            direction=Direction.Input,
+            doc="Name for the Output Data Workspace",
+        )
+        self.declareProperty(
+            "OutputNormalizationWorkspace",
+            "",
+            direction=Direction.Input,
+            doc="Name for the Output Normalization Workspace",
+        )
+        self.declareProperty(
+            "OutputBackgroundDataWorkspace",
+            "",
+            direction=Direction.Input,
+            doc="Name for the Output Background Workspace",
+        )
+        self.declareProperty(
+            "OutputBackgroundNormalizationWorkspace",
+            "",
+            direction=Direction.Input,
+            doc="Name for the Output Background Normalization Workspace",
         )
         self.declareProperty(
             WorkspaceProperty("OutputWorkspace", "", optional=PropertyMode.Mandatory, direction=Direction.Output), "Output Workspace"
@@ -167,15 +225,48 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
             if self.getProperty("Frame").value == "HKL":
                 if not inWS.getExperimentInfo(0).sample().hasOrientedLattice():
                     issues["Frame"] = (
-                        "HKL selected but neither an UBWorkspace workspace was provided or " "the InputWorkspace has an OrientedLattice"
+                        "HKL selected but neither an UBWorkspace workspace was provided or the InputWorkspace has an OrientedLattice"
                     )
+        symmetry = self.getProperty("SymmetryOperations").value
+        if symmetry:
+            try:
+                if SpaceGroupFactory.isSubscribedSymbol(symmetry):
+                    SpaceGroupFactory.createSpaceGroup(symmetry).getSymmetryOperations()
+                elif PointGroupFactory.isSubscribed(symmetry):
+                    PointGroupFactory.createPointGroup(symmetry).getSymmetryOperations()
+                else:
+                    SymmetryOperationFactory.createSymOps(symmetry)
+            except RuntimeError:
+                issues["SymmetryOperations"] = "SymmetryOperations is not a valid Space Group, Point Group or Symmetry Operation"
 
         return issues
 
     def PyExec(self):  # noqa C901
         inWS = self.getProperty("InputWorkspace").value
         normWS = self.getProperty("NormalisationWorkspace").value
+        bkgWS = self.getProperty("BackgroundWorkspace").value
+        tempData = self.getProperty("TemporaryDataWorkspace").value
+        tempNorm = self.getProperty("TemporaryNormalizationWorkspace").value
+        tempBkgData = self.getProperty("TemporaryBackgroundDataWorkspace").value
+        tempBkgNorm = self.getProperty("TemporaryBackgroundNormalizationWorkspace").value
+
+        keep_temp = self.getProperty("KeepTemporaryWorkspaces").value
+        if bool(tempData) or bool(tempNorm) or bool(tempBkgData) or bool(tempBkgNorm):
+            keep_temp = True
+
         _norm = bool(normWS)
+        _bkg = bool(bkgWS)
+
+        symmetry = self.getProperty("SymmetryOperations").value
+        if symmetry:
+            if SpaceGroupFactory.isSubscribedSymbol(symmetry):
+                sym_ops = SpaceGroupFactory.createSpaceGroup(symmetry).getSymmetryOperations()
+            elif PointGroupFactory.isSubscribed(symmetry):
+                sym_ops = PointGroupFactory.createPointGroup(symmetry).getSymmetryOperations()
+            else:
+                sym_ops = SymmetryOperationFactory.createSymOps(symmetry)
+        else:
+            sym_ops = SymmetryOperationFactory.createSymOps("x,y,z")
 
         instrument = inWS.getExperimentInfo(0).getInstrument().getName()
 
@@ -185,15 +276,13 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
         dim0_bins = int(dim0_bins)
         dim1_bins = int(dim1_bins)
         dim2_bins = int(dim2_bins)
-        dim0_bin_size = (dim0_max - dim0_min) / dim0_bins
-        dim1_bin_size = (dim1_max - dim1_min) / dim1_bins
-        dim2_bin_size = (dim2_max - dim2_min) / dim2_bins
 
         data_array = inWS.getSignalArray()  # getSignalArray returns a F_CONTIGUOUS view of the signal array
 
         number_of_runs = data_array.shape[2]
 
-        progress = Progress(self, 0.0, 1.0, number_of_runs + 4)
+        progress_end = len(sym_ops) * number_of_runs + 12
+        progress = Progress(self, 0.0, 1.0, progress_end)
 
         normaliseBy = self.getProperty("NormaliseBy").value
         if normaliseBy == "Monitor":
@@ -210,6 +299,7 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
             scale = np.ones(number_of_runs)
 
         if _norm:
+            norm_scale = 1.0
             if normaliseBy == "Monitor":
                 if instrument == "HB3A":
                     norm_scale = np.sum(normWS.getExperimentInfo(0).run().getProperty("monitor").value)
@@ -220,16 +310,36 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
                     norm_scale = np.sum(normWS.getExperimentInfo(0).run().getProperty("time").value)
                 else:
                     norm_scale = np.sum(normWS.getExperimentInfo(0).run().getProperty("duration").value)
-            else:
-                norm_scale = 1.0
             norm_array = normWS.getSignalArray().sum(axis=2)
+            norm_array /= norm_scale
+        else:
+            norm_array = np.ones_like(data_array[:, :, 0])
+
+        if _bkg:
+            if normaliseBy == "Monitor":
+                if instrument == "HB3A":
+                    bkg_scale = np.asarray(bkgWS.getExperimentInfo(0).run().getProperty("monitor").value)
+                else:
+                    bkg_scale = np.asarray(bkgWS.getExperimentInfo(0).run().getProperty("monitor_count").value)
+            elif normaliseBy == "Time":
+                if instrument == "HB3A":
+                    bkg_scale = np.asarray(bkgWS.getExperimentInfo(0).run().getProperty("time").value)
+                else:
+                    bkg_scale = np.asarray(bkgWS.getExperimentInfo(0).run().getProperty("duration").value)
+            else:
+                bkg_scale = np.ones(number_of_runs)
+            bkg_data_array = bkgWS.getSignalArray()
 
         W = np.eye(3)
+        W[:, 0] = self.getProperty("Uproj").value
+        W[:, 1] = self.getProperty("Vproj").value
+        W[:, 2] = self.getProperty("Wproj").value
+
         UBW = np.eye(3)
+        _hkl = False
         if self.getProperty("Frame").value == "HKL":
-            W[:, 0] = self.getProperty("Uproj").value
-            W[:, 1] = self.getProperty("Vproj").value
-            W[:, 2] = self.getProperty("Wproj").value
+            _hkl = True
+
             ubWS = self.getProperty("UBWorkspace").value
             if ubWS:
                 try:
@@ -253,12 +363,11 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
                 ol.qFromHKL(W[:, 0]).norm(), ol.qFromHKL(W[:, 1]).norm(), ol.qFromHKL(W[:, 2]).norm()
             )
             frames = "HKL,HKL,HKL"
-            k = 1 / self.getProperty("Wavelength").value  # Not 2pi/wavelength to save dividing by 2pi later
         else:
             names = "Q_sample_x,Q_sample_y,Q_sample_z"
             units = "Angstrom^-1,Angstrom^-1,Angstrom^-1"
             frames = "QSample,QSample,QSample"
-            k = 2 * np.pi / self.getProperty("Wavelength").value
+        k = 2 * np.pi / self.getProperty("Wavelength").value
 
         progress.report("Calculating Qlab for each pixel")
         if inWS.getExperimentInfo(0).run().hasProperty("twotheta"):
@@ -283,25 +392,27 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
 
         cop = self.getProperty("ObliquityParallaxCoefficient").value
 
-        qlab = np.vstack((np.sin(polar) * np.cos(azim), np.sin(polar) * np.sin(azim) * cop, np.cos(polar) - 1)).T * -k  # Kf - Ki(0,0,1)
+        qlab = np.vstack((np.sin(polar) * np.cos(azim), np.sin(polar) * np.sin(azim) * cop, np.cos(polar) - 1)) * -k  # Kf - Ki(0,0,1)
+
+        data_hist = np.zeros(dim0_bins * dim1_bins * dim2_bins)
+        norm_hist = np.zeros_like(data_hist)
+        if _bkg:
+            bkg_data_hist = np.zeros_like(data_hist)
+            bkg_norm_hist = np.zeros_like(data_hist)
+
+        bins = [
+            np.linspace(dim0_min, dim0_max, dim0_bins + 1),
+            np.linspace(dim1_min, dim1_max, dim1_bins + 1),
+            np.linspace(dim2_min, dim2_max, dim2_bins + 1),
+        ]
+
+        dim_bins = [dim0_bins, dim1_bins, dim2_bins]
+
+        valid_range = [(0, len(bins[i]) - 2) for i in range(3)]
+        valid_range_min = np.array([valid_range[i][0] for i in range(3)])
+        valid_range_max = np.array([valid_range[i][1] for i in range(3)])
 
         progress.report("Calculating Q volume")
-
-        output = np.zeros((dim0_bins + 2, dim1_bins + 2, dim2_bins + 2))
-        outputr = output.ravel()
-
-        output_scale = np.zeros_like(output)
-        output_scaler = output_scale.ravel()
-
-        if _norm:
-            output_norm = np.zeros_like(output)
-            output_normr = output_norm.ravel()
-            output_norm_scale = np.zeros_like(output)
-            output_norm_scaler = output_norm_scale.ravel()
-
-        bin_size = np.array([[dim0_bin_size], [dim1_bin_size], [dim2_bin_size]])
-
-        offset = np.array([[dim0_min / dim0_bin_size], [dim1_min / dim1_bin_size], [dim2_min / dim2_bin_size]]) - 0.5
 
         assert not data_array[:, :, 0].flags.owndata
         assert not data_array[:, :, 0].ravel("F").flags.owndata
@@ -310,33 +421,67 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
         s1offset = np.deg2rad(self.getProperty("S1Offset").value)
         s1offset = np.array([[np.cos(s1offset), 0, np.sin(s1offset)], [0, 1, 0], [-np.sin(s1offset), 0, np.cos(s1offset)]])
 
-        for n in range(number_of_runs):
-            R = inWS.getExperimentInfo(0).run().getGoniometer(n).getR()
-            R = np.dot(s1offset, R)
-            RUBW = np.dot(R, UBW)
-            q = np.round(np.dot(np.linalg.inv(RUBW), qlab.T) / bin_size - offset).astype(int)
-            q_index = np.ravel_multi_index(q, (dim0_bins + 2, dim1_bins + 2, dim2_bins + 2), mode="clip")
-            q_uniq, inverse = np.unique(q_index, return_inverse=True)
-            outputr[q_uniq] += np.bincount(inverse, data_array[:, :, n].ravel("F"))
-            output_scaler[q_uniq] += np.bincount(inverse) * scale[n]
-            if _norm:
-                output_normr[q_uniq] += np.bincount(inverse, norm_array.ravel("F"))
-                output_norm_scaler[q_uniq] += np.bincount(inverse)
+        R_invs = [np.dot(s1offset, inWS.getExperimentInfo(0).run().getGoniometer(n).getR()).T for n in range(number_of_runs)]
 
-            progress.report()
+        # flat array
+        data_array_flat = data_array.T.reshape(number_of_runs, -1)
+        norm_array_flat = norm_array.ravel(order="F")
+        if _bkg:
+            bkg_data_array_flat = bkg_data_array.T.reshape(number_of_runs, -1)
 
-        if _norm:
-            output *= output_norm_scale * norm_scale
-            output_norm *= output_scale
-        else:
-            output_norm = output_scale
+        # loop over symmetry operations for memory efficiency
+        for sym_op in sym_ops:
+            S = np.zeros((3, 3))
+            S[:, 0] = sym_op.transformHKL([1, 0, 0])
+            S[:, 1] = sym_op.transformHKL([0, 1, 0])
+            S[:, 2] = sym_op.transformHKL([0, 0, 1])
 
-        if self.getProperty("KeepTemporaryWorkspaces").value:
+            # transform matrix
+            if _hkl:
+                T = np.linalg.multi_dot([2 * np.pi * UB, S, W])
+            else:
+                T = np.dot(S, W)
+            T_inv = np.linalg.inv(T)
+
+            for i_gon, R_inv in enumerate(R_invs):
+                # transformation matrix
+                combined_matrix = np.matmul(T_inv, R_inv)  # (3 x 3) x (3 x 3) = (3 x 3)
+
+                # matrix-vector multiplication for all q
+                qvals = np.matmul(combined_matrix, qlab)  # (3 x 3) x (3 x n_det) = (3 x n_det)
+
+                # map q values to bin edges
+                bin_indices = np.stack([np.digitize(qvals[i], bins[i]) - 1 for i in range(3)], axis=-1)
+
+                # mask to exclude out-of-bound data
+                mask = np.all((bin_indices >= valid_range_min) & (bin_indices <= valid_range_max), axis=1)
+
+                bin_indices = np.ravel_multi_index(bin_indices[mask].T, dim_bins)
+                unique_indices, inverse_indices = np.unique(bin_indices, return_inverse=True)
+
+                # sum weights for each unique bin index
+                data_hist[unique_indices] += np.bincount(inverse_indices, data_array_flat[i_gon][mask])
+                norm_hist[unique_indices] += np.bincount(inverse_indices, norm_array_flat[mask]) * scale[i_gon]
+
+                if _bkg:
+                    # sum weights for each unique bin index
+                    bkg_data_hist[unique_indices] += np.bincount(inverse_indices, bkg_data_array_flat[i_gon][mask])
+                    bkg_norm_hist[unique_indices] += np.bincount(inverse_indices, norm_array_flat[mask]) * bkg_scale[i_gon]
+
+                progress.report()
+
+        data_hist = data_hist.reshape(dim_bins)
+        norm_hist = norm_hist.reshape(dim_bins)
+        if _bkg:
+            bkg_data_hist = bkg_data_hist.reshape(dim_bins)
+            bkg_norm_hist = bkg_norm_hist.reshape(dim_bins)
+
+        if keep_temp:
             # Create data workspace
             progress.report("Creating data MDHistoWorkspace")
             createWS_alg = self.createChildAlgorithm("CreateMDHistoWorkspace", enableLogging=False)
-            createWS_alg.setProperty("SignalInput", output[1:-1, 1:-1, 1:-1].ravel("F"))
-            createWS_alg.setProperty("ErrorInput", np.sqrt(output[1:-1, 1:-1, 1:-1].ravel("F")))
+            createWS_alg.setProperty("SignalInput", data_hist.ravel("F"))
+            createWS_alg.setProperty("ErrorInput", np.sqrt(data_hist).ravel("F"))
             createWS_alg.setProperty("Dimensionality", 3)
             createWS_alg.setProperty("Extents", "{},{},{},{},{},{}".format(dim0_min, dim0_max, dim1_min, dim1_max, dim2_min, dim2_max))
             createWS_alg.setProperty("NumberOfBins", "{},{},{}".format(dim0_bins, dim1_bins, dim2_bins))
@@ -345,13 +490,16 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
             createWS_alg.setProperty("Frames", frames)
             createWS_alg.execute()
             outWS_data = createWS_alg.getProperty("OutputWorkspace").value
-            mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_data", outWS_data)
+            if self.getProperty("OutputDataWorkspace").value:
+                mtd.addOrReplace(self.getProperty("OutputDataWorkspace").value, outWS_data)
+            else:
+                mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_data", outWS_data)
 
             # Create normalisation workspace
             progress.report("Creating norm MDHistoWorkspace")
             createWS_alg = self.createChildAlgorithm("CreateMDHistoWorkspace", enableLogging=False)
-            createWS_alg.setProperty("SignalInput", output_norm[1:-1, 1:-1, 1:-1].ravel("F"))
-            createWS_alg.setProperty("ErrorInput", np.sqrt(output_norm[1:-1, 1:-1, 1:-1].ravel("F")))
+            createWS_alg.setProperty("SignalInput", norm_hist.ravel("F"))
+            createWS_alg.setProperty("ErrorInput", np.sqrt(norm_hist).ravel("F"))
             createWS_alg.setProperty("Dimensionality", 3)
             createWS_alg.setProperty("Extents", "{},{},{},{},{},{}".format(dim0_min, dim0_max, dim1_min, dim1_max, dim2_min, dim2_max))
             createWS_alg.setProperty("NumberOfBins", "{},{},{}".format(dim0_bins, dim1_bins, dim2_bins))
@@ -359,16 +507,61 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
             createWS_alg.setProperty("Units", units)
             createWS_alg.setProperty("Frames", frames)
             createWS_alg.execute()
-            mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_normalization", createWS_alg.getProperty("OutputWorkspace").value)
+            outWS_norm = createWS_alg.getProperty("OutputWorkspace").value
+            if self.getProperty("OutputNormalizationWorkspace").value:
+                mtd.addOrReplace(self.getProperty("OutputNormalizationWorkspace").value, outWS_norm)
+            else:
+                mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_normalization", outWS_norm)
+
+            if _bkg:
+                # Create background data workspace
+                progress.report("Creating background data MDHistoWorkspace")
+                createWS_alg = self.createChildAlgorithm("CreateMDHistoWorkspace", enableLogging=False)
+                createWS_alg.setProperty("SignalInput", bkg_data_hist.ravel("F"))
+                createWS_alg.setProperty("ErrorInput", np.sqrt(bkg_data_hist).ravel("F"))
+                createWS_alg.setProperty("Dimensionality", 3)
+                createWS_alg.setProperty("Extents", "{},{},{},{},{},{}".format(dim0_min, dim0_max, dim1_min, dim1_max, dim2_min, dim2_max))
+                createWS_alg.setProperty("NumberOfBins", "{},{},{}".format(dim0_bins, dim1_bins, dim2_bins))
+                createWS_alg.setProperty("Names", names)
+                createWS_alg.setProperty("Units", units)
+                createWS_alg.setProperty("Frames", frames)
+                createWS_alg.execute()
+                outWS_bkg = createWS_alg.getProperty("OutputWorkspace").value
+                if self.getProperty("OutputBackgroundDataWorkspace").value:
+                    mtd.addOrReplace(self.getProperty("OutputBackgroundDataWorkspace").value, outWS_bkg)
+                else:
+                    mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_background_data", outWS_bkg)
+
+                # Create background normalisation workspace
+                progress.report("Creating background normalization MDHistoWorkspace")
+                createWS_alg = self.createChildAlgorithm("CreateMDHistoWorkspace", enableLogging=False)
+                createWS_alg.setProperty("SignalInput", bkg_norm_hist.ravel("F"))
+                createWS_alg.setProperty("ErrorInput", np.sqrt(bkg_norm_hist).ravel("F"))
+                createWS_alg.setProperty("Dimensionality", 3)
+                createWS_alg.setProperty("Extents", "{},{},{},{},{},{}".format(dim0_min, dim0_max, dim1_min, dim1_max, dim2_min, dim2_max))
+                createWS_alg.setProperty("NumberOfBins", "{},{},{}".format(dim0_bins, dim1_bins, dim2_bins))
+                createWS_alg.setProperty("Names", names)
+                createWS_alg.setProperty("Units", units)
+                createWS_alg.setProperty("Frames", frames)
+                createWS_alg.execute()
+                outWS_bkgNorm = createWS_alg.getProperty("OutputWorkspace").value
+                if self.getProperty("OutputBackgroundNormalizationWorkspace").value:
+                    mtd.addOrReplace(self.getProperty("OutputBackgroundNormalizationWorkspace").value, outWS_bkgNorm)
+                else:
+                    mtd.addOrReplace(self.getPropertyValue("OutputWorkspace") + "_background_normalization", outWS_bkgNorm)
 
         old_settings = np.seterr(divide="ignore", invalid="ignore")  # Ignore RuntimeWarning: invalid value encountered in true_divide
-        output /= output_norm  # We often divide by zero here and we get NaN's, this is desired behaviour
+        result = data_hist / norm_hist  # We often divide by zero here and we get NaN's, this is desired behaviour
+        result_var = data_hist / norm_hist**2
+        if _bkg:
+            result -= bkg_data_hist / bkg_norm_hist
+            result_var += bkg_data_hist / bkg_norm_hist**2
         np.seterr(**old_settings)
 
         progress.report("Creating MDHistoWorkspace")
         createWS_alg = self.createChildAlgorithm("CreateMDHistoWorkspace", enableLogging=False)
-        createWS_alg.setProperty("SignalInput", output[1:-1, 1:-1, 1:-1].ravel("F"))
-        createWS_alg.setProperty("ErrorInput", (np.sqrt(output / output_norm))[1:-1, 1:-1, 1:-1].ravel("F"))
+        createWS_alg.setProperty("SignalInput", result.ravel("F"))
+        createWS_alg.setProperty("ErrorInput", np.sqrt(result_var).ravel("F"))
         createWS_alg.setProperty("Dimensionality", 3)
         createWS_alg.setProperty("Extents", "{},{},{},{},{},{}".format(dim0_min, dim0_max, dim1_min, dim1_max, dim2_min, dim2_max))
         createWS_alg.setProperty("NumberOfBins", "{},{},{}".format(dim0_bins, dim1_bins, dim2_bins))
@@ -391,10 +584,23 @@ class ConvertWANDSCDtoQ(PythonAlgorithm):
         except NameError:
             pass
 
-        if self.getProperty("KeepTemporaryWorkspaces").value:
+        if keep_temp:
             outWS_data.copyExperimentInfos(outWS)
 
-        progress.report()
+            if bool(tempData):
+                progress.report("Accumulating Data Workspace")
+                PlusMD(LHSWorkspace=outWS_data, RHSWorkspace=tempData, OutputWorkspace=tempData)
+            if bool(tempNorm):
+                progress.report("Accumulating Normalization Workspace")
+                PlusMD(LHSWorkspace=outWS_norm, RHSWorkspace=tempNorm, OutputWorkspace=tempNorm)
+            if bool(tempBkgData):
+                progress.report("Accumulating Background Data Workspace")
+                PlusMD(LHSWorkspace=outWS_bkg, RHSWorkspace=tempBkgData, OutputWorkspace=tempBkgData)
+            if bool(tempBkgNorm):
+                progress.report("Accumulating Background Normalization Workspace")
+                PlusMD(LHSWorkspace=outWS_bkgNorm, RHSWorkspace=tempBkgNorm, OutputWorkspace=tempBkgNorm)
+
+        progress.report(progress_end, "Done")
         self.setProperty("OutputWorkspace", outWS)
 
 

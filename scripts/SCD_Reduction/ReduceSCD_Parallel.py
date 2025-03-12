@@ -49,7 +49,22 @@ import ReduceDictionary
 sys.path.append("/opt/mantidnightly/bin")
 # sys.path.append("/opt/Mantid/bin")
 
-from mantid.simpleapi import *
+from mantid import apiVersion, FileFinder
+from mantid.simpleapi import (
+    CombinePeaksWorkspaces,
+    CreatePeaksWorkspace,
+    FindUBUsingFFT,
+    FindUBUsingLatticeParameters,
+    IndexPeaks,
+    Load,
+    LoadEventNexus,
+    LoadIsawPeaks,
+    LoadIsawUB,
+    SaveNexus,
+    SaveIsawPeaks,
+    SaveIsawUB,
+    SelectCellOfType,
+)
 
 print("API Version")
 print(apiVersion())
@@ -150,7 +165,7 @@ while not all_done:
         thread.start()
     time.sleep(2)
     for thread in active_list:
-        if not thread.isAlive():
+        if not thread.is_alive():
             active_list.remove(thread)
     if len(procList) == 0 and len(active_list) == 0:
         all_done = True

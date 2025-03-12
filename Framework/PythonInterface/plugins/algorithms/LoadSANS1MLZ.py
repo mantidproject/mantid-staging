@@ -37,7 +37,7 @@ class LoadSANS1MLZ(PythonAlgorithm):
             name="Wavelength",
             defaultValue=0.0,
             validator=FloatBoundedValidator(lower=0.0),
-            doc="Wavelength in Angstrom. If 0, the wavelength " "will be read from the data file.",
+            doc="Wavelength in Angstrom. If 0, the wavelength will be read from the data file.",
         )
 
     def PyExec(self):
@@ -142,7 +142,7 @@ class LoadSANS1MLZ(PythonAlgorithm):
         if not self.getProperty("Wavelength").isDefault:
             metadata.setup.wavelength = user_wavelength
             self.log().notice("Wavelength set to user input.")
-        if (type(metadata.setup.wavelength) is str) or (metadata.setup.wavelength == 0.0):
+        if isinstance(metadata.setup.wavelength, str) or metadata.setup.wavelength == 0.0:
             self.log().error("Wavelength not defined.")
 
     def _log_data_analyzing(self, metadata):

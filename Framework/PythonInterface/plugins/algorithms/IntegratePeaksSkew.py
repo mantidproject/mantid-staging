@@ -26,6 +26,7 @@ from mantid.kernel import (
     logger,
     CompositeValidator,
     CompositeRelation,
+    SpecialCoordinateSystem,
 )
 import numpy as np
 from scipy.signal import convolve2d
@@ -34,6 +35,7 @@ from scipy.stats import moment
 from mantid.geometry import RectangularDetector, GridDetector
 import re
 from enum import Enum
+from mantid.dataobjects import PeakShapeDetectorBin
 
 
 class PEAK_MASK_STATUS(Enum):
@@ -215,8 +217,14 @@ class InstrumentArrayConverter:
         """
         bank = self.inst.getComponentByName(bank_name)
         row, col = peak.getRow(), peak.getCol()
-        drows, dcols = nrows // 2, ncols // 2
+        drows, dcols = int(nrows) // 2, int(ncols) // 2
         detids, det_edges, irow_peak, icol_peak = self.get_detid_array(bank, detid, row, col, drows, dcols, nrows_edge, ncols_edge)
+        # add masked pixels to edges (sometimes used to denote edges or broken components)
+        det_info = self.ws.detectorInfo()
+        for irow in range(det_edges.shape[0]):
+            for icol in range(det_edges.shape[1]):
+                if det_info.isMasked(det_info.indexOf(int(detids[irow, icol]))):
+                    det_edges[irow, icol] = True
         peak_data = PeakData(irow_peak, icol_peak, det_edges, detids, peak, self.ws)
         return peak_data
 
@@ -266,7 +274,7 @@ class PeakData:
                 if len(xvals) > signal.shape[-1]:
                     xvals = 0.5 * (xvals[:-1] + xvals[1:])  # convert to bin centers
                 xcens[irow, icol, :] = xvals
-        return xcens, signal, errors
+        return xcens, signal, errors**2, ispecs
 
     def get_roi_on_detector(self, detids):
         isort = np.argsort(detids.flatten())
@@ -429,7 +437,7 @@ class PeakData:
         prev_skew = moment(signal[ibg_seed[isort[istart:iend]]], 3)
         for istart in range(1, iend):
             this_skew = moment(signal[ibg_seed[isort[istart:iend]]], 3)
-            if this_skew >= prev_skew:
+            if this_skew >= prev_skew or this_skew < 0:
                 istart -= 1
                 break
             else:
@@ -645,16 +653,16 @@ class PeakData:
             xmask, ymask = np.where(self.peak_mask.T)
             ax[0].lines[0].set_xdata(xmask)
             ax[0].lines[0].set_ydata(ymask)
-            ax[0].lines[1].set_xdata(self.icol)
-            ax[0].lines[1].set_ydata(self.irow)
+            ax[0].lines[1].set_xdata([self.icol])
+            ax[0].lines[1].set_ydata([self.irow])
             img.set_extent([-0.5, self.x_integrated_data.shape[1] - 0.5, self.x_integrated_data.shape[0] - 0.5, -0.5])
             # update 1D focused spectrum
             # vlines
             xmin_line, xmax_line, data, xpos_line, xmin_init_line, xmax_init_line, y0 = ax[1].lines
-            xmin_line.set_xdata(self.xmin_opt)
-            xmax_line.set_xdata(self.xmax_opt)
-            xmin_init_line.set_xdata(self.xmin)
-            xmax_init_line.set_xdata(self.xmax)
+            xmin_line.set_xdata([self.xmin_opt])
+            xmax_line.set_xdata([self.xmax_opt])
+            xmin_init_line.set_xdata([self.xmin])
+            xmax_init_line.set_xdata([self.xmax])
             xpos_line.set_xdata([self.xpos])
             # spectrum
             yerr = np.sqrt(self.epk_sq[istart:iend])
@@ -728,8 +736,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             defaultValue=17,
             direction=Direction.Input,
             validator=IntBoundedValidator(lower=3),
-            doc="Number of column components in the window around a peak on the detector. "
-            "For WISH column components correspond to tubes.",
+            doc="Number of column components in the window around a peak on the detector. For WISH column components correspond to tubes.",
         )
         self.declareProperty(
             name="BackscatteringTOFResolution",
@@ -769,7 +776,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             name="NFWHM",
             defaultValue=4,
             direction=Direction.Input,
-            doc="Initial TOF window is NFWHM x FWHM of the BackToBackExponential peak at that " "position",
+            doc="Initial TOF window is NFWHM x FWHM of the BackToBackExponential peak at that position",
         )
         not_use_B2B_exp_params = EnabledWhenProperty("GetTOFWindowFromBackToBackParams", PropertyCriterion.IsDefault)
         self.setPropertySettings("BackscatteringTOFResolution", not_use_B2B_exp_params)
@@ -824,15 +831,15 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             name="NRowsEdge",
             defaultValue=1,
             direction=Direction.Input,
-            validator=IntBoundedValidator(lower=1),
-            doc="Masks including pixels on rows NRowsEdge from the detector edge are " "defined as on the edge.",
+            validator=IntBoundedValidator(lower=0),
+            doc="Masks including pixels on rows NRowsEdge from the detector edge are defined as on the edge.",
         )
         self.declareProperty(
             name="NColsEdge",
             defaultValue=1,
             direction=Direction.Input,
-            validator=IntBoundedValidator(lower=1),
-            doc="Masks including pixels on cols NColsEdge from the detector edge are " "defined as on the edge.",
+            validator=IntBoundedValidator(lower=0),
+            doc="Masks including pixels on cols NColsEdge from the detector edge are defined as on the edge.",
         )
         self.declareProperty(
             name="NPixMin",
@@ -914,7 +921,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
         # plotting
         self.declareProperty(
             FileProperty("OutputFile", "", FileAction.OptionalSave, ".pdf"),
-            "Optional file path in which to write diagnostic plots (note this will slow the " "execution of algorithm).",
+            "Optional file path in which to write diagnostic plots (note this will slow the execution of algorithm).",
         )
         self.setPropertyGroup("OutputFile", "Plotting")
         # Corrections
@@ -929,7 +936,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
         # Output
         self.declareProperty(
             IPeaksWorkspaceProperty(name="OutputWorkspace", defaultValue="", direction=Direction.Output),
-            doc="The output PeaksWorkspace will be a copy of the input PeaksWorkspace with the" " integrated intensities.",
+            doc="The output PeaksWorkspace will be a copy of the input PeaksWorkspace with the integrated intensities.",
         )
 
     def validateInputs(self):
@@ -964,7 +971,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             # check at least first peak in workspace has back to back params
             if not inst.getComponentByName(pk_ws.column("BankName")[0]).hasParameter("B"):
                 issues["GetTOFWindowFromBackToBackParams"] = (
-                    "Workspace doesn't have back to back exponential " "coefficients defined in the parameters.xml file."
+                    "Workspace doesn't have back to back exponential coefficients defined in the parameters.xml file."
                 )
 
         return issues
@@ -1021,7 +1028,6 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             # check that peak is in a valid detector
             detid = detids[ipk]
             detector_info = ws.detectorInfo()
-            invalid_detector = False
             try:
                 det_idx = detector_info.indexOf(detid)
                 invalid_detector = detector_info.isMonitor(det_idx) or detector_info.isMasked(det_idx)
@@ -1036,7 +1042,7 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
             # get data array in window around peak region
             peak_data = array_converter.get_peak_data(pk, detid, bank_names[ipk], nrows, ncols, nrows_edge, ncols_edge)
             if get_dTOF_from_b2bexp_params:
-                fwhm = self.get_fwhm_from_back_to_back_params(pk, ws, detid)
+                fwhm = get_fwhm_from_back_to_back_params(pk, ws, detid)
                 if fwhm is None:
                     logger.warning(
                         f"No back to back exponential parameters found for peak {ipk} - a default value of"
@@ -1084,6 +1090,9 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
                 # set peak object intensity
                 pk.setIntensity(L * peak_data.intens)
                 pk.setSigmaIntensity(L * peak_data.sig)
+
+                # Set PeakShapeDetectorBin shape for valid peaks
+                self._set_peak_shapes(ws, pk, peak_data)
             else:
                 pk.setIntensity(0.0)
                 pk.setSigmaIntensity(0.0)
@@ -1168,6 +1177,25 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
         # assign output
         self.setProperty("OutputWorkspace", pk_ws_int)
 
+    def _set_peak_shapes(self, ws, peak, peak_data):
+        """
+        Sets PeakShapeDetectorBin shape for a peak
+        @param ws - Input workspace
+        @param peak - peak to add the shape
+        @param peak_data - PeakData object containing details of the integrated peak
+        """
+        if not peak_data.peak_mask.any():
+            return
+        det_bin_list = []
+        for det in peak_data.detids[peak_data.peak_mask]:
+            ispec = ws.getIndicesFromDetectorIDs([int(det)])[0]
+            x_start = ws.readX(ispec)[peak_data.ixmin_opt]
+            x_end = ws.readX(ispec)[peak_data.ixmax_opt]
+            det_bin_list.append((int(det), x_start, x_end))
+        if len(det_bin_list) > 0:
+            peak_shape = PeakShapeDetectorBin(det_bin_list, SpecialCoordinateSystem.NONE, self.name(), self.version())
+            peak.setPeakShape(peak_shape)
+
     @staticmethod
     def estimate_linear_params(x, y):
         # adapted from scipy.stats.siegelslopes with added vectorisation
@@ -1183,14 +1211,6 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
     def calc_initial_dTOF(pk, dt0_over_t0, dth, scale_dth):
         dth_pk = dth * pk.getWavelength() if scale_dth else dth
         return pk.getTOF() * np.sqrt(dt0_over_t0**2 + (dth_pk / np.tan(pk.getScattering() / 2)) ** 2)
-
-    @staticmethod
-    def get_fwhm_from_back_to_back_params(pk, ws, detid):
-        func = FunctionFactory.Instance().createPeakFunction("BackToBackExponential")
-        func.setParameter("X0", pk.getTOF())  # set centre
-        func.setMatrixWorkspace(ws, ws.getIndicesFromDetectorIDs([int(detid)])[0], 0.0, 0.0)  # calc A,B,S based on peak cen
-        is_valid = all(func.isExplicitlySet(ipar) for ipar in [1, 2, 4])
-        return func.fwhm() if is_valid else None
 
     @staticmethod
     def plot_TOF_resolution(
@@ -1244,6 +1264,14 @@ class IntegratePeaksSkew(DataProcessorAlgorithm):
         for prop, value in kwargs.items():
             alg.setProperty(prop, value)
         alg.execute()
+
+
+def get_fwhm_from_back_to_back_params(pk, ws, detid):
+    func = FunctionFactory.Instance().createPeakFunction("BackToBackExponential")
+    func.setParameter("X0", pk.getTOF())  # set centre
+    func.setMatrixWorkspace(ws, ws.getIndicesFromDetectorIDs([int(detid)])[0], 0.0, 0.0)  # calc A,B,S based on peak cen
+    is_valid = all(func.isExplicitlySet(ipar) for ipar in [1, 2, 4])
+    return func.fwhm() if is_valid else None
 
 
 def exec_simpleapi_alg(alg_name, **kwargs):

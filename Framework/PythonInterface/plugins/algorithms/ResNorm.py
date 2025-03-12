@@ -7,7 +7,7 @@
 # pylint: disable=no-init
 from mantid.api import PythonAlgorithm, AlgorithmFactory
 from mantid.kernel import StringListValidator, StringMandatoryValidator
-from mantid.simpleapi import *
+from mantid.simpleapi import LoadNexusProcessed
 from mantid import config, logger
 import os
 
@@ -59,12 +59,7 @@ class ResNorm(PythonAlgorithm):
         self.declareProperty(name="Save", defaultValue=False, doc="Switch Save result to nxs file Off/On")
 
     def PyExec(self):
-        from IndirectImport import run_f2py_compatibility_test, is_supported_f2py_platform
-
-        if is_supported_f2py_platform():
-            import IndirectBayes as Main
-
-        run_f2py_compatibility_test()
+        import IndirectBayes as Main
 
         self.log().information("ResNorm input")
         inType = self.getPropertyValue("InputType")

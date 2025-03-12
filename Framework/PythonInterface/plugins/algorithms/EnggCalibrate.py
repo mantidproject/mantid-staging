@@ -4,8 +4,17 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import (
+    AlgorithmFactory,
+    FileAction,
+    FileProperty,
+    ITableWorkspaceProperty,
+    MatrixWorkspaceProperty,
+    Progress,
+    PropertyMode,
+    PythonAlgorithm,
+)
+from mantid.kernel import Direction, FloatArrayProperty, StringListValidator
 import mantid.simpleapi as mantid
 
 
@@ -103,7 +112,7 @@ class EnggCalibrate(PythonAlgorithm):
 
         self.declareProperty(
             ITableWorkspaceProperty("DetectorPositions", "", Direction.Input, PropertyMode.Optional),
-            "Calibrated detector positions. If not specified, default ones (from the " "current instrument definition) are used.",
+            "Calibrated detector positions. If not specified, default ones (from the current instrument definition) are used.",
         )
 
         self.declareProperty(
@@ -146,8 +155,7 @@ class EnggCalibrate(PythonAlgorithm):
 
         if not self.getPropertyValue("ExpectedPeaksFromFile") and not self.getPropertyValue("ExpectedPeaks"):
             issues["ExpectedPeaks"] = (
-                "Cannot run this algorithm without any expected peak. Please provide "
-                "either a list of peaks or a file with a list of peaks"
+                "Cannot run this algorithm without any expected peak. Please provide either a list of peaks or a file with a list of peaks"
             )
 
         return issues

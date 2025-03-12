@@ -51,7 +51,7 @@ def load_scd_fullprof_intensity_file(file_name):
     :return: 2-tuple.  dictionary for reflection (key = hkl, value = (intensity, error)); string as error message
     """
     # check validity
-    assert isinstance(file_name, str), "Fullprof SCD intensity file %s must be a string but not of type %s." "" % (
+    assert isinstance(file_name, str), "Fullprof SCD intensity file %s must be a string but not of type %s." % (
         str(file_name),
         type(file_name),
     )
@@ -253,8 +253,9 @@ def write_scd_fullprof_kvector(user_header, wave_length, k_vector_dict, peak_dic
                 part3 = "%8.2f%8.2f%4d" % (peak_dict["intensity"], peak_dict["sigma"], 1)
         except TypeError as type_err:
             raise RuntimeError(
-                "In writing Fullprof file, unable to convert intensity {0} and/or sigma {1} to "
-                "floats. FYI: {2}".format(peak_dict["intensity"], peak_dict["sigma"], type_err)
+                "In writing Fullprof file, unable to convert intensity {0} and/or sigma {1} to floats. FYI: {2}".format(
+                    peak_dict["intensity"], peak_dict["sigma"], type_err
+                )
             )
 
         peak_line = part1 + part2 + part3

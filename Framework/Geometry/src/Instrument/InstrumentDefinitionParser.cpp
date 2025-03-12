@@ -120,6 +120,10 @@ void InstrumentDefinitionParser::initialise(const std::string &filename, const s
   m_instName = instName;
   m_xmlFile = xmlFile;
 
+  // do quick check for side-by-side-view-location string, if it doesn't exist we can skip checking every element,
+  // thereby speeding up processing
+  m_sideBySideViewLocation_exists = xmlText.find("side-by-side-view-location") != std::string::npos;
+
   // Create our new instrument
   // We don't want the instrument name taken out of the XML file itself, it
   // should come from the filename (or the property)
@@ -721,6 +725,10 @@ void InstrumentDefinitionParser::setLocation(Geometry::IComponent *comp, const P
 
 void InstrumentDefinitionParser::setSideBySideViewLocation(Geometry::IComponent *comp,
                                                            const Poco::XML::Element *pCompElem) {
+  // return if no elements contain side-by-side-view-location parameter
+  if (!m_sideBySideViewLocation_exists)
+    return;
+
   auto pViewLocElem = pCompElem->getChildElement("side-by-side-view-location");
   if (pViewLocElem) {
     double x = attrToDouble(pViewLocElem, "x");
@@ -1272,9 +1280,9 @@ void InstrumentDefinitionParser::createDetectorOrMonitor(Geometry::ICompAssembly
     m_neutronicPos[detector] = pLocElem->getChildElement("neutronic");
   }
 
-  // mark-as is a depricated attribute used before is="monitor" was introduced
+  // mark-as is a deprecated attribute used before is="monitor" was introduced
   if (pCompElem->hasAttribute("mark-as") || pLocElem->hasAttribute("mark-as")) {
-    g_log.warning() << "Attribute 'mark-as' is a depricated attribute in "
+    g_log.warning() << "Attribute 'mark-as' is a deprecated attribute in "
                        "Instrument Definition File."
                     << " Please see the deprecated section of "
                        "docs.mantidproject.org/concepts/InstrumentDefinitionFile for how to remove this "
@@ -1285,7 +1293,7 @@ void InstrumentDefinitionParser::createDetectorOrMonitor(Geometry::ICompAssembly
     if (category == "Monitor" || category == "monitor")
       m_instrument->markAsMonitor(detector);
     else {
-      // for backwards compatebility look for mark-as="monitor"
+      // for backwards compatibility look for mark-as="monitor"
       if ((pCompElem->hasAttribute("mark-as") && pCompElem->getAttribute("mark-as") == "monitor") ||
           (pLocElem->hasAttribute("mark-as") && pLocElem->getAttribute("mark-as") == "monitor")) {
         m_instrument->markAsMonitor(detector);
@@ -2043,8 +2051,8 @@ void InstrumentDefinitionParser::setFacing(Geometry::IComponent *comp, const Poc
 
   } else // so if no facing element associated with location element apply
          // default facing if set
-      if (m_haveDefaultFacing)
-    makeXYplaneFaceComponent(comp, m_defaultFacing);
+    if (m_haveDefaultFacing)
+      makeXYplaneFaceComponent(comp, m_defaultFacing);
 }
 
 //-----------------------------------------------------------------------------------------------------------------------

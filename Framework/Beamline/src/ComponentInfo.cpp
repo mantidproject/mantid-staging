@@ -210,7 +210,7 @@ Eigen::Quaterniond ComponentInfo::rotation(const std::pair<size_t, size_t> &inde
 /**
  * Extract the position of a component relative to it's parent
  *
- * The parent rotatation is unwound prior to establishing the offset. This means
+ * The parent rotation is unwound prior to establishing the offset. This means
  *that
  * recorded relative positions are independent of changes in rotation.
  *
@@ -295,6 +295,26 @@ void ComponentInfo::doSetRotation(const std::pair<size_t, size_t> &index, const 
     const size_t childCompIndexOffset = compOffsetIndex(subCompIndex);
     m_positions.access()[linearIndex({childCompIndexOffset, timeIndex})] = newPos;
     m_rotations.access()[linearIndex({childCompIndexOffset, timeIndex})] = newRot.normalized();
+  }
+}
+
+void ComponentInfo::doScaleComponent(const std::pair<size_t, size_t> &index, const Eigen::Vector3d &newScaling,
+                                     const ComponentInfo::Range &detectorRange) {
+
+  const auto timeIndex = index.second;
+  const Eigen::Matrix3d scalingMatrix = newScaling.asDiagonal();
+  const Eigen::Vector3d compPos = position(index);
+  for (const auto &subIndex : detectorRange) {
+    Eigen::Vector3d oldPos = m_detectorInfo->position({subIndex, timeIndex});
+    Eigen::Vector3d newPos = scalingMatrix * oldPos + (Eigen::Matrix3d::Identity() - scalingMatrix) * compPos;
+    m_detectorInfo->setPosition({subIndex, timeIndex}, newPos);
+  }
+
+  for (const auto &subIndex : componentRangeInSubtree(index.first)) {
+    const size_t offsetIndex = compOffsetIndex(subIndex);
+    Eigen::Vector3d oldPos = position({subIndex, timeIndex});
+    Eigen::Vector3d newPos = scalingMatrix * oldPos + (Eigen::Matrix3d::Identity() - scalingMatrix) * compPos;
+    m_positions.access()[linearIndex({offsetIndex, timeIndex})] = std::move(newPos);
   }
 }
 
@@ -385,6 +405,43 @@ void ComponentInfo::setRotation(const std::pair<size_t, size_t> &index, const Ei
 
   const auto detectorRange = detectorRangeInSubtree(componentIndex);
   doSetRotation(index, newRotation, detectorRange);
+}
+
+/**
+ * Scales all detectors for a component around it's geometrical center described by target component index
+ *
+ * This will propagate and apply the derived scaling factors to all known
+ *sub-components
+ *
+ * @param componentIndex : Component index to update at
+ * @param newScaling : Absolute scaling factor to set
+ */
+void ComponentInfo::scaleComponent(const size_t componentIndex, const Eigen::Vector3d &newScaling) {
+  checkNoTimeDependence();
+
+  const auto detectorRange = detectorRangeInSubtree(componentIndex);
+  if (!detectorRange.empty())
+    failIfDetectorInfoScanning();
+
+  doScaleComponent({componentIndex, 0}, newScaling, detectorRange);
+}
+
+/**
+ * Scales all detectors for a component around it's geometrical center described by component and time index
+ *
+ * This will propagate and apply the derived scaling factors to all known
+ *sub-components
+ *
+ * @param index : Component and time index pair
+ * @param newScaling : Absolute scaling factor to set
+ */
+void ComponentInfo::scaleComponent(const std::pair<size_t, size_t> &index, const Eigen::Vector3d &newScaling) {
+  const auto componentIndex = index.first;
+  checkSpecialIndices(componentIndex);
+
+  const auto detectorRange = detectorRangeInSubtree(componentIndex);
+
+  doScaleComponent(index, newScaling, detectorRange);
 }
 
 void ComponentInfo::failIfDetectorInfoScanning() const {
@@ -641,7 +698,7 @@ void ComponentInfo::merge(const ComponentInfo &other) {
 
 std::vector<bool> ComponentInfo::buildMergeIndices(const ComponentInfo &other) const {
   checkSizes(other);
-  std::vector<bool> merge(other.m_scanIntervals.size(), true);
+  std::vector<bool> mergeIndices(other.m_scanIntervals.size(), true);
   for (size_t t1 = 0; t1 < other.m_scanIntervals.size(); ++t1) {
     for (size_t t2 = 0; t2 < m_scanIntervals.size(); ++t2) {
       const auto interval1 = other.m_scanIntervals[t1];
@@ -651,13 +708,13 @@ std::vector<bool> ComponentInfo::buildMergeIndices(const ComponentInfo &other) c
           checkIdenticalIntervals(other, std::pair<size_t, size_t>(compIndex, t1),
                                   std::pair<size_t, size_t>(compIndex, t2));
         }
-        merge[t1] = false;
+        mergeIndices[t1] = false;
       } else if ((interval1.first < interval2.second) && (interval1.second > interval2.first)) {
         failMerge("scan intervals overlap but not identical");
       }
     }
   }
-  return merge;
+  return mergeIndices;
 }
 
 void ComponentInfo::checkSizes(const ComponentInfo &other) const {

@@ -5,6 +5,7 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import math
+from typing import Literal
 import warnings
 
 import numpy as np
@@ -164,6 +165,7 @@ M_2_HARTREE = constants.value("atomic mass unit-hartree relationship")  # amu * 
 
 # ALL_SAMPLE_FORMS = ["SingleCrystal", "Powder"]  # valid forms of samples
 ALL_SAMPLE_FORMS = ["Powder"]  # valid forms of samples
+ALL_SAMPLE_FORMS_TYPE = Literal["Powder"]
 
 # keywords which define data structure of KpointsData
 ALL_KEYWORDS_K_DATA = ["weights", "k_vectors", "frequencies", "atomic_displacements", "unit_cell"]
@@ -190,6 +192,9 @@ COMPLEX_TYPE = np.dtype(complex)
 
 INT_ID = np.dtype(np.uint32).num
 INT_TYPE = np.dtype(np.uint32)
+
+# Valid types for hdf5 attr read/write
+HDF5_ATTR_TYPE = np.int64 | int | np.float64 | float | str | bytes | bool
 
 HIGHER_ORDER_QUANTUM_EVENTS = 3  # number of quantum order effects taken into account
 HIGHER_ORDER_QUANTUM_EVENTS_DIM = HIGHER_ORDER_QUANTUM_EVENTS
@@ -262,7 +267,7 @@ T_THRESHOLD = 1e-12
 MAX_ORDER = 4  # max quantum order event
 
 ALL_SUPPORTED_AB_INITIO_PROGRAMS = ["CRYSTAL", "CASTEP", "DMOL3", "GAUSSIAN", "VASP"]
-AB_INITIO_FILE_EXTENSIONS = ["phonon", "out", "outmol", "log", "LOG", "xml", "yaml", "castep_bin", "hdf5"]
+AB_INITIO_FILE_EXTENSIONS = ["phonon", "out", "outmol", "log", "LOG", "xml", "yaml", "castep_bin", "hdf5", "json"]
 
 ONE_DIMENSIONAL_INSTRUMENTS = ["TOSCA", "Lagrange"]
 TWO_DIMENSIONAL_CHOPPER_INSTRUMENTS = ["MAPS", "MARI", "MERLIN"]
@@ -312,9 +317,12 @@ EOF = b""
 
 ROTATIONS_AND_TRANSLATIONS = 6
 
-# This constant is used to check whether for the given atom mass averaged over all isotopes or mass of the
-# specific isotope is used.
+# This constant is used to check whether the standard atomic mass is "close enough",
+# if closer isotope exists but lacks data
 MASS_EPS = 1e-2  # in amu units.
+
+# Tolerance when distinguishing between mass types in the input data
+FINE_MASS_EPS = 1e-8
 
 # this constant is used to check if in a system for the given symbol of an element all atoms with this symbol have
 # the same mass

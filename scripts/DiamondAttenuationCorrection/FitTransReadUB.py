@@ -4,6 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+# ruff: noqa: E741  # Ambiguous variable name
 """
 1. all the functions are defined and built consistently.
 
@@ -18,6 +19,7 @@ Data types:
 *** UB1, UB2 = numpy arrays (3x3) holds UB matrices from input files
 ***
 """
+
 # Import all needed libraries
 from matplotlib import pyplot as plt
 import numpy as np

@@ -4,9 +4,19 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+from mantid import FileFinder
+from mantid.api import (
+    AlgorithmFactory,
+    DataProcessorAlgorithm,
+    NumericAxis,
+    Progress,
+    PropertyMode,
+    WorkspaceGroupProperty,
+    WorkspaceProperty,
+)
+from mantid.kernel import config, logger, Direction, Property, StringListValidator
 from mantid.simpleapi import AppendSpectra, CloneWorkspace, ElasticWindow, LoadLog, Logarithm, SortXAxis, Transpose
-from mantid.kernel import *
-from mantid.api import *
+from IndirectCommon import get_instrument_and_run
 
 import numpy as np
 
@@ -104,10 +114,10 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
         background_range_end = self.getProperty("BackgroundRangeEnd").value
 
         if background_range_start != Property.EMPTY_DBL and background_range_end == Property.EMPTY_DBL:
-            issues["BackgroundRangeEnd"] = "If background range start was given and " "background range end must also be provided."
+            issues["BackgroundRangeEnd"] = "If background range start was given and background range end must also be provided."
 
         if background_range_start == Property.EMPTY_DBL and background_range_end != Property.EMPTY_DBL:
-            issues["BackgroundRangeStart"] = "If background range end was given and background " "range start must also be provided."
+            issues["BackgroundRangeStart"] = "If background range end was given and background range start must also be provided."
 
         return issues
 
@@ -130,14 +140,14 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
         self._background_range_end = self.getProperty("BackgroundRangeEnd").value
 
     def PyExec(self):
-        from IndirectCommon import getInstrRun
-
         # Do setup
         self._setup()
 
         # Lists of input and output workspaces
         q_workspaces = list()
         q2_workspaces = list()
+        elf_workspace = None  # initializing for logs
+        elt_workspace = None
         run_numbers = list()
         sample_param = list()
 
@@ -166,7 +176,7 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
             q2_workspaces.append(q2_workspace)
 
             # Get the run number
-            run_no = getInstrRun(input_ws.name())[1]
+            run_no = get_instrument_and_run(input_ws.name())[1]
             run_numbers.append(run_no)
 
             # Get the sample environment unit
@@ -186,7 +196,7 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
         else:
             if not workspaces_have_same_size(q_workspaces) or not workspaces_have_same_size(q2_workspaces):
                 raise RuntimeError(
-                    "The ElasticWindow algorithm produced differently sized workspaces. Please check " "the input files are compatible."
+                    "The ElasticWindow algorithm produced differently sized workspaces. Please check the input files are compatible."
                 )
             q_workspace = _append_all(q_workspaces)
             q2_workspace = _append_all(q2_workspaces)
@@ -236,7 +246,8 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
             _normalize_by_index(elt_workspace, 0)
 
             self.setProperty("OutputELT", elt_workspace)
-
+        # Add sample logs
+        self._add_sample_logs_to_output_workspaces([q_workspace, q2_workspace, elf_workspace, elt_workspace])
         # Set the output workspace
         self.setProperty("OutputInQ", q_workspace)
         self.setProperty("OutputInQSquared", q2_workspace)
@@ -248,9 +259,7 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
         @param workspace The workspace
         @returns sample in given units or None if not found
         """
-        from IndirectCommon import getInstrRun
-
-        instr, run_number = getInstrRun(workspace.name())
+        instr, run_number = get_instrument_and_run(workspace.name())
 
         pad_num = config.getInstrument(instr).zeroPadding(int(run_number))
         zero_padding = "0" * (pad_num - len(run_number))
@@ -287,6 +296,21 @@ class ElasticWindowMultiple(DataProcessorAlgorithm):
 
         return sample, unit
 
+    def _add_sample_logs_to_output_workspaces(self, out_ws):
+        names = ["integration_range_start", "integration_range_end"]
+        values = [self._integration_range_start, self._integration_range_end]
+        for ws in out_ws:
+            if ws is not None:
+                self._add_sample_log(ws, names, values)
+
+    def _add_sample_log(self, workspace, names, values):
+        add_log = self.createChildAlgorithm("AddSampleLogMultiple", enableLogging=False)
+        add_log.setProperty("Workspace", workspace)
+        add_log.setProperty("LogNames", names)
+        add_log.setProperty("LogValues", values)
+        add_log.setProperty("ParseType", True)
+        add_log.execute()
+
 
 def _extract_temperature_from_log(workspace, sample_log_name, log_filename, run_name):
     log_path = FileFinder.getFullPath(log_filename)
@@ -317,7 +341,7 @@ def _extract_sensor_name(sample_log_name, run, instrument):
             return sensor_names[position]
         elif position < len(default_names):
             logger.warning(
-                "Position {0} not found within the instrument parameters, " "using default '{1}'.".format(position, default_names[position])
+                "Position {0} not found within the instrument parameters, using default '{1}'.".format(position, default_names[position])
             )
             return default_names[position]
         else:

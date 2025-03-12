@@ -5,8 +5,7 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 
-""" Main view for the ISIS SANS reduction interface.
-"""
+"""Main view for the ISIS SANS reduction interface."""
 
 from abc import ABCMeta, abstractmethod
 
@@ -67,6 +66,8 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         "Sample Shape",
         "Sample Height",
         "Sample Width",
+        "Background Workspace",
+        "Scale Factor",
         "SSP",
         "STP",
         "SDP",
@@ -116,6 +117,10 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
         @abstractmethod
         def on_sample_geometry_selection(self, show_geometry):
+            pass
+
+        @abstractmethod
+        def on_background_subtraction_selection(self, show_background_subtraction):
             pass
 
         @abstractmethod
@@ -313,6 +318,7 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
         self.multi_period_check_box.stateChanged.connect(self._on_multi_period_selection)
         self.sample_geometry_checkbox.stateChanged.connect(self._on_sample_geometry_selection)
+        self.background_subtraction_checkbox.stateChanged.connect(self._on_background_subtraction_selection)
 
         self.wavelength_step_type_combo_box.currentIndexChanged.connect(self._on_wavelength_step_type_changed)
 
@@ -378,6 +384,12 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
         self.wavelength_stacked_widget.setCurrentIndex(0)
         self.hide_geometry()
+        self.hide_background_subtraction()
+
+        # Hide broken functionality: https://github.com/mantidproject/mantid/issues/37836
+        self.event_slice_optimisation_checkbox.setChecked(False)
+        self.event_slice_optimisation_checkbox.setHidden(True)
+        self.event_slice_optimisation_label.setHidden(True)
 
         return True
 
@@ -387,10 +399,10 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
             self.wavelength_step_label.setText("Step [\u00c5]")
         elif self.wavelength_step_type == RangeStepType.RANGE_LOG:
             self.wavelength_stacked_widget.setCurrentIndex(1)
-            self.wavelength_step_label.setText("Step [d\u03BB/\u03BB]")
+            self.wavelength_step_label.setText("Step [d\u03bb/\u03bb]")
         elif self.wavelength_step_type == RangeStepType.LOG:
             self.wavelength_stacked_widget.setCurrentIndex(0)
-            self.wavelength_step_label.setText("Step [d\u03BB/\u03BB]")
+            self.wavelength_step_label.setText("Step [d\u03bb/\u03bb]")
         elif self.wavelength_step_type == RangeStepType.LIN:
             self.wavelength_stacked_widget.setCurrentIndex(0)
             self.wavelength_step_label.setText("Step [\u00c5]")
@@ -544,7 +556,7 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
     @staticmethod
     def _on_help_button_clicked():
-        InterfaceManager().showHelpPage("qthelp://org.sphinx.mantidproject/doc/" "interfaces/isis_sans/ISIS%20SANS.html")
+        InterfaceManager().showHelpPage("qthelp://org.sphinx.mantidproject/doc/interfaces/isis_sans/ISIS%20SANS.html")
 
     def _on_output_mode_clicked(self):
         """This method is called when an output mode is clicked on the gui"""
@@ -673,6 +685,12 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         self.can_sas_checkbox.setEnabled(True)
         self.nx_can_sas_checkbox.setEnabled(True)
         self.rkh_checkbox.setEnabled(True)
+
+    def disable_can_sas_1D_button(self):
+        self.can_sas_checkbox.setEnabled(False)
+
+    def enable_can_sas_1D_button(self):
+        self.can_sas_checkbox.setEnabled(True)
 
     def disable_process_buttons(self):
         self.process_selected_button.setEnabled(False)
@@ -909,6 +927,10 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         UsageService.registerFeatureUsage(FeatureType.Feature, ["ISIS SANS", "Sample Geometry Toggled"], False)
         self._call_settings_listeners(lambda listener: listener.on_sample_geometry_selection(self.is_sample_geometry()))
 
+    def _on_background_subtraction_selection(self):
+        UsageService.registerFeatureUsage(FeatureType.Feature, ["ISIS SANS", "Background Subtraction Toggled"], False)
+        self._call_settings_listeners(lambda listener: listener.on_background_subtraction_selection(self.is_background_subtraction()))
+
     def _on_manage_directories(self):
         self._call_settings_listeners(lambda listener: listener.on_manage_directories())
 
@@ -976,6 +998,15 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
     def set_sample_geometry_mode(self, mode):
         self.sample_geometry_checkbox.setChecked(mode)
+
+    def is_background_subtraction(self):
+        return self.background_subtraction_checkbox.isChecked()
+
+    def set_background_subtraction_mode(self, mode):
+        self.background_subtraction_checkbox.setChecked(mode)
+
+    def set_plot_results_checkbox_visibility(self, visibility):
+        self.plot_results_checkbox.setVisible(visibility)
 
     # $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
     # $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -1115,7 +1146,9 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
 
     @event_slice_optimisation.setter
     def event_slice_optimisation(self, value):
-        self.event_slice_optimisation_checkbox.setChecked(value)
+        # Functionality is broken, so the checkbox for this setter is hidden. See here for more information:
+        # https://github.com/mantidproject/mantid/issues/37836
+        pass
 
     @property
     def instrument(self):
@@ -1485,7 +1518,7 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         minimum = spin_box.minimum()
         maximum = spin_box.maximum()
         if value < minimum or value > maximum:
-            raise ValueError("The value for the polynomial order {} has " "to be in the range of {} and {}".format(value, minimum, maximum))
+            raise ValueError("The value for the polynomial order {} has to be in the range of {} and {}".format(value, minimum, maximum))
         spin_box.setValue(value)
 
     @property
@@ -2099,6 +2132,24 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         """
         execute_script(text)
 
+    def hide_geometry(self):
+        self.data_processor_table.hideColumn(self._column_index_map["Sample Shape"])
+        self.data_processor_table.hideColumn(self._column_index_map["Sample Height"])
+        self.data_processor_table.hideColumn(self._column_index_map["Sample Width"])
+
+    def show_geometry(self):
+        self.data_processor_table.showColumn(self._column_index_map["Sample Shape"])
+        self.data_processor_table.showColumn(self._column_index_map["Sample Height"])
+        self.data_processor_table.showColumn(self._column_index_map["Sample Width"])
+
+    def hide_background_subtraction(self):
+        self.data_processor_table.hideColumn(self._column_index_map["Background Workspace"])
+        self.data_processor_table.hideColumn(self._column_index_map["Scale Factor"])
+
+    def show_background_subtraction(self):
+        self.data_processor_table.showColumn(self._column_index_map["Background Workspace"])
+        self.data_processor_table.showColumn(self._column_index_map["Scale Factor"])
+
     def hide_period_columns(self):
         self.multi_period_check_box.setChecked(False)
 
@@ -2133,6 +2184,9 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         array[self._column_index_map["Sample Thickness"]] = row_state_obj.sample_thickness
         array[self._column_index_map["Sample Width"]] = row_state_obj.sample_width
 
+        array[self._column_index_map["Background Workspace"]] = row_state_obj.background_ws
+        array[self._column_index_map["Scale Factor"]] = row_state_obj.scale_factor
+
         array[self._column_index_map["CDP"]] = row_state_obj.can_direct_period
         array[self._column_index_map["CSP"]] = row_state_obj.can_scatter_period
         array[self._column_index_map["CTP"]] = row_state_obj.can_transmission_period
@@ -2160,6 +2214,9 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         entry.sample_thickness = row_array[self._column_index_map["Sample Thickness"]]
         entry.sample_width = row_array[self._column_index_map["Sample Width"]]
 
+        entry.background_ws = row_array[self._column_index_map["Background Workspace"]]
+        entry.scale_factor = row_array[self._column_index_map["Scale Factor"]]
+
         entry.can_direct_period = row_array[self._column_index_map["CDP"]]
         entry.can_scatter_period = row_array[self._column_index_map["CSP"]]
         entry.can_transmission_period = row_array[self._column_index_map["CTP"]]
@@ -2171,16 +2228,6 @@ class SANSDataProcessorGui(QMainWindow, Ui_SansDataProcessorWindow):
         entry.options.set_user_options(row_array[self._column_index_map["Options"]])
 
         return entry
-
-    def show_geometry(self):
-        self.data_processor_table.showColumn(self._column_index_map["Sample Shape"])
-        self.data_processor_table.showColumn(self._column_index_map["Sample Height"])
-        self.data_processor_table.showColumn(self._column_index_map["Sample Width"])
-
-    def hide_geometry(self):
-        self.data_processor_table.hideColumn(self._column_index_map["Sample Shape"])
-        self.data_processor_table.hideColumn(self._column_index_map["Sample Height"])
-        self.data_processor_table.hideColumn(self._column_index_map["Sample Width"])
 
     def closeEvent(self, event):
         for child in self.children():

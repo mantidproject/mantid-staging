@@ -10,7 +10,7 @@ import mantid.simpleapi as mantid
 from mantid.kernel import logger
 from Diffraction.single_crystal.base_sx import BaseSX, PEAK_TYPE, INTEGRATION_TYPE
 from mantid.api import AnalysisDataService as ADS
-from FindGoniometerFromUB import getR
+from plugins.algorithms.FindGoniometerFromUB import getR
 from os import path
 
 tof_min = 700
@@ -18,19 +18,33 @@ tof_max = 18800
 
 
 class SXD(BaseSX):
-    def __init__(self, vanadium_runno=None, empty_runno=None, detcal_path=None):
+    def __init__(self, vanadium_runno=None, empty_runno=None, detcal_path=None, file_ext=".raw", scale_integrated=True):
         self.empty_runno = empty_runno
         self.detcal_path = detcal_path
-        super().__init__(vanadium_runno)
+        super().__init__(vanadium_runno, file_ext, scale_integrated)
         self.sphere_shape = """<sphere id="sphere">
                                <centre x="0.0"  y="0.0" z="0.0" />
                                <radius val="0.003"/>
                                </sphere>"""  # sphere radius 3mm  - used for vanadium and NaCl
+        self.beam_width = 0.6  # cm
+        self.beam_height = 0.6  # cm
 
     def process_data(self, runs: Sequence[str], *args):
+        """
+        Function to load and normalise a sequence of runs
+        :param runs: sequence of run numbers (can be ints or string)
+        :param args: goniometer angles - one positional arg for each goniometer axis/motor
+        :return: workspace name of last run loaded
+
+        Examples for providing goniometer angles (passed to SetGoniometer)
+        e.g. using motor names for 2 axes defined sxd.set_goniometer_axes for 3 runs
+        sxd.process_data(range(3), "wccr", "ewald_pos")
+        e.g. using a sequence of angles for each motor
+        sxd.process_data(range(3), [1,2,3], [4,5,6]])  # e.g. for the first run wccr=1 and ewald_pos=4
+        """
         gonio_angles = args
         for irun, run in enumerate(runs):
-            wsname = self.load_run(run)
+            wsname = self.load_run(run, self.file_ext)
             # set goniometer
             if self.gonio_axes is not None:
                 if len(gonio_angles) != len(self.gonio_axes):
@@ -38,30 +52,39 @@ class SXD(BaseSX):
                 elif isinstance(gonio_angles[0], str):
                     self._set_goniometer_on_ws(wsname, gonio_angles)
                 else:
-                    # gonio_angles is a list of individual or tuple motor angles for each run
-                    self._set_goniometer_on_ws(wsname, gonio_angles[irun])
+                    if len(gonio_angles[0]) == len(runs):
+                        # gonio_angles is a list of individual or tuple motor angles for each run
+                        self._set_goniometer_on_ws(wsname, [angles[irun] for angles in gonio_angles])
+                    else:
+                        logger.warning(
+                            "No goniometer will be applied as the number of goniometer angles for each motor doesn't "
+                            "match the number of runs."
+                        )
             # normalise by vanadium
             self._divide_workspaces(wsname, self.van_ws)  # van_ws has been converted to TOF
             # set sample (must be done after gonio to rotate shape) and correct for attenuation
             if self.sample_dict is not None:
                 mantid.SetSample(wsname, EnableLogging=False, **self.sample_dict)
-                mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="Wavelength", EnableLogging=False)
-                if "<sphere" in ADS.retrieve(wsname).sample().getShape().getShapeXML():
-                    transmission = mantid.SphericalAbsorption(InputWorkspace=wsname, OutputWorkspace="transmission", EnableLogging=False)
-                else:
-                    transmission = mantid.MonteCarloAbsorption(
-                        InputWorkspace=wsname, OutputWorkspace="transmission", EventsPerPoint=self.n_mcevents, EnableLogging=False
-                    )
-                self._divide_workspaces(wsname, transmission)
-                mantid.DeleteWorkspace(transmission)
-                mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="TOF", EnableLogging=False)
+                if not self.scale_integrated:
+                    mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="Wavelength", EnableLogging=False)
+                    if "<sphere" in ADS.retrieve(wsname).sample().getShape().getShapeXML():
+                        transmission = mantid.SphericalAbsorption(
+                            InputWorkspace=wsname, OutputWorkspace="transmission", EnableLogging=False
+                        )
+                    else:
+                        transmission = mantid.MonteCarloAbsorption(
+                            InputWorkspace=wsname, OutputWorkspace="transmission", EventsPerPoint=self.n_mcevents, EnableLogging=False
+                        )
+                    self._divide_workspaces(wsname, transmission)
+                    mantid.DeleteWorkspace(transmission)
+                    mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="TOF", EnableLogging=False)
             # save results in dictionary
             self.set_ws(run, wsname)
         return wsname
 
-    def load_run(self, runno):
+    def load_run(self, runno, file_ext=".raw"):
         wsname = "SXD" + str(runno)
-        mantid.Load(Filename=wsname + ".raw", OutputWorkspace=wsname, EnableLogging=False)
+        mantid.Load(Filename=wsname + self.file_ext, OutputWorkspace=wsname, EnableLogging=False)
         if self.detcal_path is not None:
             mantid.LoadParameterFile(Workspace=wsname, Filename=self.detcal_path, EnableLogging=False)
         mantid.CropWorkspace(InputWorkspace=wsname, OutputWorkspace=wsname, XMin=tof_min, XMax=tof_max, EnableLogging=False)
@@ -95,8 +118,8 @@ class SXD(BaseSX):
 
     def process_vanadium(self):
         # load empty and vanadium
-        empty_ws = self.load_run(self.empty_runno)
-        self.van_ws = self.load_run(self.van_runno)
+        empty_ws = self.load_run(self.empty_runno, self.file_ext)
+        self.van_ws = self.load_run(self.van_runno, self.file_ext)
         # create grouping file per bank
         bank_grouping_ws, _, ngroups = mantid.CreateGroupingWorkspace(
             InputWorkspace=self.van_ws, GroupDetectorsBy="bank", OutputWorkspace="bank_groups", EnableLogging=False
@@ -301,9 +324,13 @@ class SXD(BaseSX):
             mantid.DeleteWorkspace(ws)
 
     @staticmethod
-    def undo_calibration(ws):
+    def undo_calibration(ws, peaks_ws=None):
         mantid.ClearInstrumentParameters(Workspace=ws)  # reset workspace calibration
         mantid.LoadParameterFile(Workspace=ws, Filename="SXD_Parameters.xml", EnableLogging=False)
+        if peaks_ws is not None:
+            mantid.ApplyInstrumentToPeaks(
+                InputWorkspace=peaks_ws, InstrumentWorkspace=ws, OutputWorkspace=SXD.retrieve(peaks_ws).name(), EnableLogging=False
+            )
 
     @staticmethod
     def remove_peaks_on_detector_edge(peaks, nedge):
@@ -314,16 +341,20 @@ class SXD(BaseSX):
             mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove, EnableLogging=False)
 
     @staticmethod
-    def find_sx_peaks(ws, bg=None, nstd=None, lambda_min=0.45, lambda_max=3, nbunch=3, out_peaks=None, **kwargs):
+    def find_sx_peaks(ws, out_peaks=None, **kwargs):
         wsname = SXD.retrieve(ws).name()
-        ws_rb = wsname + "_rb"
-        mantid.Rebunch(InputWorkspace=ws, OutputWorkspace=ws_rb, NBunch=nbunch, EnableLogging=False)
-        SXD.mask_detector_edges(ws_rb)
-        SXD.crop_ws(ws_rb, lambda_min, lambda_max, xunit="Wavelength")
         if out_peaks is None:
-            out_peaks = wsname + "_peaks"  # need to do this so not "_rb_peaks"
-        BaseSX.find_sx_peaks(ws_rb, bg, nstd, out_peaks, **kwargs)
-        mantid.DeleteWorkspace(ws_rb, EnableLogging=False)
+            out_peaks = wsname + "_peaks"
+        default_kwargs = {
+            "NRows": 7,
+            "NCols": 7,
+            "GetNBinsFromBackToBackParams": True,
+            "NFWHM": 6,
+            "PeakFindingStrategy": "VarianceOverMean",
+            "ThresholdVarianceOverMean": 2,
+        }
+        kwargs = {**default_kwargs, **kwargs}  # will overwrite default with provided if duplicate keys
+        mantid.FindSXPeaksConvolve(InputWorkspace=wsname, PeaksWorkspace=out_peaks, **kwargs)
         return out_peaks
 
     @staticmethod

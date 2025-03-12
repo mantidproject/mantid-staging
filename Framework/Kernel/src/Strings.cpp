@@ -127,6 +127,15 @@ MANTID_KERNEL_DLL std::string toUpper(const std::string &input) {
   return output;
 }
 
+/** Checks if string ends with a suffix
+ */
+MANTID_KERNEL_DLL bool endsWith(std::string const &str, std::string const &suffix) {
+  if (str.size() >= suffix.size()) {
+    return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+  }
+  return false;
+}
+
 //------------------------------------------------------------------------------------------------
 /**
  * Function to convert a number into hex
@@ -407,7 +416,7 @@ std::string strip(const std::string &A) {
  */
 bool skipLine(const std::string &line) {
   // Empty or comment
-  return (line.empty() || boost::starts_with(line, "#"));
+  return (line.empty() || line.starts_with("#"));
 }
 
 //------------------------------------------------------------------------------------------------
@@ -1154,6 +1163,21 @@ std::istream &extractToEOL(std::istream &is, std::string &str) {
     }
   }
   return is;
+}
+
+//------------------------------------------------------------------------------------------------
+std::string randomString(size_t len) {
+  static const std::string alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+  std::string result;
+  result.reserve(len);
+
+  while (result.size() != len) {
+    size_t randPos = ((rand() % (alphabet.size() - 1)));
+    result.push_back(alphabet[randPos]);
+  }
+
+  return result;
 }
 
 /// \cond TEMPLATE

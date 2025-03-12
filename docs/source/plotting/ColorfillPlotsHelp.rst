@@ -66,33 +66,10 @@ Click Menus
 Scripting
 ---------
 
-Click the generate a script button |GenerateAScript.png| on a `Colorfill Plot <https://matplotlib.org/3.2.1/api/_as_gen/matplotlib.pyplot.imshow.html>`_:
-
-.. code-block:: python
-
-   import matplotlib.pyplot as plt
-   import numpy as np
-   from matplotlib.colors import LogNorm
-   from matplotlib.ticker import LogLocator
-   from mantid.api import AnalysisDataService as ADS
-
-   MAR11060 = ADS.retrieve('MAR11060')
-
-   fig, axes = plt.subplots(figsize=[8.0, 7.0], num='MAR11060-1', subplot_kw={'projection': 'mantid'})
-   cfill = axes.imshow(MAR11060, aspect='auto', cmap='viridis', distribution=False, origin='lower')
-   cfill.set_norm(LogNorm(vmin=0.0001, vmax=3792.3352))
-   # If no ticks appear on the color bar remove the subs argument inside the LogLocator below
-   cbar = fig.colorbar(cfill, ax=[axes], ticks=LogLocator(subs=np.arange(1, 10)), pad=0.06)
-   cbar.set_label('Counts ($\\mu s$)$^{-1}$')
-   axes.set_title('MAR11060')
-   axes.set_xlabel('Time-of-flight ($\\mu s$)')
-   axes.set_ylabel('Spectrum')
-   axes.set_xlim([5.0, 19992.0])
-   axes.set_ylim([0.5, 922.5])
-
-   plt.show()
+Click the generate a script button |GenerateAScript.png| on a `Colorfill Plot <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.imshow.html>`_:
 
 .. plot::
+   :include-source:
 
    # import mantid algorithms, numpy and matplotlib
    from mantid.simpleapi import *
@@ -116,7 +93,7 @@ Click the generate a script button |GenerateAScript.png| on a `Colorfill Plot <h
    axes.set_xlim([5.0, 19992.0])
    axes.set_ylim([0.5, 922.5])
 
-   plt.show()
+   fig.show()
 
 For more advice:
 
@@ -178,7 +155,7 @@ Click Menus
 Scripting
 ---------
 
-Basic example of plotting a `Contour Plot <https://matplotlib.org/api/_as_gen/matplotlib.axes.Axes.contour.html>`_:
+Basic example of plotting a `Contour Plot <https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.contour.html>`_:
 
 .. plot::
    :include-source:
@@ -200,7 +177,8 @@ Basic example of plotting a `Contour Plot <https://matplotlib.org/api/_as_gen/ma
    cbar=fig.colorbar(c)
    cbar.set_label('Counts ($\mu s$)$^{-1}$') #add text to colorbar
    fig.tight_layout()
-   plt.show()
+
+   fig.show()
 
 For more advice:
 
@@ -246,7 +224,7 @@ File > Settings
 **Other Plotting Documentation**
 
 * :ref:`plotting`
-* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/3.1.1/users/navigation_toolbar.html#navigation-keyboard-shortcuts>`_
+* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/stable/users/explain/figure/interactive.html#navigation-keyboard-shortcuts>`_
 
 .. |O| image:: /images/FigureOptionsGear.png
    :width: 150px

@@ -7,8 +7,9 @@
 # pylint: disable=invalid-name
 from isis_reduction_steps import StripEndNans
 from isis_instrument import LARMOR
-from mantid.simpleapi import *
+from mantid.api import mtd
 from mantid.kernel import Logger
+from mantid.simpleapi import CloneWorkspace, DeleteWorkspace, MaskDetectorsInShape, Minus, RenameWorkspace, ReplaceSpecialValues
 import SANSUtility
 
 
@@ -390,7 +391,7 @@ class BeamCentrePositionUpdaterFactory(object):  # pylint: disable=R0903
             return BeamCentrePositionUpdaterAll()
         else:
             RuntimeError(
-                "Error in BeamCentrePositionUpdaterFactory: You need to provide a position update" "policy, ie up/down, left/right or all"
+                "Error in BeamCentrePositionUpdaterFactory: You need to provide a position update policy, ie up/down, left/right or all"
             )
 
 

@@ -7,8 +7,8 @@
 #  This file is part of the mantid workbench.
 #
 #
-"""A selection of utility functions related to Qt functionality
-"""
+"""A selection of utility functions related to Qt functionality"""
+
 # stdlib modules
 import os
 import os.path as osp
@@ -16,14 +16,16 @@ from contextlib import contextmanager
 from importlib import import_module
 import warnings
 
-warnings.filterwarnings(action="ignore", category=DeprecationWarning, module=".*uic.*")
-
 # 3rd-party modules
 from qtpy import QT_VERSION
 from qtpy.QtCore import QPoint
 from qtpy.QtGui import QKeySequence
 from qtpy.QtWidgets import QAction, QMenu, QDesktopWidget
-from qtpy.uic import loadUi, loadUiType
+
+# Must be called before trying to import module with a deprecation warning
+warnings.filterwarnings(action="ignore", category=DeprecationWarning, module=".*uic.*")
+
+from qtpy.uic import loadUi, loadUiType  # noqa: E402
 
 LIB_SUFFIX = "qt" + QT_VERSION[0]
 
@@ -176,7 +178,7 @@ def add_actions(target, actions):
         elif isinstance(action, QAction):
             target.addAction(action)
         else:
-            raise ValueError("Unexpected action type. " "Expected one of (QAction,QMenu) but found '{}'".format(type(action)))
+            raise ValueError("Unexpected action type. Expected one of (QAction,QMenu) but found '{}'".format(type(action)))
 
 
 def toQSettings(settings):
@@ -217,9 +219,9 @@ def force_layer_backing_BigSur():
     # https://codereview.qt-project.org/gitweb?p=qt/qtbase.git;a=commitdiff;h=c5d904639dbd690a36306e2b455610029704d821
     # A complication with Big Sur numbering means we check for 10.16 and 11:
     #   https://eclecticlight.co/2020/08/13/macos-version-numbering-isnt-so-simple/
-    from distutils.version import LooseVersion
+    from packaging.version import Version
     import platform
 
-    mac_vers = LooseVersion(platform.mac_ver()[0])
-    if mac_vers >= "11" or mac_vers == "10.16":
+    mac_vers = Version(platform.mac_ver()[0])
+    if mac_vers >= Version("11") or mac_vers == Version("10.16"):
         os.environ["QT_MAC_WANTS_LAYER"] = "1"

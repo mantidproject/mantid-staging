@@ -9,8 +9,9 @@ import numpy as np
 import sys
 from scipy.special import factorial
 from scipy.optimize import curve_fit
-from mantid.simpleapi import *
-from mantid.kernel import V3D
+from mantid.api import mtd
+from mantid.simpleapi import BinMD, ConvertToMD, CreateWorkspace, Fit, FunctionWrapper, Load, LoadIsawDetCal, Polynomial
+from mantid.kernel import logger, V3D
 import ICConvoluted as ICC
 import itertools
 from functools import reduce
@@ -1143,7 +1144,7 @@ def integrateSample(
                     logger.information("Peak {:d} has 0 events or is HKL=000. Skipping!".format(p))
                     peak.setIntensity(0)
                     peak.setSigmaIntensity(1)
-                    paramLisg.append([i, energy, 0.0, 1.0e10, 1.0e10] + [0 for i in range(mtd["fit_parameters"].rowCount())] + [0])
+                    paramList.append([i, energy, 0.0, 1.0e10, 1.0e10] + [0 for i in range(mtd["fit_parameters"].rowCount())] + [0])
 
                     mtd.remove("MDbox_" + str(run) + "_" + str(i))
                     continue

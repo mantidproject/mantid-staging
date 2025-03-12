@@ -32,11 +32,8 @@ class SimpleAPITest(unittest.TestCase):
     def test_simpleapi_does_not_import_qt(self):
         import sys
 
-        modules = [mod for mod in sys.modules]
-        qt_import = "qtpy"
-        matching_qtpy_imports = [mod for mod in modules if qt_import in mod]
         self.assertFalse(
-            len(matching_qtpy_imports) > 0,
+            "qtpy" in sys.modules,
             msg="The simpleapi shouldn't import qtpy, one or more of "
             "imports you've added includes a package which imports "
             "qtpy, please amend your imports.",
@@ -45,11 +42,8 @@ class SimpleAPITest(unittest.TestCase):
     def test_simpleapi_does_not_import_mantidqt(self):
         import sys
 
-        modules = [mod for mod in sys.modules]
-        mantidqt_import = "mantidqt"
-        matching_mantidqt_imports = [mod for mod in modules if mantidqt_import in mod]
         self.assertFalse(
-            len(matching_mantidqt_imports) > 0,
+            "mantidqt" in sys.modules,
             msg="The simpleapi shouldn't import mantidqt, one or more of "
             "imports you've added includes a package which imports "
             "mantidqt, please amend your imports.",
@@ -65,16 +59,32 @@ class SimpleAPITest(unittest.TestCase):
     def test_alg_has_expected_doc_string(self):
         # Test auto generated string, Load is manually written
         expected_doc = (
-            "Rebins data with new X bin boundaries. For EventWorkspaces, you can very quickly rebin in-place by keeping the same output name and PreserveEvents=true.\n\n"
+            "Rebins data with new X bin boundaries. For EventWorkspaces, you can very quickly rebin "
+            "in-place by keeping the same output name and PreserveEvents=true.\n\n"
             "Property descriptions: \n\n"
             "InputWorkspace(Input:req) *MatrixWorkspace*       Workspace containing the input data\n\n"
             "OutputWorkspace(Output:req) *MatrixWorkspace*       The name to give the output workspace\n\n"
-            "Params(Input:req) *dbl list*       A comma separated list of first bin boundary, width, last bin boundary. Optionally this can be followed by a comma and more widths and last boundary pairs. Optionally this can also be a single number, which is the bin width. In this case, the boundary of binning will be determined by minimum and maximum TOF values among all events, or previous binning boundary, in case of event Workspace, or non-event Workspace, respectively. Negative width values indicate logarithmic binning.\n\n"
-            "PreserveEvents(Input) *boolean*       Keep the output workspace as an EventWorkspace, if the input has events. If the input and output EventWorkspace names are the same, only the X bins are set, which is very quick. If false, then the workspace gets converted to a Workspace2D histogram.\n\n"
+            "Params(Input:req) *dbl list*       A comma separated list of first bin boundary, width, last "
+            "bin boundary. Optionally this can be followed by a comma and more widths and last boundary pairs. "
+            "Optionally this can also be a single number, which is the bin width. In this case, the boundary "
+            "of binning will be determined by minimum and maximum TOF values among all events, or previous "
+            "binning boundary, in case of event Workspace, or non-event Workspace, respectively. Negative width "
+            "values indicate logarithmic binning.\n\n"
+            "PreserveEvents(Input) *boolean*       Keep the output workspace as an EventWorkspace, if the input "
+            "has events. If the input and output EventWorkspace names are the same, only the X bins are set, "
+            "which is very quick. If false, then the workspace gets converted to a Workspace2D histogram.\n\n"
             "FullBinsOnly(Input) *boolean*       Omit the final bin if its width is smaller than the step size\n\n"
-            "IgnoreBinErrors(Input) *boolean*       Ignore errors related to zero/negative bin widths in input/output workspaces. When ignored, the signal and errors are set to zero\n\n"
-            "UseReverseLogarithmic(Input) *boolean*       For logarithmic intervals, the splitting starts from the end and goes back to the start, ie the bins are bigger at the start getting exponentially smaller until they reach the end. For these bins, the FullBinsOnly flag is ignored.\n\n"
-            "Power(Input) *number*       Splits the interval in bins which actual width is equal to requested width / (i ^ power); default is linear. Power must be between 0 and 1.\n"
+            "IgnoreBinErrors(Input) *boolean*       Ignore errors related to zero/negative bin widths in input/output "
+            "workspaces. When ignored, the signal and errors are set to zero\n\n"
+            "UseReverseLogarithmic(Input) *boolean*       For logarithmic intervals, the splitting starts from the "
+            "end and goes back to the start, ie the bins are bigger at the start getting exponentially smaller until "
+            "they reach the end. For these bins, the FullBinsOnly flag is ignored.\n\n"
+            "Power(Input) *number*       Splits the interval in bins which actual width is equal to requested "
+            "width / (i ^ power); default is linear. Power must be between 0 and 1.\n\n"
+            "BinningMode(Input) *string*       Optional. Binning behavior can be specified in the usual way through "
+            "sign of binwidth and other properties ('Default'); or can be set to one of the allowed binning modes. "
+            "This will override all other specification or default behavior.[Default, Linear, Logarithmic, "
+            "ReverseLogarithmic, Power]\n"
         )
         doc = simpleapi.rebin.__doc__
         self.assertGreater(len(doc), 0)
@@ -109,7 +119,7 @@ class SimpleAPITest(unittest.TestCase):
 
     def test_function_call_raises_RuntimeError_when_passed_incorrect_args(self):
         for func_call in (simpleapi.LoadNexus, simpleapi.Load):
-            self.assertRaises(RuntimeError, func_call, NotAProperty=1)
+            self.assertRaises(TypeError, func_call, NotAProperty=1)
 
     def test_function_call_returns_tuple_when_a_single_argument_is_provided(self):
         dataX = numpy.linspace(start=1, stop=3, num=11)

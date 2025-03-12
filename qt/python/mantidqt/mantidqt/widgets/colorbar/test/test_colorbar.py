@@ -4,14 +4,16 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+from unittest.mock import patch
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from unittest import TestCase
+from unittest import TestCase, mock
 
 from mantidqt.utils.qt.testing import start_qapplication
 from mantidqt.widgets.colorbar.colorbar import ColorbarWidget, NORM_OPTS
-from matplotlib.colors import LogNorm, Normalize, SymLogNorm
+from matplotlib.colors import LogNorm, Normalize, SymLogNorm, ListedColormap
 
 
 @start_qapplication
@@ -51,6 +53,14 @@ class ColorbarWidgetTest(TestCase):
             self.assertEqual(self.widget.cmin_value, expected_c_min)
             self.assertEqual(self.widget.cmax_value, c_max)
 
+    @patch("mantidqt.widgets.colorbar.colorbar.get_current_cmap")
+    def test_cmap_values_are_replaced_correctly(self, mocked_cmap):
+        image = plt.imshow(self.data, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+        mock_cmap = mock.MagicMock()
+        mock_cmap.name = "gist_rainbow"
+        mocked_cmap.return_value = mock_cmap
+        self.widget.set_mappable(image)
+
     def test_that_all_zero_slice_with_log_normalisation_gives_valid_clim(self):
         image = plt.imshow(self.data * 0, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
 
@@ -89,6 +99,93 @@ class ColorbarWidgetTest(TestCase):
 
             self.assertEqual(c_min, expected_c_min)
             self.assertEqual(c_max, 99)
+
+    def test_colorbar_limits_min_max(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(0)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0)
+        self.assertEqual(vmax, 99.0)
+
+    def test_colorbar_limits_3sigma(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(1)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0)
+        self.assertEqual(vmax, 99.0)
+
+    def test_colorbar_limits_15interquartile(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(2)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0)
+        self.assertEqual(vmax, 99.0)
+
+    def test_colorbar_limits_15median(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(3)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 12.0)
+        self.assertEqual(vmax, 87.0)
+
+    def test_colorbar_limits_min_max_lognorm(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(0)
+        self.widget.norm.setCurrentIndex(1)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0099)
+        self.assertEqual(vmax, 99.0)
+
+    def test_colorbar_limits_min_max_symmetric_log10(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(0)
+        self.widget.norm.setCurrentIndex(2)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0)
+        self.assertEqual(vmax, 99.0)
+
+    def test_colorbar_limits_min_max_power(self):
+        image = plt.imshow(self.data * np.nan, cmap="plasma", norm=Normalize(vmin=None, vmax=None))
+
+        self.widget.set_mappable(image)
+        self.widget.autoscale.setChecked(True)
+        self.widget.autotype.setCurrentIndex(0)
+        self.widget.norm.setCurrentIndex(3)
+
+        vmin, vmax = self.widget._calculate_auto_color_limits(self.data)
+
+        self.assertEqual(vmin, 0.0)
+        self.assertEqual(vmax, 99.0)
 
     def test_invalid_cmax_range_is_reset(self):
         image = plt.imshow(self.data, cmap="plasma", norm=SymLogNorm(1e-8, vmin=None, vmax=None))
@@ -142,3 +239,18 @@ class ColorbarWidgetTest(TestCase):
             self.widget.clim_changed()
 
             self.assertEqual("0.0", self.widget.cmin.text())
+
+    def test_custom_colormaps(self):
+        # test that users can register custom colormaps and have it as an option in the colorbar
+        cmap_name = "custom_cmap"
+        self.assertFalse(cmap_name in plt.colormaps)
+        self.assertTrue(self.widget.cmap.findText(cmap_name) == -1)
+
+        plt.colormaps.register(cmap=ListedColormap([[0, 0, 0], [0, 0, 1]]), name=cmap_name)
+        self.assertTrue(cmap_name in plt.colormaps)
+
+        # now when you create a colorbar widget, the custom colormap should now be available
+        cb = ColorbarWidget()
+        self.assertTrue(cb.cmap.findText(cmap_name) != -1)
+
+        plt.colormaps.unregister(cmap_name)

@@ -11,6 +11,7 @@ import unittest
 
 import numpy as np
 from numpy.testing import assert_almost_equal
+from pydantic import ValidationError
 
 import abins
 from abins import AbinsData
@@ -32,7 +33,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
     _instruments_defaults = {}
 
     default_calculator_kwargs = dict(
-        temperature=_temperature, instrument=_instrument, sample_form=_sample_form, quantum_order_num=_order_event, autoconvolution=False
+        temperature=_temperature, instrument=_instrument, sample_form=_sample_form, quantum_order_num=_order_event, autoconvolution_max=0
     )
 
     def setUp(self):
@@ -52,7 +53,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
             good_data = AbinsData.from_dict(json.load(fp))
 
         # invalid filename
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValidationError, "Input should be a valid string"):
             abins.SCalculatorFactory.init(
                 filename=1,
                 temperature=self._temperature,
@@ -63,7 +64,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
             )
 
         # invalid temperature
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValidationError, "Input should be greater than 0"):
             abins.SCalculatorFactory.init(
                 filename=full_path_filename,
                 temperature=-1,
@@ -85,7 +86,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
             )
 
         # invalid abins data: content of abins data instead of object abins_data
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValidationError, "Input should be an instance of AbinsData"):
             abins.SCalculatorFactory.init(
                 filename=full_path_filename,
                 temperature=self._temperature,
@@ -96,7 +97,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
             )
 
         # invalid instrument
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValidationError, "Input should be an instance of Instrument"):
             abins.SCalculatorFactory.init(
                 filename=full_path_filename,
                 temperature=self._temperature,
@@ -113,7 +114,7 @@ class SCalculatorFactoryPowderTest(unittest.TestCase):
         self._good_case(test_name=self._si2 + "_1d_o2", abinsdata_name=self._si2, quantum_order_num=2)
 
     def test_1d_order10(self):
-        self._good_case(test_name=self._si2 + "_1d_o10", abinsdata_name=self._si2, quantum_order_num=2, autoconvolution=True)
+        self._good_case(test_name=self._si2 + "_1d_o10", abinsdata_name=self._si2, quantum_order_num=2, autoconvolution_max=10)
 
     def test_2d_order1_mari(self):
         abins.parameters.instruments["MARI"].update({"q_size": 10, "n_energy_bins": 100})

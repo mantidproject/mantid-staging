@@ -16,6 +16,14 @@ Bugfixes
 ############
 .. amalgamate:: Framework/Algorithms/Bugfixes
 
+Deprecated
+############
+.. amalgamate:: Framework/Algorithms/Deprecated
+
+Removed
+############
+.. amalgamate:: Framework/Algorithms/Removed
+
 Fit Functions
 -------------
 
@@ -26,6 +34,14 @@ New features
 Bugfixes
 ############
 .. amalgamate:: Framework/Fit_Functions/Bugfixes
+
+Deprecated
+############
+.. amalgamate:: Framework/Fit_Functions/Deprecated
+
+Removed
+############
+.. amalgamate:: Framework/Fit_Functions/Removed
 
 
 Data Objects
@@ -50,6 +66,18 @@ New features
 Bugfixes
 ############
 .. amalgamate:: Framework/Python/Bugfixes
+
+
+Dependencies
+------------------
+
+New features
+############
+.. amalgamate:: Framework/Dependencies/New_features
+
+Bugfixes
+############
+.. amalgamate:: Framework/Dependencies/Bugfixes
 
 
 MantidWorkbench

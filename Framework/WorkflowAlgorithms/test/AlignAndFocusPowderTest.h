@@ -28,6 +28,8 @@
 #include "MantidDataObjects/GroupingWorkspace.h"
 #include "MantidWorkflowAlgorithms/AlignAndFocusPowder.h"
 
+#include <boost/algorithm/string/join.hpp>
+
 using namespace Mantid::API;
 using namespace Mantid::Algorithms;
 using namespace Mantid::DataHandling;
@@ -93,6 +95,8 @@ public:
     AnalysisDataService::Instance().remove(m_inputWS);
 
     // Test the output
+    auto eventWS = std::dynamic_pointer_cast<EventWorkspace>(m_outWS);
+    TS_ASSERT_EQUALS(eventWS->getNumberEvents(), 870622);
     // [99] 1920.2339999999983, 41
     TS_ASSERT_DELTA(m_outWS->x(0)[99], 1920.23400, 0.0001);
     TS_ASSERT_EQUALS(m_outWS->y(0)[99], 41.);
@@ -173,10 +177,10 @@ public:
     // Test the output
     // [465] 1942.1284, 2415.9
     TS_ASSERT_DELTA(m_outWS->x(0)[465], 1942.1284, 0.0001);
-    TS_ASSERT_DELTA(m_outWS->y(0)[465], 2415.9, 0.1);
+    TS_ASSERT_DELTA(m_outWS->y(0)[465], 2498, 0.1);
     // [974] 15076.563463: 60043.5
     TS_ASSERT_DELTA(m_outWS->x(0)[974], 15076.563463, 0.0001);
-    TS_ASSERT_DELTA(m_outWS->y(0)[974], 60043.5, 0.1);
+    TS_ASSERT_DELTA(m_outWS->y(0)[974], 59802, 0.1);
     AnalysisDataService::Instance().remove(m_outputWS);
   }
 
@@ -235,6 +239,59 @@ public:
     TS_ASSERT_DELTA(m_outWS->x(0)[789], 6843.398982999533, 0.0001);
     TS_ASSERT_EQUALS(m_outWS->y(0)[789], 27);
     AnalysisDataService::Instance().remove(m_outputWS);
+  }
+
+  void testEventWksp_preserveEvents_ragged() {
+    // Setup the event workspace
+    m_numBanks = 2;
+    setUp_EventWorkspace("EventWksp_preserveEvents_ragged");
+    m_numBanks = 1;
+
+    groupAllBanks(m_inputWS, "bank"); // should result in 2 output histograms
+
+    for (bool preserveEvents : {true, false}) {
+
+      AlignAndFocusPowder align_and_focus;
+      align_and_focus.initialize();
+      align_and_focus.setPropertyValue("InputWorkspace", m_inputWS);
+      align_and_focus.setPropertyValue("OutputWorkspace", m_outputWS);
+      align_and_focus.setProperty("GroupingWorkspace", m_groupWS);
+      align_and_focus.setProperty("DMin", std::vector<double>{0.2, 0.3});
+      align_and_focus.setProperty("DMax", std::vector<double>{1.5, 2.0});
+      align_and_focus.setProperty("DeltaRagged", std::vector<double>{-2., -1.});
+      align_and_focus.setProperty("Dspacing", true);
+      align_and_focus.setProperty("PreserveEvents", preserveEvents);
+      TS_ASSERT_THROWS_NOTHING(align_and_focus.execute());
+      TS_ASSERT(align_and_focus.isExecuted());
+
+      m_outWS = AnalysisDataService::Instance().retrieveWS<MatrixWorkspace>(m_outputWS);
+
+      // test the output
+      if (preserveEvents)
+        TS_ASSERT_EQUALS(m_outWS->id(), "EventWorkspace")
+      else
+        TS_ASSERT_EQUALS(m_outWS->id(), "Workspace2D")
+
+      TS_ASSERT_EQUALS(m_outWS->getAxis(0)->unit()->unitID(), "TOF");
+      TS_ASSERT_EQUALS(m_outWS->getNumberHistograms(), 2);
+
+      TS_ASSERT_EQUALS(m_outWS->x(0).size(), 3);
+      TS_ASSERT_EQUALS(m_outWS->x(1).size(), 4);
+      TS_ASSERT_EQUALS(m_outWS->y(0).size(), 2);
+      TS_ASSERT_EQUALS(m_outWS->y(1).size(), 3);
+      TS_ASSERT_DELTA(m_outWS->x(0)[0], 1066.4818329, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->x(0)[1], 3199.4454987, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->x(1)[0], 1599.7227493, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->x(1)[1], 3199.4454987, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->y(0)[0], 13968, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->y(0)[1], 113472, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->y(1)[0], 13968, 0.0001);
+      TS_ASSERT_DELTA(m_outWS->y(1)[1], 82512, 0.0001);
+
+      AnalysisDataService::Instance().remove(m_outputWS);
+    }
+    AnalysisDataService::Instance().remove(m_inputWS);
+    AnalysisDataService::Instance().remove(m_groupWS);
   }
 
   void testEventWksp_preserveEvents_tmin_tmax() {
@@ -421,6 +478,38 @@ public:
     AnalysisDataService::Instance().remove(m_outputWS);
   }
 
+  void testEventWksp_preserveEvents_logCompressTolerance() {
+    // Setup the event workspace
+    setUp_EventWorkspace("EventWksp_preserveEvents_logCompressTolerance");
+
+    // Set the inputs for doTestEventWksp
+    m_preserveEvents = true;
+    m_useGroupAll = false;
+    m_useResamplex = true;
+    m_compressTolerance = "-1e-5";
+
+    // Run the main test function
+    doTestEventWksp();
+
+    // Reset inputs to default values
+    m_compressTolerance = "0";
+
+    // Test the input
+    docheckEventInputWksp();
+    AnalysisDataService::Instance().remove(m_inputWS);
+
+    // Test the output: expected result shall be same as testEventWksp_preserveEvents but have fewer events
+    auto eventWS = std::dynamic_pointer_cast<EventWorkspace>(m_outWS);
+    TS_ASSERT_EQUALS(eventWS->getNumberEvents(), 451436);
+    // [99] 1920.2339999999983, 41
+    TS_ASSERT_DELTA(m_outWS->x(0)[99], 1920.23400, 0.0001);
+    TS_ASSERT_EQUALS(m_outWS->y(0)[99], 41.);
+    // [899] 673.0, 15013.033999999987
+    TS_ASSERT_DELTA(m_outWS->x(0)[899], 15013.03400, 0.0001);
+    TS_ASSERT_EQUALS(m_outWS->y(0)[899], 673.0);
+    AnalysisDataService::Instance().remove(m_outputWS);
+  }
+
   void testEventWksp_preserveEvents_removePromptPulse() {
     // Setup the event workspace
     setUp_EventWorkspace("EventWksp_preserveEvents_removePromptPulse");
@@ -598,13 +687,13 @@ public:
     align_and_focus.setProperty("ResampleX", 1000);
     align_and_focus.setProperty("Dspacing", false);
 
-    const std::string INSTR("HRPD");
+    const std::string instrfilename("HRPD_Definition_pre20210301.xml");
     const std::string calfilename("hrpd_new_072_01.cal");
     const std::string grpfilename("hrpd_new_072_01_grp.xml"); // TODO add to external data repo
     if (useCalfile)
       align_and_focus.setPropertyValue("CalFilename", calfilename);
     else if (useCalWksp) {
-      loadDiffCal(INSTR, calfilename, false, true, true);
+      loadDiffCal(instrfilename, calfilename, false, true, true);
       // didn't load group
       align_and_focus.setPropertyValue("CalibrationWorkspace", m_loadDiffWSName + "_cal");
       align_and_focus.setPropertyValue("MaskWorkspace", m_loadDiffWSName + "_mask");
@@ -613,7 +702,7 @@ public:
     if (useGroupfile)
       align_and_focus.setPropertyValue("GroupFilename", grpfilename);
     else if (useGroupWksp) {
-      loadDiffCal(INSTR, calfilename, true, false, true);
+      loadDiffCal(instrfilename, calfilename, true, false, true);
       align_and_focus.setPropertyValue("GroupingWorkspace", m_loadDiffWSName + "_group");
       // didn't load calibration
       align_and_focus.setPropertyValue("MaskWorkspace", m_loadDiffWSName + "_mask");
@@ -752,9 +841,9 @@ public:
     if (m_compressStartTime != "0")
       align_and_focus.setProperty("CompressStartTime", m_compressStartTime);
 
-    // Remove prompt pulse; will cutoff last 6 long-TOF peaks (freq is 200 Hz)
+    // Remove prompt pulse; will cutoff the first peak from 6 long-TOF peaks (freq is 200 Hz)
     if (m_removePromptPulse)
-      align_and_focus.setProperty("RemovePromptPulseWidth", 1e4);
+      align_and_focus.setProperty("RemovePromptPulseWidth", 2200.0);
 
     // Filter absorption resonances - default unit is wavelength
     align_and_focus.setPropertyValue("ResonanceFilterLowerLimits", m_filterResonanceLower);
@@ -813,11 +902,11 @@ public:
   }
 
   /* Utility functions */
-  void loadDiffCal(const std::string &instrname, const std::string &calfilename, bool group, bool cal, bool mask) {
+  void loadDiffCal(const std::string &instrfilename, const std::string &calfilename, bool group, bool cal, bool mask) {
     LoadDiffCal loadDiffAlg;
     loadDiffAlg.initialize();
     loadDiffAlg.setPropertyValue("Filename", calfilename);
-    loadDiffAlg.setPropertyValue("InstrumentName", instrname);
+    loadDiffAlg.setPropertyValue("InstrumentFilename", instrfilename);
     loadDiffAlg.setProperty("MakeGroupingWorkspace", group);
     loadDiffAlg.setProperty("MakeCalWorkspace", cal);
     loadDiffAlg.setProperty("MakeMaskWorkspace", mask);
@@ -825,11 +914,11 @@ public:
     loadDiffAlg.execute();
   }
 
-  void groupAllBanks(const std::string &m_inputWS) {
+  void groupAllBanks(const std::string &m_inputWS, std::string group_by = "All") {
     CreateGroupingWorkspace groupAlg;
     groupAlg.initialize();
     groupAlg.setPropertyValue("InputWorkspace", m_inputWS);
-    groupAlg.setPropertyValue("GroupDetectorsBy", "All");
+    groupAlg.setPropertyValue("GroupDetectorsBy", group_by);
     groupAlg.setPropertyValue("OutputWorkspace", m_groupWS);
     groupAlg.execute();
   }

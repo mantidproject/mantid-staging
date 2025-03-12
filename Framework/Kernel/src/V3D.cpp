@@ -7,6 +7,7 @@
 #include "MantidKernel/V3D.h"
 #include "MantidKernel/Matrix.h"
 #include "MantidKernel/Quat.h"
+#include "MantidNexusCpp/NeXusFile.hpp"
 #include <algorithm>
 #include <boost/version.hpp>
 #include <sstream>
@@ -18,8 +19,6 @@ using boost::math::gcd;
 #include <boost/integer/common_factor.hpp>
 using boost::integer::gcd;
 #endif
-
-#include <nexus/NeXusFile.hpp>
 
 namespace {
 /** transform vector into form, used to describe directions in crystallogaphical
@@ -138,9 +137,7 @@ double V3D::normalize() {
 
 /** Round each component to the nearest integer */
 void V3D::round() noexcept {
-  for (auto &p : m_pt) {
-    p = std::round(p);
-  }
+  std::transform(m_pt.cbegin(), m_pt.cend(), m_pt.begin(), [](auto p) { return std::round(p); });
 }
 
 /** Calculates the zenith angle (theta) of this vector with respect to another
@@ -239,16 +236,11 @@ bool V3D::coLinear(const V3D &Bv, const V3D &Cv) const noexcept {
   @return true if the vector's elements are less in magnitude than tolerance
 */
 bool V3D::nullVector(const double tolerance) const noexcept {
-  for (const double p : m_pt) {
-    if (std::abs(p) > tolerance) {
-      return false;
-    }
-  }
-  // Getting to this point means a null vector
-  return true;
+  return std::none_of(m_pt.cbegin(), m_pt.cend(), [&tolerance](const auto p) { return std::abs(p) > tolerance; });
 }
 
 bool V3D::unitVector(const double tolerance) const noexcept {
+  // NOTE could be made more efficient using norm2()
   const auto l = norm();
   return std::abs(l - 1.) < tolerance;
 }
@@ -508,12 +500,12 @@ V3D V3D::directionAngles(bool inDegrees) const {
 */
 int V3D::maxCoeff() {
   int MaxOrder = 0;
-  if (abs(static_cast<int>(m_pt[0])) > MaxOrder)
-    MaxOrder = abs(static_cast<int>(m_pt[0]));
-  if (abs(static_cast<int>(m_pt[1])) > MaxOrder)
-    MaxOrder = abs(static_cast<int>(m_pt[1]));
-  if (abs(static_cast<int>(m_pt[2])) > MaxOrder)
-    MaxOrder = abs(static_cast<int>(m_pt[2]));
+  if (std::abs(static_cast<int>(m_pt[0])) > MaxOrder)
+    MaxOrder = std::abs(static_cast<int>(m_pt[0]));
+  if (std::abs(static_cast<int>(m_pt[1])) > MaxOrder)
+    MaxOrder = std::abs(static_cast<int>(m_pt[1]));
+  if (std::abs(static_cast<int>(m_pt[2])) > MaxOrder)
+    MaxOrder = std::abs(static_cast<int>(m_pt[2]));
   return MaxOrder;
 }
 
@@ -521,15 +513,16 @@ int V3D::maxCoeff() {
   Calculates the absolute value.
   @return The absolute value
 */
-V3D V3D::absoluteValue() const { return V3D(fabs(m_pt[0]), fabs(m_pt[1]), fabs(m_pt[2])); }
+V3D V3D::absoluteValue() const { return V3D(std::abs(m_pt[0]), std::abs(m_pt[1]), std::abs(m_pt[2])); }
 
 /**
   Calculates the error of the HKL to compare with tolerance
   @return The error
 */
 double V3D::hklError() const {
-  return fabs(m_pt[0] - std::round(m_pt[0])) + fabs(m_pt[1] - std::round(m_pt[1])) +
-         fabs(m_pt[2] - std::round(m_pt[2]));
+  return std::abs(m_pt[0] - std::round(m_pt[0])) + //
+         std::abs(m_pt[1] - std::round(m_pt[1])) + //
+         std::abs(m_pt[2] - std::round(m_pt[2]));
 }
 
 } // namespace Mantid::Kernel

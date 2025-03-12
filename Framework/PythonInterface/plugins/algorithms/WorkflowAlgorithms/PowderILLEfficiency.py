@@ -22,9 +22,53 @@ from mantid.kernel import (
     StringListValidator,
     VisibleWhenProperty,
 )
-from mantid.api import FileAction, FileProperty, MatrixWorkspaceProperty, MultipleFileProperty, Progress, PropertyMode, PythonAlgorithm
+from mantid.api import (
+    mtd,
+    AlgorithmFactory,
+    FileAction,
+    FileProperty,
+    MatrixWorkspaceProperty,
+    MultipleFileProperty,
+    Progress,
+    PropertyMode,
+    PythonAlgorithm,
+)
 
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    ApplyDetectorScanEffCorr,
+    CloneWorkspace,
+    ConjoinXRuns,
+    ConvertToHistogram,
+    ConvertSpectrumAxis,
+    ConvertToPointData,
+    CopyLogs,
+    CreateWorkspace,
+    CropWorkspace,
+    DeleteWorkspace,
+    DeleteWorkspaces,
+    Divide,
+    ExtractMonitors,
+    ExtractSingleSpectrum,
+    ExtractSpectra,
+    GroupWorkspaces,
+    LoadAndMerge,
+    LoadILLDiffraction,
+    LoadNexusProcessed,
+    MaskBins,
+    MaskBinsIf,
+    MostLikelyMean,
+    Multiply,
+    NormaliseToMonitor,
+    Plus,
+    Scale,
+    RenameWorkspace,
+    ReplaceSpecialValues,
+    SplineInterpolation,
+    SortXAxis,
+    SumOverlappingTubes,
+    Transpose,
+    WeightedMean,
+)
 
 
 def _crop_bins(ws, bin_min, bin_max, out):
@@ -60,7 +104,6 @@ def _plus_friendly(ws1, ws2, out):
 
 
 class PowderILLEfficiency(PythonAlgorithm):
-
     _out_name = None  # the name of the output workspace
     _input_files = None  # input files (numor), must be detector scans (to list for D2B, to merge for D20)
     _calib_file = None  # file containing previously derived calibration constants
@@ -118,7 +161,7 @@ class PowderILLEfficiency(PythonAlgorithm):
             name="CalibrationMethod",
             defaultValue="Median",
             validator=StringListValidator(["Median", "Mean", "MostLikelyMean"]),
-            doc="The method of how the calibration constant of a pixel " "is derived from the distribution of ratios.",
+            doc="The method of how the calibration constant of a pixel is derived from the distribution of ratios.",
         )
 
         self.declareProperty(
@@ -407,7 +450,7 @@ class PowderILLEfficiency(PythonAlgorithm):
                 "Consider checking the option InterpolateOverlappingAngles.".format(scan_step_in_pixel_numbers)
             )
         if self._pixel_range[1] > self._n_det:
-            self.log().warning("Last pixel number provided is larger than total number of pixels. " "Taking the last existing pixel.")
+            self.log().warning("Last pixel number provided is larger than total number of pixels. Taking the last existing pixel.")
             self._pixel_range[1] = self._n_det
         if self._excluded_ranges.any():
             n_excluded_ranges = int(len(self._excluded_ranges) / 2)

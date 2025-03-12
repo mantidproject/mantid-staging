@@ -10,7 +10,8 @@
 """
 Functionality for dealing with legends on plots
 """
-from distutils.version import LooseVersion
+
+from packaging.version import Version
 
 import matplotlib
 from matplotlib.patches import BoxStyle
@@ -68,7 +69,7 @@ class LegendProperties(dict):
         else:
             props["round_edges"] = False
 
-        if LooseVersion(matplotlib.__version__) >= LooseVersion("3.6.0"):
+        if Version(matplotlib.__version__) >= Version("3.6.0"):
             props["columns"] = legend._ncols
         else:
             props["columns"] = legend._ncol
@@ -123,17 +124,21 @@ class LegendProperties(dict):
     def create_legend(cls, props, ax):
         # Imported here to prevent circular import.
         from mantid.plots.datafunctions import get_legend_handles
+        from matplotlib.layout_engine import TightLayoutEngine
 
         loc = ConfigService.getString("plots.legend.Location")
         font_size = float(ConfigService.getString("plots.legend.FontSize"))
         if not props:
-            legend_set_draggable(ax.legend(handles=get_legend_handles(ax), loc=loc, prop={"size": font_size}), True)
+            legend = ax.legend(handles=get_legend_handles(ax), loc=loc, prop={"size": font_size})
+            if type(ax.figure.get_layout_engine()) is TightLayoutEngine:
+                legend.set_in_layout(False)
+            legend_set_draggable(legend, True)
             return
 
         if "loc" in props.keys():
             loc = props["loc"]
 
-        if LooseVersion(matplotlib.__version__) >= LooseVersion("3.6.0"):
+        if Version(matplotlib.__version__) >= Version("3.6.0"):
             legend = ax.legend(
                 handles=get_legend_handles(ax),
                 ncols=props["columns"],
@@ -187,4 +192,9 @@ class LegendProperties(dict):
             text.set_color(props["entries_color"])
 
         legend.set_visible(props["visible"])
+
+        # Dragging the legend around in a tight layout plot causes some strange behaviour
+        if type(ax.figure.get_layout_engine()) is TightLayoutEngine:
+            legend.set_in_layout(False)
+
         legend_set_draggable(legend, True)

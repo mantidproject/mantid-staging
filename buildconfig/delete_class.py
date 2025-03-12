@@ -5,9 +5,11 @@
 #     NScD Oak Ridge National Laboratory, European Spallation Source
 #     & Institut Laue - Langevin
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Utility for deleting a class file """
+"""Utility for deleting a class file"""
+
 import argparse
-from cmakelists_utils import *
+import os
+from cmakelists_utils import remove_from_cmake
 
 
 def delete_one(oldfilename):
@@ -17,7 +19,6 @@ def delete_one(oldfilename):
 
 
 def delete_all(subproject, classname, args):
-
     # Directory at base of subproject
     basedir = os.path.join(os.path.curdir, "Framework/" + subproject)
 
@@ -42,8 +43,7 @@ def delete_all(subproject, classname, args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Utility to delete a Mantid class from a project. "
-        "Please note, you may still have more fixes to do to get compilation!"
+        description="Utility to delete a Mantid class from a project. Please note, you may still have more fixes to do to get compilation!"
     )
 
     parser.add_argument("subproject", metavar="SUBPROJECT", type=str, help="The subproject under Framework/; e.g. Kernel")

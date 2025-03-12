@@ -105,8 +105,7 @@ def pyexec_setup(new_options):
 
 
 class BASISCrystalDiffraction(DataProcessorAlgorithm):
-
-    _mask_file = "/SNS/BSS/shared/autoreduce/new_masks_08_12_2015/" "BASIS_Mask_default_diff.xml"
+    _mask_file = "/SNS/BSS/shared/autoreduce/new_masks_08_12_2015/BASIS_Mask_default_diff.xml"
     _solid_angle_ws_ = "/SNS/BSS/shared/autoreduce/solid_angle_diff.nxs"
     _flux_ws_ = "/SNS/BSS/shared/autoreduce/int_flux.nxs"
     _wavelength_bands = {"311": [3.07, 3.60], "111": [6.05, 6.60]}
@@ -136,7 +135,7 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
 
     @staticmethod
     def summary():
-        return "Multiple-file BASIS crystal reduction for diffraction " "detectors."
+        return "Multiple-file BASIS crystal reduction for diffraction detectors."
 
     @staticmethod
     def seeAlso():
@@ -220,7 +219,7 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
         #
         crystal_diffraction_title = "Single Crystal Diffraction"
         self.declareProperty(
-            "PsiAngleLog", "SE50Rot", direction=Direction.Input, doc="log entry storing rotation of the sample" "around the vertical axis"
+            "PsiAngleLog", "SE50Rot", direction=Direction.Input, doc="log entry storing rotation of the sample around the vertical axis"
         )
         self.declareProperty("PsiOffset", 0.0, direction=Direction.Input, doc="Add this quantity to PsiAngleLog")
         self.declareProperty(
@@ -234,23 +233,23 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
         #    Reciprocal vector to be aligned with incoming beam
         self.declareProperty(
             FloatArrayProperty("VectorU", [1, 0, 0], array_length_three, direction=Direction.Input),
-            doc="three item, comma-separated, HKL indexes" "of the diffracting plane",
+            doc="three item, comma-separated, HKL indices of the diffracting plane",
         )
         #    Reciprocal vector orthogonal to VectorU and in-plane with
         #    incoming beam
         self.declareProperty(
             FloatArrayProperty("VectorV", [0, 1, 0], array_length_three, direction=Direction.Input),
-            doc="three item, comma-separated, HKL indexes" "of the direction perpendicular to VectorV" "and the vertical axis",
+            doc="three item, comma-separated, HKL indices of the direction perpendicular to VectorVand the vertical axis",
         )
         #    Abscissa view
         self.declareProperty(
             FloatArrayProperty("Uproj", [1, 0, 0], array_length_three, direction=Direction.Input),
-            doc="three item comma-separated Abscissa view" "of the diffraction pattern",
+            doc="three item comma-separated Abscissa view of the diffraction pattern",
         )
         #    Ordinate view
         self.declareProperty(
             FloatArrayProperty("Vproj", [0, 1, 0], array_length_three, direction=Direction.Input),
-            doc="three item comma-separated Ordinate view" "of the diffraction pattern",
+            doc="three item comma-separated Ordinate view of the diffraction pattern",
         )
         #    Hidden axis
         self.declareProperty(FloatArrayProperty("Wproj", [0, 0, 1], array_length_three, direction=Direction.Input), doc="Hidden axis view")
@@ -275,7 +274,6 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
         # Facility and database configuration
         config_new_options = {"default.facility": "SNS", "default.instrument": "BASIS", "datasearch.searcharchive": "On"}
 
-        # implement with ContextDecorator after python2 is deprecated)
         with pyexec_setup(config_new_options) as self._temps:
             # Load the mask to a temporary workspace
             self._t_mask = LoadMask(Instrument="BASIS", InputFile=self.getProperty("MaskFile").value, OutputWorkspace="_t_mask")
@@ -419,7 +417,7 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
                 OutputNormalizationWorkspace="_t_norm",
                 TemporaryDataWorkspace="_t_data" if mtd.doesExist("_t_data") else None,
                 TemporaryNormalizationWorkspace="_t_norm" if mtd.doesExist("_t_norm") else None,
-                **md_norm_scd_kwargs
+                **md_norm_scd_kwargs,
             )
             if self._bkg:
                 MDNormSCD(
@@ -428,7 +426,7 @@ class BASISCrystalDiffraction(DataProcessorAlgorithm):
                     OutputNormalizationWorkspace="_t_bkg_norm",
                     TemporaryDataWorkspace="_t_bkg_data" if mtd.doesExist("_t_bkg_data") else None,
                     TemporaryNormalizationWorkspace="_t_bkg_norm" if mtd.doesExist("_t_bkg_norm") else None,
-                    **md_norm_scd_kwargs
+                    **md_norm_scd_kwargs,
                 )
             message = "Processing sample {} of {}".format(i_run + 1, len(run_numbers))
             diffraction_reporter.report(message)

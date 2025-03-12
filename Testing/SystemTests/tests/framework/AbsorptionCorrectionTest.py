@@ -548,13 +548,12 @@ class CompareAbsorptionCorrectionToInternationalTablesCylinder(systemtesting.Man
     }
 
     def runTest(self):
-
         ws = create_test_ws()
 
         cylinder_height = 0.00001  # m
         cylinder_radius = 0.01  # m
         cylinder_xml = (
-            f"<cylinder id='some-cylinder'><centre-of-bottom-base x='0.0' y='-{cylinder_height/2}' z='0.0' />"
+            f"<cylinder id='some-cylinder'><centre-of-bottom-base x='0.0' y='-{cylinder_height / 2}' z='0.0' />"
             + f"<radius val='{cylinder_radius}' /><height val='{cylinder_height}' /><axis x='0' y='1' z='0' />"
             + "</cylinder><algebra val='some-cylinder' />"
         )
@@ -1110,7 +1109,6 @@ class CompareAbsorptionCorrectionToInternationalTablesSphere(systemtesting.Manti
     }
 
     def runTest(self):
-
         ws = create_test_ws()
 
         sphere_radius = 0.01

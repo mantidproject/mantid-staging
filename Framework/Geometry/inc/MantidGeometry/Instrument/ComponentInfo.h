@@ -9,6 +9,7 @@
 #include "MantidBeamline/ComponentType.h"
 #include "MantidGeometry/DllConfig.h"
 #include "MantidGeometry/Instrument/ComponentInfoIterator.h"
+#include "MantidGeometry/Instrument/SolidAngleParams.h"
 #include "MantidGeometry/Objects/BoundingBox.h"
 #include "MantidKernel/DateAndTime.h"
 #include <memory>
@@ -96,6 +97,8 @@ public:
   void setRotation(size_t componentIndex, const Kernel::Quat &newRotation);
   void setPosition(const std::pair<size_t, size_t> &index, const Kernel::V3D &newPosition);
   void setRotation(const std::pair<size_t, size_t> &index, const Kernel::Quat &newRotation);
+  void scaleComponent(const size_t componentIndex, const Kernel::V3D &newScaling);
+  void scaleComponent(const std::pair<size_t, size_t> &index, const Kernel::V3D &newScaling);
   size_t parent(const size_t componentIndex) const;
   bool hasParent(const size_t componentIndex) const;
   bool hasDetectorInfo() const;
@@ -121,7 +124,7 @@ public:
 
   const Geometry::IObject &shape(const size_t componentIndex) const;
 
-  double solidAngle(const size_t componentIndex, const Kernel::V3D &observer) const;
+  double solidAngle(const size_t componentIndex, const Geometry::SolidAngleParams &params) const;
   BoundingBox boundingBox(const size_t componentIndex, const BoundingBox *reference = nullptr,
                           const bool excludeMonitors = false) const;
   Beamline::ComponentType componentType(const size_t componentIndex) const;

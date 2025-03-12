@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init
 import systemtesting
-from mantid.simpleapi import *
+from mantid.simpleapi import Load, LoadMask, StepScan
 
 
 class StepScanWorkflowAlgorithm(systemtesting.MantidSystemTest):
@@ -25,4 +25,5 @@ class StepScanWorkflowAlgorithm(systemtesting.MantidSystemTest):
         )
 
     def validate(self):
+        self.tolerance = 1e-7
         return "StepScan", "StepScan.nxs"

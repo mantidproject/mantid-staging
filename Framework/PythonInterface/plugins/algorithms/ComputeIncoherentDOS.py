@@ -8,7 +8,7 @@ import numpy as np
 from scipy import constants
 from mantid.kernel import CompositeValidator, Direction, FloatBoundedValidator
 from mantid.api import AlgorithmFactory, CommonBinsValidator, HistogramValidator, MatrixWorkspaceProperty, PythonAlgorithm
-from mantid.simpleapi import *
+from mantid.simpleapi import CloneWorkspace, Rebin, Rebin2D, ScaleX, Transpose
 
 
 class UnitError(ValueError):
@@ -271,7 +271,7 @@ class ComputeIncoherentDOS(PythonAlgorithm):
         engrid = np.transpose(np.tile(en, (np.shape(y)[1], 1)))
         # Calculates the Debye-Waller and Bose factors from the Temperature and mean-squared displacements
         qqgridsq = qqgrid**2
-        DWF = np.exp(-2 * (qqgridsq * msd))
+        DWF = np.exp(-(qqgridsq * msd))
         idm = np.where(engrid < 0)
         idp = np.where(engrid >= 0)
         # The expression for the population (Bose) factor and phonon energy dependence below actually refer to the phonon
@@ -324,9 +324,7 @@ class ComputeIncoherentDOS(PythonAlgorithm):
     def absoluteUnits(self, atoms):
         absunits = self.getProperty("StatesPerEnergy").value
         if absunits and len(atoms) != 1:
-            self.log().warning(
-                "Sample material information not set, or sample is not a pure element. " "Ignoring StatesPerEnergy property."
-            )
+            self.log().warning("Sample material information not set, or sample is not a pure element. Ignoring StatesPerEnergy property.")
             absunits = False
         return absunits
 

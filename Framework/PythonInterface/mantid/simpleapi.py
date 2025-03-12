@@ -4,6 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+# ruff: noqa: F403,F405   # Wild imports and Undefined locals
 """
 This module defines a function-style API for running Mantid
 algorithms. Each algorithm within Mantid is mapped to a Python
@@ -26,6 +27,7 @@ and assign it to the rebinned variable.
 
 Importing this module starts the FrameworkManager instance.
 """
+
 # std libs
 from collections import OrderedDict, namedtuple
 from contextlib import contextmanager
@@ -40,11 +42,9 @@ import mantid
 from mantid import api as _api, kernel as _kernel
 from mantid import apiVersion  # noqa: F401
 from mantid.kernel import plugins as _plugin_helper
-from mantid.kernel import ConfigService, logger
 from mantid.kernel.funcinspect import (
     customise_func as _customise_func,
     lhs_info as _lhs_info,
-    replace_signature as _replace_signature,
     LazyFunctionSignature,
 )
 
@@ -163,8 +163,7 @@ def Load(*args, **kwargs):
     # then raise a more helpful error than what we would get from an algorithm
     if lhs[0] == 0 and "OutputWorkspace" not in kwargs:
         raise RuntimeError(
-            "Unable to set output workspace name. Please either assign the output of "
-            "Load to a variable or use the OutputWorkspace keyword."
+            "Unable to set output workspace name. Please either assign the output of Load to a variable or use the OutputWorkspace keyword."
         )
 
     lhs_args = _get_args_from_lhs(lhs, algm)
@@ -246,7 +245,7 @@ def StartLiveData(*args, **kwargs):
     # Check for any properties that aren't known and warn they will not be used
     for key in list(final_keywords.keys()):
         if key not in algm:
-            logger.warning("You've passed a property (%s) to StartLiveData() " "that doesn't apply to this Instrument." % key)
+            logger.warning("You've passed a property (%s) to StartLiveData() that doesn't apply to this Instrument." % key)
             del final_keywords[key]
 
     set_properties(algm, **final_keywords)
@@ -281,7 +280,7 @@ def fitting_algorithm(inout=False):
                 del kwargs["InputWorkspace"]
 
             # Check for behaviour consistent with old API
-            if type(function) == str and function in _api.AnalysisDataService:
+            if isinstance(function, str) and function in _api.AnalysisDataService:
                 msg = "Fit API has changed. The function must now come " + "first in the argument list and the workspace second."
                 raise ValueError(msg)
             # Deal with case where function is a FunctionWrapper.
@@ -320,7 +319,7 @@ def fitting_algorithm(inout=False):
 
         # end
         function_name = f.__name__
-        signature = ("\bFunction, InputWorkspace", "**kwargs")
+        signature = LazyFunctionSignature(alg_name=function_name, include_self=False)
         fwrapper = _customise_func(wrapper, function_name, signature, f.__doc__)
         if function_name not in __SPECIALIZED_FUNCTIONS__:
             __SPECIALIZED_FUNCTIONS__.append(function_name)
@@ -450,7 +449,7 @@ def CutMD(*args, **kwargs):  # noqa: C901
     # Ensure the output names we were given are valid
     if handling_multiple_workspaces:
         if not isinstance(out_names, list):
-            raise RuntimeError("Multiple OutputWorkspaces must be given as a list when" " processing multiple InputWorkspaces.")
+            raise RuntimeError("Multiple OutputWorkspaces must be given as a list when processing multiple InputWorkspaces.")
     else:
         # We wrap in a list for our convenience. The user must not pass us one though.
         if not isinstance(out_names, list):
@@ -478,7 +477,8 @@ def CutMD(*args, **kwargs):  # noqa: C901
     # Now check that all the kwargs we've got are correct
     for key in kwargs.keys():
         if key not in algm:
-            raise RuntimeError("Unknown property: {0}".format(key))
+            msg = f"'{key}' is an invalid keyword argument for {algm.name()}-v{algm.version()}"
+            raise TypeError(msg)
 
     # We're now going to build to_process, which is the list of workspaces we want to process.
     to_process = list()
@@ -525,7 +525,7 @@ def CutMD(*args, **kwargs):  # noqa: C901
         return out_names[0]
 
 
-_replace_signature(CutMD, ("\bInputWorkspace", "**kwargs"))
+CutMD.__signature__ = LazyFunctionSignature(alg_name="CutMD", include_self=False)
 
 
 def RenameWorkspace(*args, **kwargs):
@@ -570,7 +570,7 @@ def RenameWorkspace(*args, **kwargs):
     return _gather_returns("RenameWorkspace", lhs, algm)
 
 
-_replace_signature(RenameWorkspace, ("\bInputWorkspace,[OutputWorkspace],[True||False]", "**kwargs"))
+RenameWorkspace.__signature__ = LazyFunctionSignature(alg_name="RenameWorkspace", include_self=False)
 
 
 def _get_function_spec(func):
@@ -655,7 +655,8 @@ def _get_mandatory_args(func_name, required_args, *args, **kwargs):
             val = dict_containing_key[key]
             return val
         except KeyError:
-            raise RuntimeError("%s argument not supplied to %s function" % (str(key), func_name))
+            # raise TypeError similar to python
+            raise TypeError(f"{func_name} missing required argument: '{key}'")
 
     nrequired = len(required_args)
     npositional = len(args)
@@ -702,10 +703,16 @@ def _check_mandatory_args(algorithm, _algm_object, error, *args, **kwargs):
         if len(valid_str) > 0 and p not in kwargs.keys():
             missing_arg_list.append(p)
     if len(missing_arg_list) != 0:
-        raise RuntimeError("%s argument(s) not supplied to %s" % (missing_arg_list, algorithm))
+        # raise TypeError similar to python
+        missing_arg_list = [f"'{arg}'" for arg in missing_arg_list]
+        raise TypeError(f"{algorithm} missing required arguments: " + ", ".join(missing_arg_list))
     # If the error was not caused by missing property the algorithm specific error should suffice
     else:
-        raise RuntimeError(str(error))
+        msg = f"in running {algorithm}: {str(error)}"
+        if "Some invalid Properties found" in str(error):
+            raise TypeError(msg)
+        else:
+            raise RuntimeError(msg)
 
 
 # ------------------------ General simple function calls ----------------------
@@ -722,7 +729,7 @@ def _is_workspace_property(prop):
     """
     if isinstance(prop, _api.IWorkspaceProperty):
         return True
-    if type(prop) == _kernel.Property and "Workspace" in prop.name:
+    if type(prop) is _kernel.Property and "Workspace" in prop.name:
         return True
     else:
         # Doesn't look like a workspace property
@@ -822,7 +829,7 @@ def _gather_returns(func_name, lhs, algm_obj, ignore_regex=None, inout=False):
         # Matched nothing
         return False
 
-    if type(ignore_regex) is str:
+    if isinstance(ignore_regex, str):
         ignore_regex = [ignore_regex]
     # Compile regexes
     for index, expr in enumerate(ignore_regex):
@@ -935,8 +942,14 @@ def set_properties(alg_object, *args, **kwargs):
             else:
                 alg_object.setProperty(key, new_value)
         except (RuntimeError, TypeError, ValueError) as e:
-            msg = 'Problem setting "{}" in {}-v{}: {}'.format(name, alg_object.name(), alg_object.version(), str(e))
-            raise e.__class__(msg) from e
+            if str(e).startswith("Unknown property search object") or "is an invalid keyword argument for" in str(e):
+                # raise TypeError similar to python
+                msg = f"'{name}' is an invalid keyword argument for {alg_object.name()}-v{alg_object.version()}"
+                raise TypeError(msg)
+            else:
+                # re-raise the error with clearer message
+                msg = 'Problem setting "{}" in {}-v{}: {}'.format(name, alg_object.name(), alg_object.version(), str(e))
+                raise e.__class__(msg) from e
 
     # end
     if len(args) > 0:
@@ -1164,23 +1177,6 @@ def _find_parent_pythonalgorithm(frame):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def _create_fake_function(name):
-    """Create fake functions for the given name"""
-
-    # ------------------------------------------------------------------------------------------------
-    def fake_function(*args, **kwargs):
-        raise RuntimeError(
-            "Mantid import error. The mock simple API functions have not been replaced!"
-            " This is an error in the core setup logic of the mantid module, "
-            "please contact the development team."
-        )
-
-    # ------------------------------------------------------------------------------------------------
-    fake_function.__name__ = name
-    _replace_signature(fake_function, ("", ""))
-    globals()[name] = fake_function
-
-
 def _mockup(plugins):
     """
     Creates fake, error-raising functions for any plugins given.
@@ -1343,7 +1339,7 @@ try:
         logger.information("Path to plugins manifest is empty. The python plugins will not be loaded.")
     elif not os.path.exists(plugins_manifest_path):
         logger.warning(
-            "The path to the python plugins manifest is invalid. The built in python plugins will " "not be loaded into the simpleapi."
+            "The path to the python plugins manifest is invalid. The built in python plugins will not be loaded into the simpleapi."
         )
     else:
         with open(plugins_manifest_path) as manifest:

@@ -10,6 +10,7 @@
 # system imports
 
 # 3rd-party imports
+import sys
 import warnings
 
 import matplotlib as mpl
@@ -38,12 +39,21 @@ def initialize_matplotlib():
     mpl.rcParams["figure.dpi"] = QApplication.instance().desktop().physicalDpiX()
     # Hide warning made by matplotlib before checking our backend.
     warnings.filterwarnings("ignore", message="Starting a Matplotlib GUI outside of the main thread will likely fail.")
+    # Disabling default key shortcuts for toggling axes scale
+    mpl.rcParams["keymap.xscale"].remove("k")
+    mpl.rcParams["keymap.xscale"].remove("L")
+    mpl.rcParams["keymap.yscale"].remove("l")
 
 
 def init_mpl_gcf():
     """
     Replace vanilla Gcf with our custom manager
     """
+    # It is very important this assertion is met. If the matplotlib backend is imported
+    # before we set the 'Gcf' object to our custom global figure manager, then the plotting
+    # in Mantid will be broken.
+    assert "matplotlib.backend_bases" not in sys.modules
+
     setattr(_pylab_helpers, "Gcf", GlobalFigureManager)
 
 

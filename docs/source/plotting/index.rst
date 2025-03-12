@@ -19,7 +19,7 @@ Matplotlib in Mantid
 
 * :ref:`02_scripting_plots`
 * :ref:`06_formatting_plots`
-* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/3.1.1/users/navigation_toolbar.html#navigation-keyboard-shortcuts>`_
+* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/stable/users/explain/figure/interactive.html#navigation-keyboard-shortcuts>`_
 
 **Help Documentation**
 
@@ -52,7 +52,7 @@ This page is intended to provide examples about how to use different
 Matplotlib commands for several types of common task that Mantid users are interested in.
 
 To understand the matplotlib vocabulary, a useful tool is the `"anatomy of a figure"
-<https://matplotlib.org/examples/showcase/anatomy.html>`_, also shown below.
+<https://matplotlib.org/stable/gallery/showcase/anatomy.html#sphx-glr-gallery-showcase-anatomy-py>`_, also shown below.
 
 .. plot::
 
@@ -219,7 +219,7 @@ If one wants to save the output, the figure object has a function called `savefi
 The main argument of savefig is the filename. Matplotlib will figure out the format of the figure
 from the file extension. The 'png', 'ps', 'eps', and 'pdf' extensions will work with
 almost any backend. For more information, see the documentation of
-`Figure.savefig <https://matplotlib.org/api/_as_gen/matplotlib.figure.Figure.html#matplotlib.figure.Figure.savefig>`_
+`Figure.savefig <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`_
 Just replace the code above with:
 
 .. code-block:: python
@@ -473,7 +473,7 @@ Both can be found `online <https://www.rapidtables.com/web/color/html-color-code
 Custom Colormap (MantidWorkbench)
 #################################
 
-You can view the premade Colormaps `here <https://matplotlib.org/2.2.3/gallery/color/colormap_reference.html?highlight=colormap>`_.
+You can view the premade Colormaps `here <https://matplotlib.org/stable/gallery/color/colormap_reference.html>`_.
 These Colormaps can be registered and remain for the current session, but need to be rerun if Mantid has been reopened. Choose the location to Save your Colormap file wisely, outside of your MantidInstall folder!
 
 The following methods show how to Load, Convert from MantidPlot format, Create from Scratch and Visualise a Custom Colormap.
@@ -487,12 +487,13 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
   import matplotlib.pyplot as plt
   import numpy as np
   from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+  from matplotlib import colormaps
 
   Cmap_Name = 'Beach' # Colormap name
-  Loaded_Cmap = np.loadtxt("C:\Path\to\File\Filename.txt")
+  Loaded_Cmap = np.loadtxt("/Path/to/file/Filename.txt")
   # Register the Loaded Colormap
   Listed_CustomCmap = ListedColormap(Loaded_Cmap, name=Cmap_Name)
-  plt.register_cmap(name=Cmap_Name, cmap= Listed_CustomCmap)
+  colormaps.register(name=Cmap_Name, cmap= Listed_CustomCmap)
 
   # Create and register the reverse colormap
   Res = len(Loaded_Cmap)
@@ -502,7 +503,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
         Reverse[i][j] = Loaded_Cmap[Res-(i+1)][j]
 
   Listed_CustomCmap_r = ListedColormap(Reverse, name=(Cmap_Name + '_r') )
-  plt.register_cmap(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
+  colormaps.register(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
 
 - If you have a Colormap file in a Mantid format (N by 3) with all values between 0 and 255, firstly **rename the file extension from .map to .txt**, then use:
 
@@ -513,6 +514,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
   import matplotlib.pyplot as plt
   import numpy as np
   from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+  from matplotlib import colormaps
 
   Cmap_Name = 'Beach'
   Loaded_Cmap = np.loadtxt("/Path/to/file/Beach.txt")
@@ -539,7 +541,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
 
   # Register the Loaded Colormap
   Listed_CustomCmap = ListedColormap(Cmap, name=Cmap_Name)
-  plt.register_cmap(name=Cmap_Name, cmap= Listed_CustomCmap)
+  colormaps.register(name=Cmap_Name, cmap= Listed_CustomCmap)
 
   # Create and register the reverse colormap
   Reverse = np.zeros((Res,4))
@@ -548,7 +550,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
         Reverse[i][j] = Cmap[Res-(i+1)][j]
 
   Listed_CustomCmap_r = ListedColormap(Reverse, name=(Cmap_Name + '_r') )
-  plt.register_cmap(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
+  colormaps.register(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
 
 - To Create a Colormap from scratch, use:
 
@@ -559,6 +561,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
   import matplotlib.pyplot as plt
   from matplotlib.colors import ListedColormap, LinearSegmentedColormap
   import numpy as np
+  from matplotlib import colormaps
 
   Cmap_Name = 'Beach' # Colormap name
   Res = 500 # Resolution of your Colormap (number of steps in colormap)
@@ -585,7 +588,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
   #np.savetxt("C:\Path\to\File\Filename.txt",Cmap) #uncomment to save to file
 
   Listed_CustomCmap = ListedColormap(Cmap, name = Cmap_Name)
-  plt.register_cmap(name = Cmap_Name, cmap = Listed_CustomCmap)
+  colormaps.register(name = Cmap_Name, cmap = Listed_CustomCmap)
 
   # Create and register the reverse colormap
   Reverse = np.zeros((Res,4))
@@ -594,7 +597,7 @@ The following methods show how to Load, Convert from MantidPlot format, Create f
         Reverse[i][j] = Cmap[Res-(i+1)][j]
 
   Listed_CustomCmap_r = ListedColormap(Reverse, name=(Cmap_Name + '_r') )
-  plt.register_cmap(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
+  colormaps.register(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
 
 Now the Custom Colormap has been registered, right-click on a workspace and produce a colorfill plot. In Figure Options (Gear Icon in Plot Figure), under the Images Tab, you can use the drop down-menu to select the new Colormap, and use the check-box to select its Reverse!
 
@@ -625,6 +628,7 @@ Now the Custom Colormap has been registered, right-click on a workspace and prod
   import matplotlib.pyplot as plt
   from matplotlib.colors import ListedColormap, LinearSegmentedColormap
   import numpy as np
+  from matplotlib import colormaps
 
   Cmap_Name = 'Beach' # Colormap name
   Res = 500 # Resolution of your Colormap (number of steps in colormap)
@@ -651,7 +655,7 @@ Now the Custom Colormap has been registered, right-click on a workspace and prod
   #np.savetxt("C:\Path\to\File\Filename.txt",Cmap) #uncomment to save to file
 
   Listed_CustomCmap = ListedColormap(Cmap, name = Cmap_Name)
-  plt.register_cmap(name = Cmap_Name, cmap = Listed_CustomCmap)
+  colormaps.register(name = Cmap_Name, cmap = Listed_CustomCmap)
 
   # Create and register the reverse colormap
   Reverse = np.zeros((Res,4))
@@ -660,7 +664,7 @@ Now the Custom Colormap has been registered, right-click on a workspace and prod
         Reverse[i][j] = Cmap[Res-(i+1)][j]
 
   Listed_CustomCmap_r = ListedColormap(Reverse, name=(Cmap_Name + '_r') )
-  plt.register_cmap(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
+  colormaps.register(name=(Cmap_Name + '_r'), cmap= Listed_CustomCmap_r)
 
   from mantid.simpleapi import Load, ConvertToMD, BinMD, ConvertUnits, Rebin
   from mantid import plots
@@ -677,7 +681,7 @@ Now the Custom Colormap has been registered, right-click on a workspace and prod
   cbar.set_label('Intensity (arb. units)') #add text to colorbar
   #fig.show()
 
-Colormaps can also be created with the `colormap package <https://colormap.readthedocs.io/en/latest/>`_ or by `concatenating existing colormaps <https://matplotlib.org/3.1.0/tutorials/colors/colormap-manipulation.html>`_.
+Colormaps can also be created with the `colormap package <https://colormap.readthedocs.io/en/latest/>`_ or by `concatenating existing colormaps <https://matplotlib.org/stable/users/explain/colors/colormap-manipulation.html>`_.
 
 Plotting Sample Logs
 --------------------
@@ -901,7 +905,7 @@ Change Matplotlib Defaults
 It is possible to alter the default appearance of Matplotlib plots, e.g. linewidths, label sizes,
 colour cycles etc. This is most readily achieved by setting the ``rcParams`` at the start of a
 Mantid Workbench session. The example below shows a plot with the default line width, followed be resetting the parameters with ``rcParams``. An example with many of the
-editable parameters is available at `the Matplotlib site <https://matplotlib.org/users/customizing.html>`_.
+editable parameters is available at `the Matplotlib site <https://matplotlib.org/stable/users/explain/customizing.html>`_.
 
 .. plot::
    :include-source:
@@ -930,7 +934,7 @@ editable parameters is available at `the Matplotlib site <https://matplotlib.org
     ax.plot(yy)
 
 For much more on customising the graph appearance see the `Matplotlib documentation
-<https://matplotlib.org/users/dflt_style_changes.html>`_.
+<https://matplotlib.org/stable/users/prev_whats_new/dflt_style_changes.html>`_.
 
 A list of some common properties you might want to change and the keywords to set:
 
@@ -954,5 +958,5 @@ A list of some common properties you might want to change and the keywords to se
 | Font type          | ``font.family``         | sans-serif |
 +--------------------+-------------------------+------------+
 
-A much fuller list of properties is avialble `in the Matplotlib documentation
-<https://matplotlib.org/users/customizing.html>`_.
+A much fuller list of properties is available `in the Matplotlib documentation
+<https://matplotlib.org/stable/users/explain/customizing.html>`_.

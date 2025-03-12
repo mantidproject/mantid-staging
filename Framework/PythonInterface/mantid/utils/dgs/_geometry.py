@@ -154,7 +154,7 @@ def _qangle_validate_inputs(
 
     if goniometer_constraints:
         if goniometer_range[1] < goniometer_range[0] or goniometer_range[0] < -180.0 or goniometer_range[1] > 180.0:
-            raise ValueError("goniometer_range must be an increasing array, " "with both limits between -180 and 180 degrees")
+            raise ValueError("goniometer_range must be an increasing array, with both limits between -180 and 180 degrees")
 
     return (Ei, DeltaE, sign, UB)
 
@@ -300,9 +300,9 @@ def qangle(
         ] = ErrorCodes.INSIDE_BEAMSTOP
 
     if goniometer_constraints:
-        error_code[
-            ((omega < goniometer_range[0]) | (omega > goniometer_range[1])) & (error_code == ErrorCodes.CORRECT)
-        ] = ErrorCodes.GONIOMETR
+        error_code[((omega < goniometer_range[0]) | (omega > goniometer_range[1])) & (error_code == ErrorCodes.CORRECT)] = (
+            ErrorCodes.GONIOMETR
+        )
 
     return dict(
         Q_lab_x=Q_lab_x,

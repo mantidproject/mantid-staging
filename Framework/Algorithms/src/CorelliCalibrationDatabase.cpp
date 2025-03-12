@@ -26,8 +26,7 @@
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
+#include <filesystem>
 #include <sstream>
 #include <string>
 
@@ -280,7 +279,7 @@ TableWorkspace_sptr CalibrationTableHandler::saveCompomentDatabase(const std::st
   // Load the database file for the specific component to a table workspace
   // if extant, otherwise instantiate an empty table
   TableWorkspace_sptr compcaltable = nullptr;
-  if (boost::filesystem::exists(filename)) {
+  if (std::filesystem::exists(filename)) {
     compcaltable = loadComponentCalibrationTable(filename, tablewsname);
   } else {
     compcaltable = createCalibrationTableWorkspace(tablewsname, true);
@@ -457,7 +456,7 @@ void CorelliCalibrationDatabase::exec() {
   saveCalibrationTable(calibDatabaseDir);
 
   // Clean up memory
-  for (auto &[compname, calibws] : component_caibws_map) {
+  for (const auto &[compname, calibws] : component_caibws_map) {
     if (calibws) {
       g_log.debug() << "Removing " << compname << "calibration table from ADS\n";
       AnalysisDataService::Instance().remove(calibws->getName());
@@ -518,7 +517,7 @@ void CorelliCalibrationDatabase::updateComponentDatabaseFiles(const std::string 
 void CorelliCalibrationDatabase::loadNonCalibratedComponentDatabase(
     const std::string &calibdbdir, std::map<std::string, TableWorkspace_sptr> &calibwsmap) {
   // go through all the components
-  for (auto &[componentname, componentcaltable] : calibwsmap) {
+  for (const auto &[componentname, componentcaltable] : calibwsmap) {
     // check whether the calibration workspace has been loaded
     if (componentcaltable) // skip if it has been loaded
       continue;
@@ -551,8 +550,8 @@ void CorelliCalibrationDatabase::createOutputCalibrationTable(std::map<std::stri
   CorelliCalibration::CalibrationTableHandler handler = CorelliCalibration::CalibrationTableHandler();
   handler.setCalibrationTable(mOutputWS);
 
-  for (auto componentname : orderedcomponents) {
-    auto componentcaltable = calibwsmap[componentname];
+  for (const auto &componentname : orderedcomponents) {
+    const auto componentcaltable = calibwsmap[componentname];
     if (componentcaltable) {
       // only take care of calibrated components (before and now)
       auto lastpos = CorelliCalibration::CalibrationTableHandler::getLatestCalibratedPosition(componentcaltable);
@@ -646,7 +645,7 @@ bool CorelliCalibrationDatabase::isFileExist(const std::string &filepath) {
 
   // TODO - replace by std::filesystem::exists(filename) until C++17 is properly
   // supported
-  return boost::filesystem::exists(filepath);
+  return std::filesystem::exists(filepath);
 }
 
 //-----------------------------------------------------------------------------
@@ -657,9 +656,9 @@ bool CorelliCalibrationDatabase::isFileExist(const std::string &filepath) {
  * @return
  */
 std::string CorelliCalibrationDatabase::joinPath(const std::string &directory, const std::string &basename) {
-  boost::filesystem::path dir(directory);
-  boost::filesystem::path file(basename);
-  boost::filesystem::path fullpath = dir / file;
+  std::filesystem::path dir(directory);
+  std::filesystem::path file(basename);
+  std::filesystem::path fullpath = dir / file;
 
   return fullpath.string();
 }
@@ -675,7 +674,7 @@ std::string CorelliCalibrationDatabase::joinPath(const std::string &directory, c
 void CorelliCalibrationDatabase::setComponentMap(const std::vector<std::string> &componentnames,
                                                  std::map<std::string, DataObjects::TableWorkspace_sptr> &compmap) {
   // Add entries
-  for (auto compname : componentnames)
+  for (const auto &compname : componentnames)
     compmap[compname] = nullptr;
 }
 

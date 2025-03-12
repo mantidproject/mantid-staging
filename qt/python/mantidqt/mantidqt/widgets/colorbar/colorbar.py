@@ -11,7 +11,7 @@ import sys
 import glob
 import os
 from mantid.kernel import ConfigService
-from mantid.plots.utility import mpl_version_info, get_current_cmap
+from mantid.plots.utility import get_current_cmap
 from mantidqt.MPLwidgets import FigureCanvas
 from matplotlib.colorbar import Colorbar
 from matplotlib.figure import Figure
@@ -45,15 +45,16 @@ class ColorbarWidget(QWidget):
     scaleNormChanged = Signal()
     # register additional color maps from file
     register_customized_colormaps()
-    # create the list
-    cmap_list = sorted([cmap for cmap in colormaps.keys() if not cmap.endswith("_r")])
 
     def __init__(self, parent=None, default_norm_scale=None):
         """
         :param default_scale: None uses linear, else either a string or tuple(string, other arguments), e.g. tuple('Power', exponent)
         """
 
-        super(ColorbarWidget, self).__init__(parent)
+        super().__init__(parent)
+
+        # create the list. Initialize in the init so that it can be updated if new colormaps are added
+        self.cmap_list = sorted([cmap for cmap in colormaps.keys() if not cmap.endswith("_r")])
 
         self.setWindowTitle("Colorbar")
         self.setMaximumWidth(100)
@@ -139,7 +140,8 @@ class ColorbarWidget(QWidget):
         if parent:
             # Set facecolor to match parent
             self.canvas.figure.set_facecolor(parent.palette().window().color().getRgbF())
-        self.ax = self.canvas.figure.add_axes([0.0, 0.02, 0.2, 0.97])
+        self.ax = None
+        self._reset_figure_axes()
 
         # layout
         self.layout = QVBoxLayout(self)
@@ -154,28 +156,46 @@ class ColorbarWidget(QWidget):
         self.layout.addWidget(self.autoscale)
         self.layout.addLayout(self.auto_layout)
 
+    def _reset_figure_axes(self):
+        """
+        Adds axes to the figure. If axes already exist then these are removed and replaced with new ones.
+        """
+        if self.ax:
+            self.ax.clear()
+            self.canvas.figure.delaxes(self.ax)
+        self.ax = self.canvas.figure.add_axes([0.0, 0.02, 0.2, 0.97])
+
     def set_mappable(self, mappable):
         """
         When a new plot is created this method should be called with the new mappable
         """
-        self.ax.clear()
+        # The matplotlib.Colorbar doesn't seem to be garbage collected very reliably. If we recreate the axes then
+        # this seems to improve the garbage collection.
+        self._reset_figure_axes()
+
         try:  # Use current cmap
             cmap = get_current_cmap(self.colorbar)
         except AttributeError:
             # else use default
             cmap = ConfigService.getString("plots.images.Colormap")
+
         self.colorbar = Colorbar(ax=self.ax, mappable=mappable)
         self.cmin_value, self.cmax_value = mappable.get_clim()
         self.update_clim_text()
-        self.cmap_changed(cmap, False)
+        try:
+            self.cmap_changed(cmap, False)
+        except ValueError:
+            # the default mantid colormap is not available, just use matplotlib default
+            pass
 
         mappable_cmap = get_current_cmap(mappable)
 
         if mappable_cmap.name.endswith("_r"):
             self.crev.setChecked(True)
+            self.cmap.setCurrentIndex(self.cmap_list.index(mappable_cmap.name.replace("_r", "")))
         else:
             self.crev.setChecked(False)
-        self.cmap.setCurrentIndex(self.cmap_list.index(mappable_cmap.name.replace("_r", "")))
+            self.cmap.setCurrentIndex(self.cmap_list.index(mappable_cmap.name))
 
         self.redraw()
 
@@ -189,10 +209,7 @@ class ColorbarWidget(QWidget):
         if rev:
             name += "_r"
         self.colorbar.mappable.set_cmap(name)
-        if mpl_version_info() >= (3, 1):
-            self.colorbar.update_normal(self.colorbar.mappable)
-        else:
-            self.colorbar.set_cmap(name)
+        self.colorbar.update_normal(self.colorbar.mappable)
         self.redraw()
 
     def mappable_changed(self):
@@ -364,8 +381,10 @@ class ColorbarWidget(QWidget):
     def _calculate_auto_color_limits(self, signal):
         """Calculate auto scale limits"""
         scale_type = AUTO_SCALE_OPTS[self.autotype.currentIndex()]
+        signal_min, signal_max = np.nanmin(signal), np.nanmax(signal)
+
         if scale_type == "Min/Max":
-            vmin, vmax = np.nanmin(signal), np.nanmax(signal)
+            vmin, vmax = signal_min, signal_max
         elif scale_type == "3-Sigma":
             mean, sigma = np.nanmean(signal), np.nanstd(signal)
             vmin, vmax = mean - 3 * sigma, mean + 3 * sigma
@@ -376,6 +395,10 @@ class ColorbarWidget(QWidget):
             med = np.nanmedian(signal)
             mad = np.nanmedian(np.abs(signal - med))
             vmin, vmax = med - 1.5 * mad, med + 1.5 * mad
+
+        vmin = max(vmin, signal_min)
+        vmax = min(vmax, signal_max)
+
         # sanity checks
         if self._is_log_norm():
             if vmax <= 0:

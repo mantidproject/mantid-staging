@@ -3,6 +3,8 @@
 
 .. summary::
 
+.. relatedalgorithms::
+
 .. properties::
 
 Description
@@ -18,7 +20,9 @@ This algorithm corrects for non-ideal instrument component efficiencies in a pol
    \Sigma^{-+} \\
    \Sigma^{--}
    \end{bmatrix}
-   = \bm{M}
+   = \begin{bmatrix}
+        M
+     \end{bmatrix}
    \begin{bmatrix}
    I^{00} \\
    I^{01} \\
@@ -26,7 +30,8 @@ This algorithm corrects for non-ideal instrument component efficiencies in a pol
    I^{11}
    \end{bmatrix},
 
-where :math:`I^{jk}` are the experimental count rates for flipper configuration :math:`jk` and :math:`\bm{M}` is the four-by-four correction matrix as defined by equations (4) in [#WILDES]_.
+where :math:`I^{jk}` are the experimental count rates for flipper configuration :math:`jk` and
+:math:`\begin{bmatrix}M\end{bmatrix}` is the four-by-four correction matrix as defined by equations (4) in [#WILDES]_.
 
 Flipper configurations
 ######################
@@ -34,24 +39,49 @@ Flipper configurations
 *InputWorkspaces* is a list containing one to four workspace names (X unit: wavelength) corresponding to the instrument configurations given as *Flippers*. Supported configurations are:
 
 :literal:`'00, 01, 10, 11'`
-   Full polarization corrections. Four input workspaces are required. They should be in the input group in the following order: both flippers off, analyzer flipper on, polarizer flipper on, both flippers on.
+   Full polarization corrections: both flippers off, analyzer flipper on, polarizer flipper on, both flippers on. Four input workspaces are required. The flipper configuration can be provided in any order and should match the order of the workspaces in the input group.
 
 :literal:`'00, 01, 11'` and :literal:`'00, 10, 11'`
-   Polarization corrections with the assumption that the corrected count rates :math:`\Sigma^{+-} = \Sigma^{-+}`. In this case the intensity of the missing flipper configuration (01 or 10) can be solved from the other intensities. Workspaces in the input group should be in the following order: both flippers off, one flipper on, both flippers on.
+   Polarization corrections with the assumption that the corrected count rates :math:`\Sigma^{+-} = \Sigma^{-+}`. In this case the intensity of the missing flipper configuration (01 or 10) can be solved from the other intensities. The flipper configuration can be provided in any order and should match the order of the workspaces in the input group.
 
 :literal:`'00, 11'`
-   Polarization corrections with the assumption that the corrected count rates :math:`\Sigma^{+-} = \Sigma^{-+} = 0`. In this case the intensities of the missing flipper configurations (01 and 10) can be solved from the other intensities. Workspaces in the input group should be in the following order: both flippers off, both flippers on.
+   Polarization corrections with the assumption that the corrected count rates :math:`\Sigma^{+-} = \Sigma^{-+} = 0`. In this case the intensities of the missing flipper configurations (01 and 10) can be solved from the other intensities. The flipper configuration can be provided in any order and should match the order of the workspaces in the input group.
 
 :literal:`'0, 1'`
-   Polarization corrections when no analyzer has been used. Workspaces in the input group should be in the following order: polarizer flipper off, polarizer flipper on.
+   Polarization corrections when no analyzer has been used: polarizer flipper off, polarizer flipper on. The flipper configuration can be provided in any order and should match the order of the workspaces in the input group.
 
 :literal:`'0'`
    Polarization corrections for a direct beam measurement in a reflectometry experiment.
 
+Spin States
+###########
+
+The order of the workspaces in the output group workspace can be defined by setting the values in the *SpinStates*
+property. Supported configurations are:
+
+:literal:`''`
+    Default behaviour. The output workspace group will be in the order :literal:`'++, +-, -+, --'` for all outputs. In
+    instances where not all outputs are produced, the order is maintained with the missing workspaces omitted (e.g.
+    :literal:`'++, --'`).
+
+:literal:`'++, --, +-, --'`
+    For polarization corrections where both an analyzer and polarizer are used. The order of the states in the string
+    will be the same as the order of the workspaces in the *OutputWorkspace* group. Only allowed if flipper
+    configuration accounts for both flippers (contains two digits).
+
+:literal:`'--, ++'`
+    For polarization corrections when no analyzer has been used. Only allowed if the flipper configuration is also
+    setup this way (e.g. :literal:`'1, 0'`).
+
+*Note:* Output order cannot be set for direct beam measurements as there is only a single workspace in the output.
+
 Output
 ######
 
-The algorithm's output is a group workspace containing the corrected workspaces. The names of each corrected workspace is prefixed by :literal:`_++`, :literal:`_+-`, :literal:`_-+` or :literal:`_--` depending on which :math:`\Sigma^{mn}` they correspond to.
+The algorithm's output is a group workspace containing the corrected workspaces. The names of each corrected workspace is suffixed by :literal:`_++`, :literal:`_+-`, :literal:`_-+` or :literal:`_--` depending on which :math:`\Sigma^{mn}` they correspond to.
+
+If the ``AddSpinStateToLog`` property has been set to ``True`` then a sample log entry called ``spin_state_ORSO`` is added to each output child workspace.
+This log entry specifies the spin state of the data using the notation from the Reflectometry ORSO data standard [#ORSO]_.
 
 Efficiency factors
 ##################
@@ -152,6 +182,7 @@ References
 
 .. [#WILDES] A. R. Wildes, *Neutron News*, **17** 17 (2006)
              `doi: 10.1080/10448630600668738 <https://doi.org/10.1080/10448630600668738>`_
+.. [#ORSO] ORSO file format specification: `https://www.reflectometry.org/file_format/specification <https://www.reflectometry.org/file_format/specification>`_
 
 .. categories::
 

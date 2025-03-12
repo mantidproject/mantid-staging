@@ -56,9 +56,6 @@ using namespace Mantid::Geometry;
 using Mantid::Indexing::IndexInfo;
 using Mantid::Types::Core::DateAndTime;
 
-// Declare into the factory.
-DECLARE_WORKSPACE(WorkspaceTester)
-
 namespace {
 static const int INVALID_DET_ID = -1;
 static const int INVALID_DET_ID2 = -2;
@@ -403,6 +400,28 @@ public:
     ws->setTitle("something");
     TS_ASSERT_EQUALS(ws->getTitle(), "something");
     ws->setTitle("");
+  }
+
+  void testGetSetPlotType() {
+    // test default
+    TS_ASSERT_EQUALS(ws->getPlotType(), "plot");
+
+    // test invalid is rejected
+    ws->setPlotType("invalid");
+    TS_ASSERT_EQUALS(ws->getPlotType(), "plot");
+
+    // test valid is accepted
+    ws->setPlotType("marker");
+    TS_ASSERT_EQUALS(ws->getPlotType(), "marker");
+  }
+
+  void testGetSetMarkerStyle() {
+    // test default
+    TS_ASSERT_EQUALS(ws->getMarkerStyle(), "");
+
+    // test set
+    ws->setMarkerStyle("square");
+    TS_ASSERT_EQUALS(ws->getMarkerStyle(), "square");
   }
 
   void testGetSetComment() {
@@ -2448,6 +2467,20 @@ public:
       }
       ++count;
     }
+  }
+
+  void test_isCommonBins_performance() {
+    const auto iterations(100u);
+    const auto start = std::chrono::high_resolution_clock::now();
+    for (auto i = 0u; i < iterations; ++i) {
+      TS_ASSERT(m_workspace.isCommonBins());
+    }
+    const auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    const auto averageDuration = static_cast<double>(duration) / static_cast<double>(iterations);
+
+    // Assert the average is less than 100 microseconds
+    TS_ASSERT(averageDuration < 100.0);
   }
 
   void test_hasOrientedLattice() {

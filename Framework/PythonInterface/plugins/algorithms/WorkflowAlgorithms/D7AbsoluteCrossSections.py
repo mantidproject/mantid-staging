@@ -5,7 +5,7 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 
-from mantid.api import AlgorithmFactory, NumericAxis, PropertyMode, Progress, PythonAlgorithm, WorkspaceGroupProperty, WorkspaceGroup
+from mantid.api import mtd, AlgorithmFactory, NumericAxis, PropertyMode, Progress, PythonAlgorithm, WorkspaceGroupProperty, WorkspaceGroup
 from mantid.kernel import (
     Direction,
     EnabledWhenProperty,
@@ -16,8 +16,27 @@ from mantid.kernel import (
     RebinParamsValidator,
     StringListValidator,
 )
-
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    AppendSpectra,
+    ConvertAxisByFormula,
+    ConvertSpectrumAxis,
+    CloneWorkspace,
+    CreateSingleValuedWorkspace,
+    CreateWorkspace,
+    DeleteWorkspace,
+    DeleteWorkspaces,
+    Divide,
+    GroupWorkspaces,
+    Minus,
+    Multiply,
+    RenameWorkspace,
+    ReplaceSpecialValues,
+    SofQWNormalisedPolygon,
+    SumOverlappingTubes,
+    Transpose,
+    UnGroupWorkspace,
+    WeightedMean,
+)
 
 from scipy.constants import physical_constants
 import numpy as np
@@ -25,7 +44,6 @@ import math
 
 
 class D7AbsoluteCrossSections(PythonAlgorithm):
-
     _sampleAndEnvironmentProperties = None
     _mode = None
     _debug = None
@@ -142,7 +160,7 @@ class D7AbsoluteCrossSections(PythonAlgorithm):
 
         if normalisation_method == "Vanadium" and self.getProperty("VanadiumInputWorkspace").isDefault:
             issues["VanadiumInputWorkspace"] = (
-                "Vanadium input workspace is mandatory for when detector efficiency calibration" ' is "Vanadium".'
+                'Vanadium input workspace is mandatory for when detector efficiency calibration is "Vanadium".'
             )
 
         if normalisation_method in ["Incoherent", "Paramagnetic"]:
@@ -180,7 +198,6 @@ class D7AbsoluteCrossSections(PythonAlgorithm):
         return issues
 
     def PyInit(self):
-
         self.declareProperty(
             WorkspaceGroupProperty("InputWorkspace", "", direction=Direction.Input),
             doc="The input workspace with spin-flip and non-spin-flip data.",
@@ -188,7 +205,7 @@ class D7AbsoluteCrossSections(PythonAlgorithm):
 
         self.declareProperty(
             WorkspaceGroupProperty("RotatedXYZWorkspace", "", direction=Direction.Input, optional=PropertyMode.Optional),
-            doc="The workspace used in 10p method when data is taken as two XYZ" " measurements rotated by 45 degress.",
+            doc="The workspace used in 10p method when data is taken as two XYZ measurements rotated by 45 degress.",
         )
 
         self.declareProperty(
@@ -248,7 +265,7 @@ class D7AbsoluteCrossSections(PythonAlgorithm):
             defaultValue=0.5,
             validator=FloatBoundedValidator(lower=0),
             direction=Direction.Input,
-            doc="Scattering angle bin size in degrees used for expressing scan data on a single " "TwoTheta axis.",
+            doc="Scattering angle bin size in degrees used for expressing scan data on a single TwoTheta axis.",
         )
 
         self.setPropertySettings("ScatteringAngleBinSize", EnabledWhenProperty("OutputTreatment", PropertyCriterion.IsEqualTo, "Merge"))

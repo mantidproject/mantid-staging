@@ -4,22 +4,14 @@
 //   NScD Oak Ridge National Laboratory, European Spallation Source,
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-
-// clang-format off
-// boost 1.77 has a missing header on Windows. Include algorithm manually
-// https://github.com/boostorg/process/issues/213
 #include <algorithm>
 #include <boost/process/detail/traits/wchar_t.hpp>
-// clang-format on
-
 #include <boost/process/env.hpp>
 #include <boost/process/search_path.hpp>
 #include <boost/process/system.hpp>
-
 #include <cassert>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -40,7 +32,7 @@ static constexpr auto ERRORREPORTS_APP_NAME = "workbench";
 
 // aliases
 namespace bp = boost::process;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 using ExeArgs = std::vector<std::string>;
 
 // helper functions

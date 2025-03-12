@@ -48,10 +48,16 @@ public:
 
   ExperimentPresenterTest() : m_view() { Mantid::API::FrameworkManager::Instance(); }
 
+  void tearDown() override {
+    // Verifying and clearing of expectations happens when mock variables are destroyed.
+    // Some of our mocks are created as member variables and will exist until all tests have run, so we need to
+    // explicitly verify and clear them after each test.
+    verifyAndClear();
+  }
+
   void testPresenterSubscribesToView() {
     EXPECT_CALL(m_view, subscribe(_)).Times(1);
     auto presenter = makePresenter();
-    verifyAndClear();
   }
 
   void testAllWidgetsAreEnabledWhenReductionPaused() {
@@ -60,8 +66,6 @@ public:
     EXPECT_CALL(m_view, enableAll()).Times(1);
     expectNotProcessingOrAutoreducing();
     presenter.notifyReductionPaused();
-
-    verifyAndClear();
   }
 
   void testAllWidgetsAreDisabledWhenReductionResumed() {
@@ -70,8 +74,6 @@ public:
     EXPECT_CALL(m_view, disableAll()).Times(1);
     expectProcessing();
     presenter.notifyReductionResumed();
-
-    verifyAndClear();
   }
 
   void testAllWidgetsAreEnabledWhenAutoreductionPaused() {
@@ -80,8 +82,6 @@ public:
     EXPECT_CALL(m_view, enableAll()).Times(1);
     expectNotProcessingOrAutoreducing();
     presenter.notifyAutoreductionPaused();
-
-    verifyAndClear();
   }
 
   void testAllWidgetsAreDisabledWhenAutoreductionResumed() {
@@ -90,8 +90,6 @@ public:
     EXPECT_CALL(m_view, disableAll()).Times(1);
     expectAutoreducing();
     presenter.notifyAutoreductionResumed();
-
-    verifyAndClear();
   }
 
   void testModelUpdatedWhenAnalysisModeChanged() {
@@ -101,7 +99,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().analysisMode(), AnalysisMode::MultiDetector);
-    verifyAndClear();
   }
 
   void testModelUpdatedWhenSummationTypeChanged() {
@@ -111,7 +108,6 @@ public:
     presenter.notifySummationTypeChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().summationType(), SummationType::SumInQ);
-    verifyAndClear();
   }
 
   void testSumInQWidgetsDisabledWhenChangeToSumInLambda() {
@@ -120,8 +116,6 @@ public:
     EXPECT_CALL(m_view, disableReductionType()).Times(1);
     EXPECT_CALL(m_view, disableIncludePartialBins()).Times(1);
     presenter.notifySummationTypeChanged();
-
-    verifyAndClear();
   }
 
   void testSumInQWidgetsEnabledWhenChangeToSumInQ() {
@@ -131,8 +125,6 @@ public:
     EXPECT_CALL(m_view, enableReductionType()).Times(1);
     EXPECT_CALL(m_view, enableIncludePartialBins()).Times(1);
     presenter.notifySummationTypeChanged();
-
-    verifyAndClear();
   }
 
   void testChangingIncludePartialBinsUpdatesModel() {
@@ -143,7 +135,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT(presenter.experiment().includePartialBins());
-    verifyAndClear();
   }
 
   void testChangingDebugOptionUpdatesModel() {
@@ -154,7 +145,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT(presenter.experiment().debug());
-    verifyAndClear();
   }
 
   void testSetBackgroundSubtractionUpdatesModel() {
@@ -162,7 +152,6 @@ public:
     expectSubtractBackground();
     presenter.notifySettingsChanged();
     assertBackgroundSubtractionOptionsSet(presenter);
-    verifyAndClear();
   }
 
   void testBackgroundSubtractionMethodIsEnabledWhenSubtractBackgroundIsChecked() {
@@ -170,7 +159,6 @@ public:
     expectSubtractBackground(true);
     EXPECT_CALL(m_view, enableBackgroundSubtractionMethod()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testPolynomialInputsEnabledWhenSubtractingPolynomialBackground() {
@@ -179,7 +167,6 @@ public:
     EXPECT_CALL(m_view, enablePolynomialDegree()).Times(1);
     EXPECT_CALL(m_view, enableCostFunction()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testPolynomialInputsDisabledWhenSubtractingPerDetectorAverage() {
@@ -188,7 +175,6 @@ public:
     EXPECT_CALL(m_view, disablePolynomialDegree()).Times(1);
     EXPECT_CALL(m_view, disableCostFunction()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testPolynomialInputsDisabledWhenSubtractingAveragePixelFit() {
@@ -197,7 +183,6 @@ public:
     EXPECT_CALL(m_view, disablePolynomialDegree()).Times(1);
     EXPECT_CALL(m_view, disableCostFunction()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testBackgroundSubtractionInputsDisabledWhenOptionTurnedOff() {
@@ -207,7 +192,6 @@ public:
     EXPECT_CALL(m_view, disablePolynomialDegree()).Times(1);
     EXPECT_CALL(m_view, disableCostFunction()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testTogglePolarizationCorrectionOptionUpdatesModel() {
@@ -215,7 +199,6 @@ public:
     expectPolarizationAnalysisOn();
     presenter.notifySettingsChanged();
     assertPolarizationAnalysisWorkspace(presenter);
-    verifyAndClear();
   }
 
   void testPolarizationCorrectionOptionDisablesWorkspaceInput() { runTestThatPolarizationCorrectionsDisabled(); }
@@ -238,7 +221,6 @@ public:
     EXPECT_CALL(m_fileHandler, fileExists(fullTestPath)).WillOnce(Return(true));
     EXPECT_CALL(m_view, showPolCorrFilePathValid()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testInvalidPolarizationPathShowsAsInvalid() {
@@ -251,19 +233,17 @@ public:
     EXPECT_CALL(m_fileHandler, fileExists(fullTestPath)).WillOnce(Return(false));
     EXPECT_CALL(m_view, showPolCorrFilePathInvalid()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testSetFloodCorrectionsUpdatesModel() {
     auto presenter = makePresenter();
     FloodCorrections floodCorr(FloodCorrectionType::Workspace, std::string{"testWS"});
     EXPECT_CALL(m_view, getFloodCorrectionType()).Times(2).WillRepeatedly(Return("Workspace"));
-    EXPECT_CALL(m_view, getFloodWorkspace()).WillOnce(Return(floodCorr.workspace().get()));
+    EXPECT_CALL(m_view, getFloodWorkspace()).WillOnce(Return(floodCorr.workspace().value()));
     EXPECT_CALL(m_view, setFloodCorrectionWorkspaceMode()).Times(1);
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().floodCorrections(), floodCorr);
-    verifyAndClear();
   }
 
   void testSetFloodCorrectionsUpdatesModelForFilePath() {
@@ -271,15 +251,14 @@ public:
     FloodCorrections floodCorr(FloodCorrectionType::Workspace, std::string{"path/to/testWS"});
 
     EXPECT_CALL(m_view, getFloodCorrectionType()).Times(2).WillRepeatedly(Return("FilePath"));
-    EXPECT_CALL(m_fileHandler, getFullFilePath(floodCorr.workspace().get()))
-        .WillOnce(Return(floodCorr.workspace().get()));
-    EXPECT_CALL(m_fileHandler, fileExists(floodCorr.workspace().get())).WillOnce(Return(true));
-    EXPECT_CALL(m_view, getFloodFilePath()).WillOnce(Return(floodCorr.workspace().get()));
+    EXPECT_CALL(m_fileHandler, getFullFilePath(floodCorr.workspace().value()))
+        .WillOnce(Return(floodCorr.workspace().value()));
+    EXPECT_CALL(m_fileHandler, fileExists(floodCorr.workspace().value())).WillOnce(Return(true));
+    EXPECT_CALL(m_view, getFloodFilePath()).WillOnce(Return(floodCorr.workspace().value()));
     EXPECT_CALL(m_view, setFloodCorrectionFilePathMode()).Times(1);
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().floodCorrections(), floodCorr);
-    verifyAndClear();
   }
 
   void testSetFloodCorrectionsUpdatesModelForNoCorrections() {
@@ -291,7 +270,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().floodCorrections(), floodCorr);
-    verifyAndClear();
   }
 
   void testSetFloodCorrectionsToWorkspaceEnablesInputs() {
@@ -321,7 +299,6 @@ public:
     EXPECT_CALL(m_fileHandler, fileExists(fullTestPath)).WillOnce(Return(true));
     EXPECT_CALL(m_view, showFloodCorrFilePathValid()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testInvalidFloodPathShowsAsInvalid() {
@@ -334,7 +311,6 @@ public:
     EXPECT_CALL(m_fileHandler, fileExists(fullTestPath)).WillOnce(Return(false));
     EXPECT_CALL(m_view, showFloodCorrFilePathInvalid()).Times(1);
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testSetValidTransmissionRunRange() {
@@ -364,7 +340,7 @@ public:
 
   void testTransmissionRunRangeIsValidButNotUpdatedIfUnset() {
     RangeInLambda range(0.0, 0.0);
-    runTestForValidTransmissionRunRange(range, boost::none);
+    runTestForValidTransmissionRunRange(range, std::nullopt);
   }
 
   void testTransmissionParamsAreValidWithPositiveValue() { runTestForValidTransmissionParams("0.02"); }
@@ -391,7 +367,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().scaleRHS(), scaleRHS);
-    verifyAndClear();
   }
 
   void testSetTransmissionParamsAreInvalidIfContainNonNumericValue() {
@@ -403,7 +378,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().rebinParameters(), "");
-    verifyAndClear();
   }
 
   void testSetStitchOptions() {
@@ -416,7 +390,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().stitchParameters(), optionsMap);
-    verifyAndClear();
   }
 
   void testSetStitchOptionsInvalid() {
@@ -429,7 +402,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().stitchParameters(), emptyOptionsMap);
-    verifyAndClear();
   }
 
   void testSetStitchOptionsTrueTextReplacedWithValue() {
@@ -442,7 +414,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().stitchParameters(), optionsMap);
-    verifyAndClear();
   }
 
   void testSetStitchOptionsFalseTextReplacedWithValue() {
@@ -455,7 +426,6 @@ public:
     presenter.notifySettingsChanged();
 
     TS_ASSERT_EQUALS(presenter.experiment().stitchParameters(), optionsMap);
-    verifyAndClear();
   }
 
   void testNewLookupRowRequested() {
@@ -466,8 +436,6 @@ public:
     // new value should be requested from view to update model
     EXPECT_CALL(m_view, getLookupTable()).Times(1);
     presenter.notifyNewLookupRowRequested();
-
-    verifyAndClear();
   }
 
   void testRemoveLookupRowRequested() {
@@ -479,8 +447,6 @@ public:
     // new value should be requested from view to update model
     EXPECT_CALL(m_view, getLookupTable()).Times(1);
     presenter.notifyRemoveLookupRowRequested(indexToRemove);
-
-    verifyAndClear();
   }
 
   void testChangingLookupRowUpdatesModel() {
@@ -499,7 +465,6 @@ public:
       TS_ASSERT_EQUALS(lookupRows[0].thetaOrWildcard(), defaultsWithFirstAngle().thetaOrWildcard());
       TS_ASSERT_EQUALS(lookupRows[1].thetaOrWildcard(), defaultsWithSecondAngle().thetaOrWildcard());
     }
-    verifyAndClear();
   }
 
   void testMultipleUniqueAnglesAreValid() {
@@ -626,21 +591,18 @@ public:
     auto presenter = makePresenter();
     EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(AtLeast(1));
     presenter.notifySettingsChanged();
-    verifyAndClear();
   }
 
   void testChangingLookupRowNotifiesMainPresenter() {
     auto presenter = makePresenter();
     EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(AtLeast(1));
     presenter.notifyLookupRowChanged(0, 0);
-    verifyAndClear();
   }
 
   void testRestoreDefaultsUpdatesInstrument() {
     auto presenter = makePresenter();
     EXPECT_CALL(m_mainPresenter, notifyUpdateInstrumentRequested()).Times(1);
     presenter.notifyRestoreDefaultsRequested();
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesAnalysisModeInView() {
@@ -649,7 +611,6 @@ public:
     auto presenter = makePresenter(std::move(defaultOptions));
     EXPECT_CALL(m_view, setAnalysisMode("MultiDetectorAnalysis")).Times(1);
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesAnalysisModeInModel() {
@@ -658,7 +619,6 @@ public:
     auto presenter = makePresenter(std::move(defaultOptions));
     presenter.notifyInstrumentChanged("POLREF");
     TS_ASSERT_EQUALS(presenter.experiment().analysisMode(), AnalysisMode::MultiDetector);
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesReductionOptionsInView() {
@@ -669,7 +629,6 @@ public:
     EXPECT_CALL(m_view, setReductionType("NonFlatSample")).Times(1);
     EXPECT_CALL(m_view, setIncludePartialBins(true)).Times(1);
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesReductionOptionsInModel() {
@@ -680,7 +639,6 @@ public:
     TS_ASSERT_EQUALS(presenter.experiment().summationType(), SummationType::SumInQ);
     TS_ASSERT_EQUALS(presenter.experiment().reductionType(), ReductionType::NonFlatSample);
     TS_ASSERT_EQUALS(presenter.experiment().includePartialBins(), true);
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesDebugOptionsInView() {
@@ -689,7 +647,6 @@ public:
     auto presenter = makePresenter(std::move(defaultOptions));
     EXPECT_CALL(m_view, setDebugOption(true)).Times(1);
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesDebugOptionsInModel() {
@@ -698,11 +655,10 @@ public:
     auto presenter = makePresenter(std::move(defaultOptions));
     presenter.notifyInstrumentChanged("POLREF");
     TS_ASSERT_EQUALS(presenter.experiment().debug(), true);
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesLookupRowInView() {
-    auto lookupRow = LookupRow(boost::none, boost::none, TransmissionRunPair(), boost::none, RangeInQ(0.01, 0.03, 0.2),
+    auto lookupRow = LookupRow(boost::none, std::nullopt, TransmissionRunPair(), boost::none, RangeInQ(0.01, 0.03, 0.2),
                                0.7, std::string("390-415"), std::string("370-389,416-430"), boost::none);
     auto model = makeModelWithLookupRow(std::move(lookupRow));
     auto defaultOptions = expectDefaults(model);
@@ -711,24 +667,22 @@ public:
         {"", "", "", "", "", "0.010000", "0.200000", "0.030000", "0.700000", "390-415", "370-389,416-430", ""}};
     EXPECT_CALL(m_view, setLookupTable(expected)).Times(1);
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesLookupRowInModel() {
-    auto model = makeModelWithLookupRow(LookupRow(boost::none, boost::none, TransmissionRunPair(), boost::none,
+    auto model = makeModelWithLookupRow(LookupRow(boost::none, std::nullopt, TransmissionRunPair(), boost::none,
                                                   RangeInQ(0.01, 0.03, 0.2), 0.7, std::string("390-415"),
                                                   std::string("370-389,416-430"), boost::none));
     auto defaultOptions = expectDefaults(model);
     auto presenter = makePresenter(std::move(defaultOptions));
     presenter.notifyInstrumentChanged("POLREF");
-    auto expected = LookupRow(boost::none, boost::none, TransmissionRunPair(), boost::none, RangeInQ(0.01, 0.03, 0.2),
+    auto expected = LookupRow(boost::none, std::nullopt, TransmissionRunPair(), boost::none, RangeInQ(0.01, 0.03, 0.2),
                               0.7, std::string("390-415"), std::string("370-389,416-430"), boost::none);
     auto lookupRows = presenter.experiment().lookupTableRows();
     TS_ASSERT_EQUALS(lookupRows.size(), 1);
     if (lookupRows.size() == 1) {
       TS_ASSERT_EQUALS(lookupRows.front(), expected);
     }
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesTransmissionRunRangeInView() {
@@ -739,7 +693,6 @@ public:
     EXPECT_CALL(m_view, setTransmissionEndOverlap(12.0)).Times(1);
     EXPECT_CALL(m_view, showTransmissionRangeValid()).Times(1);
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesTransmissionRunRangeInModel() {
@@ -749,7 +702,6 @@ public:
     presenter.notifyInstrumentChanged("POLREF");
     auto const expected = RangeInLambda{10.0, 12.0};
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().overlapRange(), expected);
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesCorrectionInView() {
@@ -765,7 +717,6 @@ public:
     EXPECT_CALL(m_view, setPolynomialDegree(3));
     EXPECT_CALL(m_view, setCostFunction("Unweighted least squares"));
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testInstrumentChangedUpdatesCorrectionInModel() {
@@ -778,7 +729,6 @@ public:
     assertBackgroundSubtractionOptionsSet(presenter);
     assertPolarizationAnalysisParameterFile(presenter);
     assertFloodCorrectionUsesParameterFile(presenter);
-    verifyAndClear();
   }
 
   void testInstrumentChangedDisconnectsNotificationsBackFromView() {
@@ -787,7 +737,6 @@ public:
     EXPECT_CALL(m_view, connectExperimentSettingsWidgets()).Times(1);
     auto presenter = makePresenter(std::move(defaultOptions));
     presenter.notifyInstrumentChanged("POLREF");
-    verifyAndClear();
   }
 
   void testPolarizationCorrectionsDisabledForINTER() {
@@ -820,6 +769,8 @@ public:
     previewRow.setProcessingInstructions(ROIType::Transmission, "12"s);
     previewRow.setTheta(2.3);
 
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
     presenter.notifyPreviewApplyRequested(previewRow);
     // Row with angle 2.3 is the last row in the look-up table
     auto row = presenter.experiment().lookupTableRows().back();
@@ -835,6 +786,8 @@ public:
     auto previewRow = PreviewRow({"1234"});
     previewRow.setTheta(2.3);
 
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
     presenter.notifyPreviewApplyRequested(previewRow);
     // Row with angle 2.3 is the last row in the look-up table
     auto row = presenter.experiment().lookupTableRows().back();
@@ -844,12 +797,95 @@ public:
     TS_ASSERT(!row.transmissionProcessingInstructions());
   }
 
+  void testNotifyPreviewApplyRequestedDoesNotResetRowStateIfNoSettingsChanged() {
+    // makeExperiment will create a model Experiment with two lookup rows and a wildcard row
+    auto presenter = makePresenter(makeDefaults(), makeExperiment());
+    auto previewRow = PreviewRow({"1234"});
+    previewRow.setSelectedBanks("3-22"s);
+    previewRow.setProcessingInstructions(ROIType::Signal, "4-6"s);
+    previewRow.setProcessingInstructions(ROIType::Background, "2-3,7-8"s);
+    previewRow.setProcessingInstructions(ROIType::Transmission, "4"s);
+    previewRow.setTheta(2.3);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(0);
+
+    presenter.notifyPreviewApplyRequested(previewRow);
+    // Row with angle 2.3 is the last row in the look-up table
+    auto row = presenter.experiment().lookupTableRows().back();
+    TS_ASSERT_EQUALS(row.roiDetectorIDs().get(), "3-22");
+    TS_ASSERT_EQUALS(row.processingInstructions().get(), "4-6");
+    TS_ASSERT_EQUALS(row.backgroundProcessingInstructions().get(), "2-3,7-8");
+    TS_ASSERT_EQUALS(row.transmissionProcessingInstructions().get(), "4");
+  }
+
+  void testNotifyPreviewApplyRequestedResetsRowStateIfOnlyDetROIChanged() {
+    // makeExperiment will create a model Experiment with two lookup rows and a wildcard row
+    auto presenter = makePresenter(makeDefaults(), makeExperiment());
+    auto previewRow = PreviewRow({"1234"});
+    previewRow.setSelectedBanks("10-20"s);
+    previewRow.setProcessingInstructions(ROIType::Signal, "4-6"s);
+    previewRow.setProcessingInstructions(ROIType::Background, "2-3,7-8"s);
+    previewRow.setProcessingInstructions(ROIType::Transmission, "4"s);
+    previewRow.setTheta(2.3);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
+    presenter.notifyPreviewApplyRequested(previewRow);
+  }
+
+  void testNotifyPreviewApplyRequestedResetsRowStateIfOnlySignalROIChanged() {
+    // makeExperiment will create a model Experiment with two lookup rows and a wildcard row
+    auto presenter = makePresenter(makeDefaults(), makeExperiment());
+    auto previewRow = PreviewRow({"1234"});
+    previewRow.setSelectedBanks("3-22"s);
+    previewRow.setProcessingInstructions(ROIType::Signal, "4-10"s);
+    previewRow.setProcessingInstructions(ROIType::Background, "2-3,7-8"s);
+    previewRow.setProcessingInstructions(ROIType::Transmission, "4"s);
+    previewRow.setTheta(2.3);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
+    presenter.notifyPreviewApplyRequested(previewRow);
+  }
+
+  void testNotifyPreviewApplyRequestedResetsRowStateIfOnlyBackgroundROIChanged() {
+    // makeExperiment will create a model Experiment with two lookup rows and a wildcard row
+    auto presenter = makePresenter(makeDefaults(), makeExperiment());
+    auto previewRow = PreviewRow({"1234"});
+    previewRow.setSelectedBanks("3-22"s);
+    previewRow.setProcessingInstructions(ROIType::Signal, "4-6"s);
+    previewRow.setProcessingInstructions(ROIType::Background, "7-8"s);
+    previewRow.setProcessingInstructions(ROIType::Transmission, "4"s);
+    previewRow.setTheta(2.3);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
+    presenter.notifyPreviewApplyRequested(previewRow);
+  }
+
+  void testNotifyPreviewApplyRequestedResetsRowStateIfOnlyTransmissionROIChanged() {
+    // makeExperiment will create a model Experiment with two lookup rows and a wildcard row
+    auto presenter = makePresenter(makeDefaults(), makeExperiment());
+    auto previewRow = PreviewRow({"1234"});
+    previewRow.setSelectedBanks("3-22"s);
+    previewRow.setProcessingInstructions(ROIType::Signal, "4-6"s);
+    previewRow.setProcessingInstructions(ROIType::Background, "2-3,7-8"s);
+    previewRow.setProcessingInstructions(ROIType::Transmission, boost::none);
+    previewRow.setTheta(2.3);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(1);
+
+    presenter.notifyPreviewApplyRequested(previewRow);
+  }
+
   void testNotifyPreviewApplyRequestedMatchingRowNotFound() {
     // makeExperimentWithValidDuplicateCriteria will create a model Experiment with two lookup rows and no wildcard
     auto presenter = makePresenter(makeDefaults(), makeExperimentWithValidDuplicateCriteria());
     auto previewRow = PreviewRow({"1234"});
     // This angle doesn't match any in the experiment lookup table
     previewRow.setTheta(10);
+
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(0);
 
     TS_ASSERT_THROWS(presenter.notifyPreviewApplyRequested(previewRow), RowNotFoundException const &);
   }
@@ -865,6 +901,7 @@ public:
     auto previewRow = PreviewRow({""});
 
     // THEN an InvalidTableException is thrown.
+    EXPECT_CALL(m_mainPresenter, notifySettingsChanged()).Times(0);
     TS_ASSERT_THROWS(presenter.notifyPreviewApplyRequested(previewRow), InvalidTableException const &);
   }
 
@@ -1002,8 +1039,6 @@ private:
     EXPECT_CALL(m_mainPresenter, instrumentName()).Times(1).WillOnce(Return(instrument));
     EXPECT_CALL(m_view, enablePolarizationCorrections()).Times(1);
     presenter.notifySettingsChanged();
-
-    verifyAndClear();
   }
 
   void runTestThatPolarizationCorrectionsAreDisabledForInstrument(std::string const &instrument) {
@@ -1013,8 +1048,6 @@ private:
     EXPECT_CALL(m_view, setPolarizationCorrectionOption("None")).Times(1);
     EXPECT_CALL(m_view, disablePolarizationCorrections()).Times(1);
     presenter.notifySettingsChanged();
-
-    verifyAndClear();
   }
 
   void runTestThatPolarizationCorrectionsDisabled() {
@@ -1028,7 +1061,6 @@ private:
     presenter.notifySettingsChanged();
 
     assertPolarizationAnalysisNone(presenter);
-    verifyAndClear();
   }
 
   void runTestThatPolarizationCorrectionsUsesParameterFile() {
@@ -1041,7 +1073,6 @@ private:
     presenter.notifySettingsChanged();
 
     assertPolarizationAnalysisParameterFile(presenter);
-    verifyAndClear();
   }
 
   void runTestThatPolarizationCorrectionsUsesWorkspace() {
@@ -1055,7 +1086,6 @@ private:
     presenter.notifySettingsChanged();
 
     assertPolarizationAnalysisWorkspace(presenter);
-    verifyAndClear();
   }
 
   void runTestThatPolarizationCorrectionsUsesFilePath() {
@@ -1069,7 +1099,6 @@ private:
     presenter.notifySettingsChanged();
 
     assertPolarizationAnalysisWorkspace(presenter);
-    verifyAndClear();
   }
 
   void runWithFloodCorrectionInputsDisabled(std::string const &type) {
@@ -1079,8 +1108,6 @@ private:
     EXPECT_CALL(m_view, disableFloodCorrectionInputs()).Times(1);
     EXPECT_CALL(m_view, getFloodWorkspace()).Times(0);
     presenter.notifySettingsChanged();
-
-    verifyAndClear();
   }
 
   void runWithFloodCorrectionInputsEnabled(std::string const &type) {
@@ -1089,18 +1116,15 @@ private:
     EXPECT_CALL(m_view, getFloodCorrectionType()).Times(2).WillRepeatedly(Return(type));
     EXPECT_CALL(m_view, enableFloodCorrectionInputs()).Times(1);
     presenter.notifySettingsChanged();
-
-    verifyAndClear();
   }
 
-  void runTestForValidTransmissionRunRange(RangeInLambda const &range, boost::optional<RangeInLambda> const &result) {
+  void runTestForValidTransmissionRunRange(RangeInLambda const &range, std::optional<RangeInLambda> const &result) {
     auto presenter = makePresenter();
     EXPECT_CALL(m_view, getTransmissionStartOverlap()).WillOnce(Return(range.min()));
     EXPECT_CALL(m_view, getTransmissionEndOverlap()).WillOnce(Return(range.max()));
     EXPECT_CALL(m_view, showTransmissionRangeValid()).Times(1);
     presenter.notifySettingsChanged();
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().overlapRange(), result);
-    verifyAndClear();
   }
 
   void runTestForInvalidTransmissionRunRange(RangeInLambda const &range) {
@@ -1109,21 +1133,20 @@ private:
     EXPECT_CALL(m_view, getTransmissionEndOverlap()).WillOnce(Return(range.max()));
     EXPECT_CALL(m_view, showTransmissionRangeInvalid()).Times(1);
     presenter.notifySettingsChanged();
-    TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().overlapRange(), boost::none);
-    verifyAndClear();
+    TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().overlapRange(), std::nullopt);
   }
 
   // These functions create various rows in the per-theta defaults tables,
   // either as an input array of strings or an output model
   OptionsRow optionsRowWithFirstAngle() { return {"0.5", "", "13463", ""}; }
   LookupRow defaultsWithFirstAngle() {
-    return LookupRow(0.5, boost::none, TransmissionRunPair("13463", ""), boost::none, RangeInQ(), boost::none,
+    return LookupRow(0.5, std::nullopt, TransmissionRunPair("13463", ""), boost::none, RangeInQ(), boost::none,
                      boost::none, boost::none, boost::none);
   }
 
   OptionsRow optionsRowWithSecondAngle() { return {"2.3", "", "13463", "13464"}; }
   LookupRow defaultsWithSecondAngle() {
-    return LookupRow(2.3, boost::none, TransmissionRunPair("13463", "13464"), boost::none, RangeInQ(), boost::none,
+    return LookupRow(2.3, std::nullopt, TransmissionRunPair("13463", "13464"), boost::none, RangeInQ(), boost::none,
                      boost::none, boost::none, boost::none);
   }
   OptionsRow optionsRowWithWildcard() { return {"", "", "13463", "13464"}; }
@@ -1154,7 +1177,6 @@ private:
     EXPECT_CALL(m_view, getLookupTable()).WillOnce(Return(optionsTable));
     EXPECT_CALL(m_view, showAllLookupRowsAsValid()).Times(1);
     presenter.notifyLookupRowChanged(1, 1);
-    verifyAndClear();
   }
 
   void runTestForInvalidOptionsTable(OptionsTable const &optionsTable, const std::vector<int> &rows,
@@ -1168,7 +1190,6 @@ private:
     }
     presenter.notifyLookupRowChanged(1, 1);
     TS_ASSERT(!presenter.hasValidSettings());
-    verifyAndClear();
   }
 
   void runTestForInvalidOptionsTable(OptionsTable const &optionsTable, int row, std::vector<int> columns) {
@@ -1189,7 +1210,6 @@ private:
       }
     }
     presenter.notifyLookupRowChanged(0, 0);
-    verifyAndClear();
   }
 
   void runTestForValidTransmissionParams(std::string const &params) {
@@ -1198,7 +1218,6 @@ private:
     EXPECT_CALL(m_view, showTransmissionStitchParamsValid());
     presenter.notifySettingsChanged();
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().rebinParameters(), params);
-    verifyAndClear();
   }
 
   void runTestForInvalidTransmissionParams(std::string const &params) {
@@ -1207,7 +1226,6 @@ private:
     EXPECT_CALL(m_view, showTransmissionStitchParamsInvalid());
     presenter.notifySettingsChanged();
     TS_ASSERT_EQUALS(presenter.experiment().transmissionStitchOptions().rebinParameters(), "");
-    verifyAndClear();
   }
 };
 

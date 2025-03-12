@@ -4,8 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, ITableWorkspaceProperty, MatrixWorkspaceProperty, Progress, PropertyMode, PythonAlgorithm
+from mantid.kernel import logger, Direction, FloatArrayProperty, StringListValidator
 
 import EnggUtils
 
@@ -133,8 +133,9 @@ class EnggFocus(PythonAlgorithm):
             len_max = len(max_list)
             if len_min != len_max:
                 issues["MaskBinsXMins"] = (
-                    "The number of minimum and maximum values must match. Got "
-                    "{0} and {1} for the minimum and maximum, respectively".format(len_min, len_max)
+                    "The number of minimum and maximum values must match. Got {0} and {1} for the minimum and maximum, respectively".format(
+                        len_min, len_max
+                    )
                 )
 
         return issues

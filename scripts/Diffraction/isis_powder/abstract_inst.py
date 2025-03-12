@@ -104,7 +104,10 @@ class AbstractInst(object):
 
     def _output_focused_runs(self, focused_runs, run_number_string):
         run_details = self._get_run_details(run_number_string)
-        for focused_run in focused_runs:
+        input_batching = self._get_input_batching_mode()
+        for irun, focused_run in enumerate(focused_runs):
+            if input_batching == common_enums.INPUT_BATCHING.Individual:
+                run_details.output_run_string = str(common.generate_run_numbers(run_number_string=run_number_string)[irun])
             d_spacing_group, tof_group = self._output_focused_ws(focused_run, run_details=run_details)
             common.keep_single_ws_unit(d_spacing_group=d_spacing_group, tof_group=tof_group, unit_to_keep=self._get_unit_to_keep())
 
@@ -140,6 +143,12 @@ class AbstractInst(object):
     def should_subtract_empty_inst(self):
         """
         :return: Whether the empty run should be subtracted from a run being focused
+        """
+        return True
+
+    def should_subtract_empty_inst_from_vanadium(self):
+        """
+        :return: Whether the empty run should be subtracted from a vandium run
         """
         return True
 
@@ -187,6 +196,14 @@ class AbstractInst(object):
         :return: A filename that will allow Mantid to find the correct run for that instrument.
         """
         return self._generate_inst_filename(run_number=run_number, file_ext=file_ext)
+
+    def _check_sample_details(self):
+        # note vanadium sample details are set using advanced configs
+        if self._sample_details is None and not self._is_vanadium:
+            raise ValueError(
+                "Absorption corrections cannot be run without sample details."
+                " Please set sample details using set_sample before running absorption corrections."
+            )
 
     def _apply_absorb_corrections(self, run_details, ws_to_correct):
         """

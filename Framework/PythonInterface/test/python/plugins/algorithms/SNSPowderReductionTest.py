@@ -6,7 +6,6 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
 from mantid.simpleapi import SNSPowderReduction
-from numpy import concatenate, arange, sort, array_equal, where
 
 # tests run x10 slower with this on, but it may be useful to track down issues refactoring
 CHECK_CONSISTENCY = False
@@ -17,6 +16,18 @@ class SNSPowderReductionTest(unittest.TestCase):
         # PushDataPositive and OffsetData cannot be specified together
         self.assertRaises(
             RuntimeError, SNSPowderReduction, Filename="PG3_46577", OutputDirectory="/tmp/", PushDataPositive="AddMinimum", OffsetData=42.0
+        )
+
+    def testValidateInputsCompressLoad(self):
+        # PushDataPositive and OffsetData cannot be specified together
+        self.assertRaises(
+            RuntimeError,
+            SNSPowderReduction,
+            Filename="PG3_46577",
+            OutputDirectory="/tmp/",
+            PushDataPositive="AddMinimum",
+            OffsetData=42.0,
+            MinSizeCompressOnLoad=1e-14,
         )
 
 

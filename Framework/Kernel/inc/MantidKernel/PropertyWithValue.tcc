@@ -20,8 +20,7 @@
 #endif
 
 #include <json/value.h>
-#include <nexus/NeXusFile.hpp>
-
+#include "MantidNexusCpp/NeXusFile.hpp"
 #include "MantidKernel/IPropertySettings.h"
 #include "MantidKernel/StringTokenizer.h"
 #include <type_traits>
@@ -76,7 +75,7 @@ template <typename TYPE>
 PropertyWithValue<TYPE>::PropertyWithValue(const std::string &name, TYPE defaultValue,
                                            const std::string &defaultValueStr, IValidator_sptr validator,
                                            unsigned int direction)
-    : Property(std::move(name), typeid(TYPE), direction), m_value(extractToValueVector<TYPE>(defaultValueStr)),
+    : Property(name, typeid(TYPE), direction), m_value(extractToValueVector<TYPE>(defaultValueStr)),
       m_initialValue(m_value), m_validator(std::move(validator)) {
   UNUSED_ARG(defaultValue);
 }

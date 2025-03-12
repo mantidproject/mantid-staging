@@ -149,10 +149,8 @@ void LoadDNSSCD::init() {
   auto reasonableAngle = std::make_shared<BoundedValidator<double>>();
   reasonableAngle->setLower(5.0);
   reasonableAngle->setUpper(175.0);
-  // clang-format off
-  auto mustBe3D = std::make_shared<ArrayLengthValidator<double> >(3);
-  auto mustBe2D = std::make_shared<ArrayLengthValidator<double> >(2);
-  // clang-format on
+  auto mustBe3D = std::make_shared<ArrayLengthValidator<double>>(3);
+  auto mustBe2D = std::make_shared<ArrayLengthValidator<double>>(2);
   std::vector<double> u0(3, 0), v0(3, 0);
   u0[0] = 1.;
   u0[1] = 1.;
@@ -279,7 +277,7 @@ void LoadDNSSCD::exec() {
 
   ExperimentInfo_sptr expinfo = std::make_shared<ExperimentInfo>();
   API::Run &run = expinfo->mutableRun();
-  for (auto fname : filenames) {
+  for (const auto &fname : filenames) {
     std::map<std::string, std::string> str_metadata;
     std::map<std::string, double> num_metadata;
     try {

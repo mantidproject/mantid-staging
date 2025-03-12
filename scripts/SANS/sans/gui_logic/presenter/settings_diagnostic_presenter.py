@@ -4,7 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The settings diagnostic tab which visualizes the SANS state object. """
+"""The settings diagnostic tab which visualizes the SANS state object."""
+
 import json
 import os
 
@@ -118,9 +119,7 @@ class SettingsDiagnosticPresenter(object):
         # Check if it exists
         path_dir = os.path.dirname(save_location)
         if not path_dir:
-            self.gui_logger.warning(
-                "The provided save location for the SANS state does not seem to exist. " "Please provide a validate path"
-            )
+            self.gui_logger.warning("The provided save location for the SANS state does not seem to exist. Please provide a validate path")
             return
 
         file_name, _ = os.path.splitext(save_location)

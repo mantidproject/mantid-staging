@@ -14,7 +14,6 @@
 #include "MantidAPI/FunctionFactory.h"
 #include "MantidAPI/FunctionProperty.h"
 #include "MantidAPI/ITableWorkspace.h"
-#include "MantidAPI/MultiDomainFunction.h"
 #include "MantidAPI/TableRow.h"
 
 #include "MantidAPI/MatrixWorkspace.h"
@@ -23,6 +22,7 @@
 #include "MantidAPI/AnalysisDataService.h"
 #include "MantidKernel/ArrayProperty.h"
 #include "MantidKernel/CompositeValidator.h"
+#include "MantidKernel/DynamicPointerCastHelper.h"
 #include "MantidKernel/ListValidator.h"
 #include "MantidKernel/MandatoryValidator.h"
 #include "MantidKernel/PhysicalConstants.h"
@@ -126,16 +126,16 @@ std::map<std::string, std::string> ConvertFitFunctionForMuonTFAsymmetry::validat
     if (tabWS->columnCount() != 3) {
       result["NormalizationTable"] = "NormalizationTable must have three columns";
     }
-    auto names = tabWS->getColumnNames();
+    auto columnNames = tabWS->getColumnNames();
     int normCount = 0;
     int wsNamesCount = 0;
-    for (const std::string &name : names) {
+    for (const std::string &columnName : columnNames) {
 
-      if (name == "norm") {
+      if (columnName == "norm") {
         normCount += 1;
       }
 
-      if (name == "name") {
+      if (columnName == "name") {
         wsNamesCount += 1;
       }
     }
@@ -153,8 +153,9 @@ std::map<std::string, std::string> ConvertFitFunctionForMuonTFAsymmetry::validat
     }
   } else {
     const std::vector<std::string> wsNames = getProperty("WorkspaceList");
-    for (std::string name : wsNames) {
-      API::MatrixWorkspace_const_sptr ws = API::AnalysisDataService::Instance().retrieveWS<API::MatrixWorkspace>(name);
+    for (std::string wsName : wsNames) {
+      API::MatrixWorkspace_const_sptr ws =
+          API::AnalysisDataService::Instance().retrieveWS<API::MatrixWorkspace>(wsName);
       const Mantid::API::Run &run = ws->run();
       if (!run.hasProperty("analysis_asymmetry_norm")) {
         result["NormalizationTable"] = "NormalizationTable has not been "
@@ -192,7 +193,8 @@ void ConvertFitFunctionForMuonTFAsymmetry::setOutput(const Mantid::API::IFunctio
   const std::vector<std::string> wsNames = getProperty("WorkspaceList");
   if (wsNames.size() == 1) {
     // if single domain func, strip off multi domain
-    auto TFFunc = std::dynamic_pointer_cast<CompositeFunction>(function);
+    auto TFFunc =
+        Kernel::DynamicPointerCastHelper::dynamicPointerCastWithCheck<CompositeFunction, API::IFunction>(function);
     outputFitFunction = TFFunc->getFunction(0);
   }
   setProperty("OutputFunction", outputFitFunction);
@@ -210,8 +212,9 @@ ConvertFitFunctionForMuonTFAsymmetry::extractFromTFAsymmFitFunction(const Mantid
   IFunction_sptr tmp = original;
 
   size_t numDomains = original->getNumberDomains();
+  auto TFFunc =
+      Kernel::DynamicPointerCastHelper::dynamicPointerCastWithCheck<CompositeFunction, API::IFunction>(original);
   for (size_t j = 0; j < numDomains; j++) {
-    auto TFFunc = std::dynamic_pointer_cast<CompositeFunction>(original);
     if (numDomains > 1) {
       // get correct domain
       tmp = TFFunc->getFunction(j);
@@ -224,16 +227,16 @@ ConvertFitFunctionForMuonTFAsymmetry::extractFromTFAsymmFitFunction(const Mantid
   bool copyTies = getProperty("CopyTies");
   if (numDomains > 1 && copyTies) {
     auto originalNames = original->getParameterNames();
-    for (auto name : originalNames) {
-      auto index = original->parameterIndex(name);
+    for (const auto &parName : originalNames) {
+      const auto index = original->parameterIndex(parName);
       auto originalTie = original->getTie(index);
       if (originalTie) {
-        auto stringTie = originalTie->asString();
+        const auto stringTie = originalTie->asString();
         // check the tie only exists in the user function (f)
         auto start = stringTie.find_first_of(".") + 1;
-        auto end = stringTie.find_first_of("=");
+        const auto end = stringTie.find_first_of("=");
         // the wrapped name added 9 characters
-        auto LHName = stringTie.substr(start, 9);
+        const auto LHName = stringTie.substr(start, 9);
         // need to do in 2 steps
         auto RHName = stringTie.substr(end, std::string::npos);
 
@@ -241,7 +244,7 @@ ConvertFitFunctionForMuonTFAsymmetry::extractFromTFAsymmFitFunction(const Mantid
         RHName = RHName.substr(start, 9);
         if (LHName == INSERT_FUNCTION && LHName == RHName) {
           // get new tie
-          auto newTie = rmInsertFunction(stringTie);
+          const auto newTie = rmInsertFunction(stringTie);
           multi->addTies(newTie);
         }
       }
@@ -322,42 +325,25 @@ Mantid::API::IFunction_sptr
 ConvertFitFunctionForMuonTFAsymmetry::getTFAsymmFitFunction(const Mantid::API::IFunction_sptr &original,
                                                             const std::vector<double> &norms) {
   auto multi = std::make_shared<MultiDomainFunction>();
-  auto tmp = std::dynamic_pointer_cast<MultiDomainFunction>(original);
   size_t numDomains = original->getNumberDomains();
-  for (size_t j = 0; j < numDomains; j++) {
-    IFunction_sptr userFunc;
-    auto constant = FunctionFactory::Instance().createInitialized("name = FlatBackground, A0 = 1.0, ties=(A0=1)");
-    if (numDomains == 1) {
-      userFunc = original;
-    } else {
-      userFunc = tmp->getFunction(j);
+  if (numDomains == 1) {
+    configureMultiDomainFunction(multi, original, norms[0]);
+  } else {
+    auto tmp =
+        Kernel::DynamicPointerCastHelper::dynamicPointerCastWithCheck<MultiDomainFunction, API::IFunction>(original);
+    for (size_t j = 0; j < numDomains; j++) {
+      IFunction_sptr userFunc = tmp->getFunction(j);
       multi->setDomainIndex(j, j);
+      configureMultiDomainFunction(multi, userFunc, norms[j]);
     }
-    auto inBrace = std::make_shared<CompositeFunction>();
-    inBrace->addFunction(constant);
-    inBrace->addFunction(userFunc);
-    auto norm = FunctionFactory::Instance().createInitialized("name = FlatBackground, A0 "
-                                                              "=" +
-                                                              std::to_string(norms[j]));
-    auto product =
-        std::dynamic_pointer_cast<CompositeFunction>(FunctionFactory::Instance().createFunction("ProductFunction"));
-    product->addFunction(norm);
-    product->addFunction(inBrace);
-    auto composite =
-        std::dynamic_pointer_cast<CompositeFunction>(FunctionFactory::Instance().createFunction("CompositeFunction"));
-    constant = FunctionFactory::Instance().createInitialized(
-        "name = ExpDecayMuon, A = 0.0, Lambda = -" + std::to_string(MUON_LIFETIME_MICROSECONDS) +
-        ",ties = (A = 0.0, Lambda = -" + std::to_string(MUON_LIFETIME_MICROSECONDS) + ")");
-    composite->addFunction(product);
-    composite->addFunction(constant);
-    multi->addFunction(composite);
   }
+
   // if multi data set we need to do the ties manually
   bool copyTies = getProperty("CopyTies");
   if (numDomains > 1 && copyTies) {
     auto originalNames = original->getParameterNames();
-    for (auto name : originalNames) {
-      auto index = original->parameterIndex(name);
+    for (const auto &parName : originalNames) {
+      auto index = original->parameterIndex(parName);
       auto originalTie = original->getTie(index);
       if (originalTie) {
         auto stringTie = originalTie->asString();
@@ -374,5 +360,29 @@ ConvertFitFunctionForMuonTFAsymmetry::getTFAsymmFitFunction(const Mantid::API::I
   }
 
   return std::dynamic_pointer_cast<IFunction>(multi);
+}
+
+void ConvertFitFunctionForMuonTFAsymmetry::configureMultiDomainFunction(
+    std::shared_ptr<MultiDomainFunction> multiDomainFunction, const Mantid::API::IFunction_sptr &userFunc,
+    const double normValue) {
+  auto constant = FunctionFactory::Instance().createInitialized("name = FlatBackground, A0 = 1.0, ties=(A0=1)");
+  auto inBrace = std::make_shared<CompositeFunction>();
+  inBrace->addFunction(constant);
+  inBrace->addFunction(userFunc);
+  auto norm = FunctionFactory::Instance().createInitialized("name = FlatBackground, A0 "
+                                                            "=" +
+                                                            std::to_string(normValue));
+  auto product = Kernel::DynamicPointerCastHelper::dynamicPointerCastWithCheck<CompositeFunction, API::IFunction>(
+      FunctionFactory::Instance().createFunction("ProductFunction"));
+  product->addFunction(norm);
+  product->addFunction(inBrace);
+  auto composite = Kernel::DynamicPointerCastHelper::dynamicPointerCastWithCheck<CompositeFunction, API::IFunction>(
+      FunctionFactory::Instance().createFunction("CompositeFunction"));
+  constant = FunctionFactory::Instance().createInitialized(
+      "name = ExpDecayMuon, A = 0.0, Lambda = -" + std::to_string(MUON_LIFETIME_MICROSECONDS) +
+      ",ties = (A = 0.0, Lambda = -" + std::to_string(MUON_LIFETIME_MICROSECONDS) + ")");
+  composite->addFunction(product);
+  composite->addFunction(constant);
+  multiDomainFunction->addFunction(composite);
 }
 } // namespace Mantid::Muon

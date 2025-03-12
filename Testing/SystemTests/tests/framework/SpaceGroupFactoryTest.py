@@ -7,8 +7,8 @@
 # pylint: disable=no-init
 import systemtesting
 import re
-from mantid.simpleapi import *
-from mantid.geometry import *
+from mantid.api import FileFinder
+from mantid.geometry import Group, SpaceGroupFactory, SymmetryOperationFactory
 
 
 class SpaceGroupFactoryTest(systemtesting.MantidSystemTest):
@@ -37,7 +37,7 @@ class SpaceGroupFactoryTest(systemtesting.MantidSystemTest):
 
         self.checkPointGroupOfSpaceGroup(group)
 
-        self.assertTrue(group.isGroup(), ("Space group " + str(group.getNumber()) + " (" + symbol + ") does not " "fulfill group axioms"))
+        self.assertTrue(group.isGroup(), ("Space group " + str(group.getNumber()) + " (" + symbol + ") does not fulfill group axioms"))
 
         groupOperations = set(group.getSymmetryOperationStrings())
 

@@ -12,12 +12,8 @@
 #include "MantidAPI/WorkspaceFactory.h"
 #include "MantidAPI/WorkspaceGroup.h"
 #include "MantidKernel/Unit.h"
-// clang-format off
-#include <nexus/NeXusFile.hpp>
-#include <nexus/NeXusException.hpp>
-// clang-format on
-
-#include <boost/algorithm/string.hpp>
+#include "MantidNexusCpp/NeXusException.hpp"
+#include "MantidNexusCpp/NeXusFile.hpp"
 
 namespace Mantid::DataHandling {
 using namespace Kernel;
@@ -44,15 +40,12 @@ const std::string LoadMcStasNexus::category() const { return "DataHandling\\Nexu
 int LoadMcStasNexus::confidence(Kernel::NexusHDF5Descriptor &descriptor) const {
   int confidence(0);
   const auto &entries = descriptor.getAllEntries();
-  const static auto target_dataset = "information";
   for (auto iter = entries.begin(); iter != entries.end(); ++iter) {
     const auto grouped_entries = iter->second;
-    for (const auto &path : grouped_entries) {
-      // Mccode writes an information dataset so can be reasonably confident if we find it
-      if (boost::ends_with(path, target_dataset)) {
-        confidence = 40;
-        break;
-      }
+    if (std::any_of(grouped_entries.cbegin(), grouped_entries.cend(),
+                    [](const auto &path) { return path.ends_with("information"); })) {
+      confidence = 40;
+      break;
     }
   }
   return confidence;
@@ -85,9 +78,9 @@ void LoadMcStasNexus::exec() {
   WorkspaceGroup_sptr outputGroup(new WorkspaceGroup);
 
   for (auto it = entries.begin(); it != itend; ++it) {
-    std::string name = it->first;
+    std::string entryName = it->first;
     std::string type = it->second;
-    nxFile.openGroup(name, type);
+    nxFile.openGroup(entryName, type);
     auto dataEntries = nxFile.getEntries();
 
     for (auto &dataEntry : dataEntries) {
@@ -102,7 +95,7 @@ void LoadMcStasNexus::exec() {
       // Find the axis names
       auto nxdataEntries = nxFile.getEntries();
       std::string axis1Name, axis2Name;
-      for (auto &nxdataEntry : nxdataEntries) {
+      for (const auto &nxdataEntry : nxdataEntries) {
         if (nxdataEntry.second == "NXparameters")
           continue;
         nxFile.openData(nxdataEntry.first);

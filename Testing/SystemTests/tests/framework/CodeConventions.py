@@ -8,7 +8,7 @@
 import systemtesting
 import re
 import mantid
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory
 
 MAX_ALG_LEN = 40  # TODO convention says 20 is the maximum
 
@@ -26,6 +26,7 @@ ALG_BAD_PARAMS = {
     "EstimateDivergence(v1)": ("alpha", "beta0", "beta1"),
     "FindUBUsingLatticeParameters(v1)": ("a", "b", "c", "alpha", "beta", "gamma"),
     "FindGlobalBMatrix(v1)": ("a", "b", "c", "alpha", "beta", "gamma"),
+    "FindMultipleUMatrices(v1)": ("a", "b", "c", "alpha", "beta", "gamma"),
     "IndexSXPeaks(v1)": ("a", "b", "c", "alpha", "beta", "gamma", "dTolerance"),
     "LoadDNSSCD(v1)": ("a", "b", "c", "alpha", "beta", "gamma"),
     "ModeratorTzero(v1)": ("tolTOF"),
@@ -181,7 +182,7 @@ class Algorithms(systemtesting.MantidSystemTest):
     def runTest(self):
         algs = AlgorithmFactory.getRegisteredAlgorithms(True)
 
-        for (name, versions) in algs.items():
+        for name, versions in algs.items():
             if not self.verifyAlgName(name):
                 self.__ranOk += 1
                 continue
@@ -253,7 +254,6 @@ class FitFunctions(systemtesting.MantidSystemTest):
         return name in FUNC_BAD_PARAMS[func]
 
     def verifyParameter(self, alg_descr, name):
-
         if not self.paramRegExp.match(name):
             if not self.checkAllowed(alg_descr, name):
                 print(alg_descr + " property (" + name + ") violates conventions")

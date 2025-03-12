@@ -11,6 +11,7 @@
 #include "MantidAPI/TableRow.h"
 #include "MantidAPI/WorkspaceFactory.h"
 #include "MantidKernel/ArrayProperty.h"
+#include "MantidKernel/FloatingPointComparison.h"
 #include "MantidKernel/Property.h"
 #include "MantidKernel/StringTokenizer.h"
 #include "MantidKernel/Strings.h"
@@ -156,8 +157,8 @@ void PDLoadCharacterizations::exec() {
   wksp->addColumn("double", "tof_max");
   wksp->addColumn("double", "wavelength_min");
   wksp->addColumn("double", "wavelength_max");
-  for (const auto &name : canColumnNames) {
-    wksp->addColumn("str", name); // all will be strings
+  for (const auto &canColumnName : canColumnNames) {
+    wksp->addColumn("str", canColumnName); // all will be strings
   }
 
   // first file is assumed to be version 0
@@ -228,11 +229,11 @@ std::vector<std::string> PDLoadCharacterizations::getFilenames() {
   int v0_index = -1;
   int v1_index = -1;
   for (size_t i = 0; i < filenamesFromPropertyUnraveld.size(); ++i) {
-    const int version = getVersion(filenamesFromPropertyUnraveld[i]);
-    g_log.debug() << "Found version " << version << " in \"" << filenamesFromPropertyUnraveld[i] << "\"\n";
-    if (version == 0)
+    const int versionFromFile = getVersion(filenamesFromPropertyUnraveld[i]);
+    g_log.debug() << "Found version " << versionFromFile << " in \"" << filenamesFromPropertyUnraveld[i] << "\"\n";
+    if (versionFromFile == 0)
       v0_index = static_cast<int>(i);
-    else if (version == 1)
+    else if (versionFromFile == 1)
       v1_index = static_cast<int>(i);
   }
 
@@ -419,16 +420,7 @@ void PDLoadCharacterizations::readVersion0(const std::string &filename, API::ITa
 }
 
 namespace {
-bool closeEnough(const double left, const double right) {
-  // the same value
-  const double diff = fabs(left - right);
-  if (diff == 0.)
-    return true;
-
-  // same within 5%
-  const double relativeDiff = diff * 2 / (left + right);
-  return relativeDiff < .05;
-}
+bool closeEnough(const double left, const double right) { return Kernel::withinRelativeDifference(left, right, 0.05); }
 
 int findRow(API::ITableWorkspace_sptr &wksp, const std::vector<std::string> &values) {
   // don't have a good way to mark error location in these casts

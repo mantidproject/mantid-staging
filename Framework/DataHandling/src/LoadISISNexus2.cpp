@@ -16,26 +16,21 @@
 #include "MantidAPI/Axis.h"
 #include "MantidAPI/FileProperty.h"
 #include "MantidAPI/RegisterFileLoader.h"
+#include "MantidAPI/Sample.h"
 #include "MantidAPI/WorkspaceFactory.h"
+#include "MantidDataObjects/Workspace2D.h"
 #include "MantidGeometry/Instrument.h"
-#include "MantidGeometry/Instrument/Detector.h"
 #include "MantidKernel/ArrayProperty.h"
 #include "MantidKernel/BoundedValidator.h"
-#include "MantidKernel/ConfigService.h"
 #include "MantidKernel/ListValidator.h"
 #include "MantidKernel/TimeSeriesProperty.h"
 #include "MantidKernel/UnitFactory.h"
-
-// clang-format off
-#include <nexus/NeXusFile.hpp>
-#include <nexus/NeXusException.hpp>
-// clang-format on
+#include "MantidNexusCpp/NeXusFile.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <climits>
 #include <cmath>
-#include <functional>
 #include <sstream>
 #include <vector>
 
@@ -604,7 +599,7 @@ below have to be processed rather then spectra list
 intervals
 **/
 void LoadISISNexus2::buildSpectraInd2SpectraNumMap(bool range_supplied, bool hasSpectraList,
-                                                   DataBlockComposite &dataBlockComposite) {
+                                                   const DataBlockComposite &dataBlockComposite) {
 
   if (range_supplied || hasSpectraList || true) {
     auto generator = dataBlockComposite.getGenerator();
@@ -913,7 +908,7 @@ void LoadISISNexus2::loadLogs(DataObjects::Workspace2D_sptr &ws) {
   ws->populateInstrumentParameters();
 
   // Make log creator object and add the run status log
-  m_logCreator.reset(new ISISRunLogs(ws->run()));
+  m_logCreator.reset(new API::ISISRunLogs(ws->run()));
   m_logCreator->addStatusLog(ws->mutableRun());
 }
 
@@ -943,9 +938,10 @@ double LoadISISNexus2::dblSqrt(double in) { return sqrt(in); }
  *                               (contain different number of time channels)
  *
  */
-bool LoadISISNexus2::findSpectraDetRangeInFile(NXEntry &entry, std::vector<specnum_t> &spectrum_index, int64_t ndets,
-                                               int64_t n_vms_compat_spectra, std::map<specnum_t, std::string> &monitors,
-                                               bool excludeMonitors, bool separateMonitors) {
+bool LoadISISNexus2::findSpectraDetRangeInFile(const NXEntry &entry, std::vector<specnum_t> &spectrum_index,
+                                               int64_t ndets, int64_t n_vms_compat_spectra,
+                                               const std::map<specnum_t, std::string> &monitors, bool excludeMonitors,
+                                               bool separateMonitors) {
   size_t nmons = monitors.size();
 
   if (nmons > 0) {

@@ -73,12 +73,31 @@ systemtesting.MantidSystemTest
      |
 """
 
+import os
 from abc import ABCMeta, abstractmethod
 
-from mantid.simpleapi import *
+from mantid.api import mtd, FileFinder
+from mantid.kernel import config
+from mantid.simpleapi import (
+    ConvolutionFitSequential,
+    DeleteWorkspace,
+    ElasticWindowMultiple,
+    GroupWorkspaces,
+    IndirectCalibration,
+    IndirectResolution,
+    IndirectTransmissionMonitor,
+    ISISIndirectEnergyTransfer,
+    IqtFitMultiple,
+    IqtFitSequential,
+    Load,
+    LoadNexus,
+    MSDFit,
+    SaveNexusProcessed,
+    SofQWMoments,
+    TimeSlice,
+    TransformToIqt,
+)
 
-# For debugging only.
-from mantid.api import FileFinder
 from systemtesting import MantidSystemTest, using_gsl_v1
 
 
@@ -90,7 +109,7 @@ class ISISIndirectInelasticBase(MantidSystemTest, metaclass=ABCMeta):
     @abstractmethod
     def get_reference_files(self):
         """Returns the name of the reference files to compare against."""
-        raise NotImplementedError("Implmenent get_reference_files to return " "the names of the files to compare against.")
+        raise NotImplementedError("Implmenent get_reference_files to return the names of the files to compare against.")
 
     @abstractmethod
     def _run(self):
@@ -106,10 +125,10 @@ class ISISIndirectInelasticBase(MantidSystemTest, metaclass=ABCMeta):
             raise RuntimeError("The result workspace(s) should be in a list")
         if num_ref_files != num_results:
             raise RuntimeError(
-                "The number of result workspaces (%d) does not match" " the number of reference files (%d)." % (num_ref_files, num_results)
+                "The number of result workspaces (%d) does not match the number of reference files (%d)." % (num_ref_files, num_results)
             )
         if num_ref_files < 1 or num_results < 1:
-            raise RuntimeError("There needs to be a least one result and " "reference.")
+            raise RuntimeError("There needs to be a least one result and reference.")
 
     @abstractmethod
     def _validate_properties(self):
@@ -185,7 +204,7 @@ class ISISIndirectInelasticReduction(ISISIndirectInelasticBase):
             InputFiles=self.data_files,
             SumFiles=self.sum_files,
             SpectraRange=self.detector_range,
-            **kwargs
+            **kwargs,
         )
 
         self.result_names = sorted(reductions.getNames())
@@ -195,7 +214,7 @@ class ISISIndirectInelasticReduction(ISISIndirectInelasticBase):
         if not isinstance(self.instr_name, str):
             raise RuntimeError("instr_name property should be a string")
         if not isinstance(self.detector_range, list) and len(self.detector_range) != 2:
-            raise RuntimeError("detector_range should be a list of exactly 2 " "values")
+            raise RuntimeError("detector_range should be a list of exactly 2 values")
         if not isinstance(self.data_files, list):
             raise RuntimeError("data_file property should be a string")
         if self.rebin_string is not None and not isinstance(self.rebin_string, str):
@@ -331,6 +350,7 @@ class OSIRISMultiFileSummedReduction(ISISIndirectInelasticReduction):
         self.sum_files = True
 
     def get_reference_files(self):
+        self.nanEqual = True
         return ["II.OSIRISMultiFileSummedReduction.nxs"]
 
 
@@ -870,10 +890,11 @@ class OSIRISIqtAndIqtFit(ISISIndirectInelasticIqtAndIqtFit):
         self.endx = 0.118877
 
     def get_reference_files(self):
-        # Relative tolerance is used because the calculation of Monte Carlo errors means the Iqt errors are randomized
-        # within a set amount. Also, gsl v2 gives a slightly different result than v1 for II.OSIRISFuryFitSeq.
+        # The calculation of Monte Carlo errors means the Iqt errors are randomized within a set amount. We therefore
+        # turn off checking the uncertainties in the resulting workspace.
         self.tolerance = 5.0
         self.tolerance_is_rel_err = True
+        self.disableChecking = ["Uncertainty"]
         return ["II.OSIRISFury.nxs", "II.OSIRISFuryFitSeq.nxs"]
 
 
@@ -902,10 +923,11 @@ class IRISIqtAndIqtFit(ISISIndirectInelasticIqtAndIqtFit):
         self.endx = 0.169171
 
     def get_reference_files(self):
-        # Relative tolerance is used because the calculation of Monte Carlo errors means the Iqt errors are randomized
-        # within a set amount. Also, gsl v2 gives a slightly different result than v1 for II.IRISFuryFitSeq.
+        # The calculation of Monte Carlo errors means the Iqt errors are randomized within a set amount. We therefore
+        # turn off checking the uncertainties in the resulting workspace.
         self.tolerance = 5.0
         self.tolerance_is_rel_err = True
+        self.disableChecking = ["Uncertainty"]
         return ["II.IRISFury.nxs", "II.IRISFuryFitSeq.nxs"]
 
 
@@ -1003,10 +1025,11 @@ class OSIRISIqtAndIqtFitMulti(ISISIndirectInelasticIqtAndIqtFitMulti):
         self.spec_max = 41
 
     def get_reference_files(self):
-        # Relative tolerance is used because the calculation of Monte Carlo errors means the Iqt errors are randomized
-        # within a set amount
-        self.tolerance = 5.0
-        self.tolerance_is_rel_err = True
+        # The calculation of Monte Carlo errors means the Iqt errors are randomized within a set amount. We therefore
+        # turn off checking the uncertainties in the resulting workspace.
+        self.tolerance = 0.05
+        self.tolerance_is_rel_err = False
+        self.disableChecking = ["Uncertainty"]
         return ["II.OSIRISIqt.nxs", "II.OSIRISIqtFitMulti.nxs"]
 
 

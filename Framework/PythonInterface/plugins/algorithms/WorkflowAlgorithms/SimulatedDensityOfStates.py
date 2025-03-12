@@ -13,13 +13,9 @@ from collections import OrderedDict
 
 import scipy.constants
 
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, Progress, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import logger, Direction, StringArrayProperty, StringListValidator
 import mantid.simpleapi as s_api
-
-from dos.load_castep import parse_castep_file
-from dos.load_euphonic import get_data_with_euphonic
-from dos.load_phonon import parse_phonon_file
 
 
 PEAK_WIDTH_ENERGY_FLAG = "energy"
@@ -94,7 +90,7 @@ class SimulatedDensityOfStates(PythonAlgorithm):
 
         self.declareProperty(
             StringArrayProperty("Ions", Direction.Input),
-            doc="List of Ions to use to calculate partial density of states." "If left blank, total density of states will be calculated",
+            doc="List of Ions to use to calculate partial density of states. If left blank, total density of states will be calculated",
         )
 
         self.declareProperty(name="SumContributions", defaultValue=False, doc="Sum the partial density of states into a single workspace.")
@@ -254,6 +250,8 @@ class SimulatedDensityOfStates(PythonAlgorithm):
 
         @return file_data dictionary holding all required data from the castep or phonon file
         """
+        from dos.load_euphonic import get_data_with_euphonic
+
         castep_filename = self.getPropertyValue("CASTEPFile")
         phonon_filename = self.getPropertyValue("PHONONFile")
         euphonic_filename = self.getPropertyValue("ForceConstantsFile")
@@ -448,9 +446,9 @@ class SimulatedDensityOfStates(PythonAlgorithm):
 
             for index, width in zip(peaks, peak_widths.tolist()):
                 gamma_by_2 = width / 2
-                for l in range(-n_lorentz, n_lorentz):
-                    if index + l > 0:
-                        dos[index + l] += hist[index] * gamma_by_2 / (l**2 + gamma_by_2**2) / math.pi
+                for i in range(-n_lorentz, n_lorentz):
+                    if index + i > 0:
+                        dos[index + i] += hist[index] * gamma_by_2 / (i**2 + gamma_by_2**2) / math.pi
 
         return dos
 
@@ -746,6 +744,9 @@ class SimulatedDensityOfStates(PythonAlgorithm):
         @param file_name - path to the file.
         @return tuple of the frequencies, ir and raman intensities and weights
         """
+        from dos.load_castep import parse_castep_file
+        from dos.load_phonon import parse_phonon_file
+
         ext = os.path.splitext(file_name)[1]
 
         if ext == ".phonon":

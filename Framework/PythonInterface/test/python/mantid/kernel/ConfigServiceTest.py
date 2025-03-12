@@ -5,7 +5,6 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-import inspect
 import os
 import sys
 import testhelpers
@@ -134,15 +133,20 @@ class ConfigServiceTest(unittest.TestCase):
         testhelpers.assertRaisesNothing(self, config.setLogLevel, 4, True)
         testhelpers.assertRaisesNothing(self, config.setLogLevel, "warning", True)
 
+    def test_log_level_get_set(self):
+        logLevels = ["fatal", "error", "warning", "information", "debug"]
+        for x in logLevels:
+            config.setLogLevel(x)
+            self.assertEqual(config.getLogLevel(), x)
+
     def test_properties_documented(self):
         # location of the rst file relative to this file this will break if either moves
-        doc_filename = os.path.split(inspect.getfile(self.__class__))[0]
+        doc_filename = os.path.split(__file__)[0]
         doc_filename = os.path.join(doc_filename, "../../../../../../docs/source/concepts/PropertiesFile.rst")
         doc_filename = os.path.abspath(doc_filename)
 
         # read in the user documentation
         print("Parsing", doc_filename)
-        documented_keys = []
         with open(doc_filename) as handle:
             text = handle.read()
 
@@ -220,6 +224,14 @@ class ConfigServiceTest(unittest.TestCase):
         self.assertFalse(0 in ConfigService)
         # verify check for converting checked value to string
         self.assertFalse(1 in ConfigService)
+
+    def test_remove(self):
+        garbage = "garbage.truck"
+        assert garbage not in list(config.keys())
+        config.setString(garbage, "yes")
+        assert garbage in list(config.keys())
+        config.remove(garbage)
+        assert garbage not in list(config.keys())
 
     @unittest.skipIf(not _on_windows, "Windows only test, uses APPDATA")
     def test_get_app_data_dir(self):

@@ -1,18 +1,16 @@
-set(SRC_FILES src/MuonNexusReader.cpp src/NexusClasses.cpp src/NexusFileIO.cpp)
+set(SRC_FILES src/H5Util.cpp src/MuonNexusReader.cpp src/NexusClasses.cpp src/NexusFileIO.cpp)
 
-set(INC_FILES inc/MantidNexus/MuonNexusReader.h inc/MantidNexus/NexusClasses.h inc/MantidNexus/NexusFileIO.h
-              inc/MantidNexus/NexusIOHelper.h
+set(INC_FILES inc/MantidNexus/H5Util.h inc/MantidNexus/MuonNexusReader.h inc/MantidNexus/NexusClasses.h
+              inc/MantidNexus/NexusFileIO.h inc/MantidNexus/NexusIOHelper.h
 )
 
-set(TEST_FILES NexusIOHelperTest.h)
+set(TEST_FILES H5UtilTest.h NexusIOHelperTest.h)
 
 if(COVERAGE)
   foreach(loop_var ${SRC_FILES} ${INC_FILES})
     set_property(GLOBAL APPEND PROPERTY COVERAGE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/${loop_var}")
   endforeach(loop_var)
 endif()
-
-add_definitions(-DIN_NEXUS_CPP_LIBRARY)
 
 # Add the target for this directory
 add_library(Nexus ${SRC_FILES} ${INC_FILES})
@@ -33,7 +31,7 @@ endif()
 # Add to the 'Framework' group in VS
 set_property(TARGET Nexus PROPERTY FOLDER "MantidFramework")
 
-target_link_libraries(Nexus PUBLIC Mantid::API Mantid::DataObjects Mantid::Kernel Nexus::nexus Nexus::nexuscpp)
+target_link_libraries(Nexus PUBLIC Mantid::API Mantid::DataObjects Mantid::Kernel Mantid::NexusCpp)
 
 # Add the unit tests directory
 add_subdirectory(test)

@@ -9,7 +9,7 @@
 #include "UnwrappedSurface.h"
 
 #include <QPolygonF>
-#include <boost/optional.hpp>
+#include <optional>
 
 namespace MantidQt {
 namespace MantidWidgets {
@@ -57,10 +57,12 @@ class EXPORT_OPT_MANTIDQT_INSTRUMENTVIEW PanelsSurface : public UnwrappedSurface
 public:
   PanelsSurface(const IInstrumentActor *rootActor, const Mantid::Kernel::V3D &origin, const Mantid::Kernel::V3D &axis,
                 const QSize &widgetSize, const bool maintainAspectRatio);
-  PanelsSurface() : m_zaxis({0., 0., 1.0}){};
+  PanelsSurface() : m_zaxis({0., 0., 1.0}) {};
   ~PanelsSurface() override;
   void init() override;
   void project(const size_t detIndex, double &u, double &v, double &uscale, double &vscale) const override;
+  void project(const Mantid::Kernel::V3D &position, double &u, double &v, double &uscale,
+               double &vscale) const override;
   void resetInstrumentActor(const IInstrumentActor *rootActor) override;
 
 protected:
@@ -68,7 +70,7 @@ protected:
 
   void processStructured(size_t rootIndex);
 
-  boost::optional<size_t> processTubes(size_t rootIndex);
+  std::optional<size_t> processTubes(size_t rootIndex);
 
   void processGrid(size_t rootIndex);
 

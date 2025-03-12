@@ -5,9 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.api import *
-from mantid.simpleapi import *
-from mantid.kernel import *
+from mantid.api import AlgorithmFactory, AnalysisDataService, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import Direction, IntArrayLengthValidator, IntArrayProperty, StringListValidator
+from mantid.simpleapi import Minus, RefRoi
 
 
 class LRSubtractAverageBackground(PythonAlgorithm):
@@ -41,7 +41,7 @@ class LRSubtractAverageBackground(PythonAlgorithm):
         self.declareProperty(
             "ErrorWeighting",
             False,
-            "If True, a weighted average is used to to estimate the background. " "Otherwise, a simple average is used.",
+            "If True, a weighted average is used to to estimate the background. Otherwise, a simple average is used.",
         )
         detector_list = ["2D-Detector", "LinearDetector"]
         self.declareProperty("TypeOfDetector", "2D-Detector", StringListValidator(detector_list), doc="The type of detector used")

@@ -17,6 +17,7 @@
 #include <Poco/Path.h>
 #include <fstream>
 #include <memory>
+#include <regex>
 #include <string>
 
 #include <Poco/NObserver.h>
@@ -105,6 +106,19 @@ public:
 
     TS_ASSERT_THROWS_NOTHING(ConfigService::Instance().setLogLevel(3));
     TSM_ASSERT("The log level should be 3 after the filters are set to 3", log1.is(3));
+
+    // return back to previous values
+    TS_ASSERT_THROWS_NOTHING(ConfigService::Instance().setLogLevel(4));
+  }
+
+  void testLogLevelSetGet() {
+    Logger log1("testLogLevelGetSet");
+
+    for (std::string x : Logger::PriorityNames) {
+      TS_ASSERT_THROWS_NOTHING(ConfigService::Instance().setLogLevel(x));
+      TS_ASSERT_EQUALS(log1.getLevelName(), x);
+      TS_ASSERT_EQUALS(ConfigService::Instance().getLogLevel(), x);
+    }
 
     // return back to previous values
     TS_ASSERT_THROWS_NOTHING(ConfigService::Instance().setLogLevel(4));
@@ -275,8 +289,8 @@ public:
 
   void testCustomPropertyAsValue() {
     // Mantid.legs is defined in the properties script as 6
-    int value = ConfigService::Instance().getValue<int>("projectRecovery.secondsBetween").get_value_or(0);
-    double dblValue = ConfigService::Instance().getValue<double>("projectRecovery.secondsBetween").get_value_or(0);
+    int value = ConfigService::Instance().getValue<int>("projectRecovery.secondsBetween").value_or(0);
+    double dblValue = ConfigService::Instance().getValue<double>("projectRecovery.secondsBetween").value_or(0);
 
     TS_ASSERT_EQUALS(value, 60);
     TS_ASSERT_EQUALS(dblValue, 60.0);
@@ -403,6 +417,50 @@ public:
     TS_ASSERT(!contents.empty());
     TS_ASSERT(contents.find("mantid.legs") == std::string::npos);
 
+    try {
+      Poco::File backup(userFileBackup);
+      backup.moveTo(settings.getUserFilename());
+    } catch (Poco::Exception &) {
+    }
+  }
+
+  void testRemoveNotPopulated() {
+    /* If a property was not originally set in the properties file,
+     *  but is later removed, it will still appear in a list or properties
+     *  to update.  This test ensures the removed properties are not present.
+     */
+
+    // Backup current user settings
+    ConfigServiceImpl &settings = ConfigService::Instance();
+    const std::string userFileBackup = settings.getUserFilename() + ".unittest";
+    try {
+      Poco::File userFile(settings.getUserFilename());
+      userFile.moveTo(userFileBackup);
+    } catch (Poco::Exception &) {
+    }
+
+    // pick a property that is not in the config file
+    std::string garbage("garbage.truck");
+    std::string keeps("garbage.keep"); // control property
+    TS_ASSERT(!settings.hasProperty(garbage));
+    TS_ASSERT(!settings.hasProperty(keeps));
+
+    // add the property to the config
+    settings.setString(garbage, "yes");
+    settings.setString(keeps, "yes");
+    TS_ASSERT(settings.hasProperty(garbage));
+    TS_ASSERT(settings.hasProperty(keeps));
+
+    // now remove the property and save.
+    // ensure the removed property is not inside the config file
+    settings.remove(garbage);
+    settings.saveConfig(settings.getUserFilename());
+    const std::string contents = readFile(settings.getUserFilename());
+    TS_ASSERT(!contents.empty());
+    TS_ASSERT(contents.find(garbage) == std::string::npos);
+    TS_ASSERT(contents.find(keeps) != std::string::npos);
+
+    // restore the old file
     try {
       Poco::File backup(userFileBackup);
       backup.moveTo(settings.getUserFilename());
@@ -586,6 +644,19 @@ public:
     ConfigService::Instance().remove(rootName);
     mantidLegs = ConfigService::Instance().hasProperty(rootName);
     TS_ASSERT_EQUALS(mantidLegs, false);
+  }
+
+  void testMacOsVersionReadable() {
+    const std::string osName = ConfigService::Instance().getOSName();
+    const std::string osVersionReadable = ConfigService::Instance().getOSVersionReadable();
+    if (osName == "Darwin") {
+      const std::string macOsRegexPattern = "[mM]ac[ ]?OS.*";
+      const bool match = std::regex_match(osVersionReadable, std::regex(macOsRegexPattern));
+      if (!match) {
+        // This will print the incorrect string, unlike TS_ASSERT(match)
+        TS_ASSERT_EQUALS(osVersionReadable, macOsRegexPattern);
+      }
+    }
   }
 
 protected:

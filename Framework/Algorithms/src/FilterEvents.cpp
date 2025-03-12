@@ -28,9 +28,9 @@
 #include "MantidKernel/PhysicalConstants.h"
 #include "MantidKernel/PropertyWithValue.h"
 #include "MantidKernel/Strings.h"
-#include "MantidKernel/System.h"
 #include "MantidKernel/TimeSeriesProperty.h"
 #include "MantidKernel/VisibleWhenProperty.h"
+
 #include <MantidKernel/InvisibleProperty.h>
 
 #include <memory>
@@ -285,6 +285,15 @@ void FilterEvents::exec() {
   else
     progressamount = 0.7;
 
+  // sort the input events here so tbb can better parallelize the tasks
+  {
+    const auto startTime = std::chrono::high_resolution_clock::now();
+    const auto sortType = m_filterByPulseTime ? EventSortType::PULSETIME_SORT : EventSortType::PULSETIMETOF_SORT;
+    m_eventWS->sortAll(sortType, nullptr);
+    addTimer("sortEvents", startTime, std::chrono::high_resolution_clock::now());
+  }
+
+  // filter the events
   filterEvents(progressamount);
 
   // Optional to group detector
@@ -556,14 +565,15 @@ TimeROI FilterEvents::partialROI(const int &index) {
  * @brief FilterEvents::parseInputSplitters
  */
 void FilterEvents::parseInputSplitters() {
-  if (m_splittersWorkspace)
-    m_timeSplitter = TimeSplitter(m_splittersWorkspace);
-  else if (m_splitterTableWorkspace)
+  if (m_splittersWorkspace) {
+    m_timeSplitter = TimeSplitter{m_splittersWorkspace};
+  } else if (m_splitterTableWorkspace) {
     m_timeSplitter =
         TimeSplitter(m_splitterTableWorkspace, m_isSplittersRelativeTime ? m_filterStartTime : DateAndTime::GPS_EPOCH);
-  else
+  } else {
     m_timeSplitter =
         TimeSplitter(m_matrixSplitterWS, m_isSplittersRelativeTime ? m_filterStartTime : DateAndTime::GPS_EPOCH);
+  }
 
   m_targetWorkspaceIndexSet = m_timeSplitter.outputWorkspaceIndices();
 
@@ -627,6 +637,8 @@ void FilterEvents::createOutputWorkspaces() {
   // Clone the input workspace but without any events. Will serve as blueprint for the output workspaces
   std::shared_ptr<EventWorkspace> templateWorkspace = create<EventWorkspace>(*m_eventWS);
   templateWorkspace->setSharedRun(Kernel::make_cow<Run>()); // clear the run object
+  templateWorkspace->clearMRU();
+  templateWorkspace->switchEventType(m_eventWS->getEventType());
 
   // Set up target workspaces
   size_t number_of_output_workspaces{0};
@@ -656,9 +668,9 @@ void FilterEvents::createOutputWorkspaces() {
       } else if (descriptiveNames) {
         auto infoiter = infomap.find(wsindex);
         if (infoiter != infomap.end()) {
-          std::string name = infoiter->second;
-          name = Kernel::Strings::removeSpace(name);
-          wsname << name;
+          std::string nameFromMap = infoiter->second;
+          nameFromMap = Kernel::Strings::removeSpace(nameFromMap);
+          wsname << nameFromMap;
         } else {
           wsname << m_timeSplitter.getWorkspaceIndexName(wsindex, delta_wsindex);
         }
@@ -975,6 +987,8 @@ void FilterEvents::setupCustomizedTOFCorrection() {
 }
 
 void FilterEvents::filterEvents(double progressamount) {
+  const bool pulseTof{!m_filterByPulseTime};           // split by pulse-time + TOF ?
+  const bool tofCorrect{m_tofCorrType != NoneCorrect}; // apply corrections to the TOF values?
   const auto startTime = std::chrono::high_resolution_clock::now();
   size_t numberOfSpectra = m_eventWS->getNumberHistograms();
   g_log.debug() << "Number of spectra in input/source EventWorkspace = " << numberOfSpectra << ".\n";
@@ -982,17 +996,15 @@ void FilterEvents::filterEvents(double progressamount) {
   PARALLEL_FOR_NO_WSP_CHECK()
   for (int64_t iws = 0; iws < int64_t(numberOfSpectra); ++iws) {
     PARALLEL_START_INTERRUPT_REGION
-    if (!m_vecSkip[iws]) {                                      // Filter the non-skipped
-      std::map<int, DataObjects::EventList *> partialEvenLists; // event lists receiving the events from input list
-      PARALLEL_CRITICAL(build_elist) {
+    if (!m_vecSkip[iws]) {                                                        // Filter the non-skipped
+      const DataObjects::EventList &inputEventList = m_eventWS->getSpectrum(iws); // input event list
+      if (!inputEventList.empty()) {                              // nothing to split if there aren't events
+        std::map<int, DataObjects::EventList *> partialEvenLists; // event lists receiving the events from input list
         for (auto &ws : m_outputWorkspacesMap) {
-          int index = ws.first;
+          const int index = ws.first;
           auto &partialEventList = ws.second->getSpectrum(iws);
           partialEvenLists.emplace(index, &partialEventList);
         }
-        const DataObjects::EventList &inputEventList = m_eventWS->getSpectrum(iws); // input event list
-        const bool pulseTof{!m_filterByPulseTime};                                  // split by pulse-time + TOF ?
-        const bool tofCorrect{m_tofCorrType != NoneCorrect}; // apply corrections to the TOF values?
         m_timeSplitter.splitEventList(inputEventList, partialEvenLists, pulseTof, tofCorrect, m_detTofFactors[iws],
                                       m_detTofOffsets[iws]);
       }

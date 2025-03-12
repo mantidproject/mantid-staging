@@ -177,7 +177,7 @@ Batches
 
 The main window contains one or more "Batches", which are shown as vertical
 tabs on the left. Each Batch contains a group of settings tabs (Runs, Event
-Handling, Experiment, Instrument and Save ASCII). Together, these provide all
+Handling, Experiment, Instrument and Save). Together, these provide all
 of the settings for a particular reduction.
 
 .. figure:: /images/ISISReflectometryInterface/batches.png
@@ -209,7 +209,9 @@ The **Batch** menu contains options for managing the Batch tabs:
 | Action           | Effect                                                   |
 +==================+==========================================================+
 | New              | Add a new Batch tab                                      |
++------------------+----------------------------------------------------------+
 | Load             | Load settings for the current Batch tab from a file      |
++------------------+----------------------------------------------------------+
 | Save             | Save settings for the current Batch to a file            |
 +------------------+----------------------------------------------------------+
 
@@ -222,6 +224,7 @@ The **Tools** menu provides access to options and utilities:
 | Action           | Effect                                                   |
 +==================+==========================================================+
 | Slit Calculator  | Tool for calculating approximate slit widths             |
++------------------+----------------------------------------------------------+
 | Options          | Tool for controlling warnings and rounding precision     |
 +------------------+----------------------------------------------------------+
 
@@ -357,8 +360,8 @@ The processing table contains the following columns:
 | dQ/Q                | No        | Contains the resolution used when rebinning                                     |
 |                     |           | output workspaces. If left blank, this is                                       |
 |                     |           | calculated for you using the                                                    |
-|                     |           | NRCalculateSlitResolution algorithm. This value is                              |
-|                     |           | negated so that Logarithmic binning can be                                      |
+|                     |           | :ref:`NRCalculateSlitResolution <algm-NRCalculateSlitResolution>` algorithm.    |
+|                     |           | This value is negated so that Logarithmic binning can be                        |
 |                     |           | applied for the IvsQ workspace.                                                 |
 |                     |           | If you desire linear binning then you                                           |
 |                     |           | may negate the value in the processing table                                    |
@@ -374,8 +377,8 @@ The processing table contains the following columns:
 |                     |           | Example: ``1.0``                                                                |
 +---------------------+-----------+---------------------------------------------------------------------------------+
 | Options             | No        | Contains options that allow you to override                                     |
-|                     |           | ReflectometryReductionOne's properties. To                                      |
-|                     |           | override a property, just use the property's                                    |
+|                     |           | :ref:`ReflectometryReductionOne's <algm-ReflectometryReductionOne>` properties. |
+|                     |           | To override a property, just use the property's                                 |
 |                     |           | name as a key, and the desired value as the                                     |
 |                     |           | value.                                                                          |
 |                     |           | Options are specified in ``key=value`` pairs,                                   |
@@ -507,6 +510,12 @@ search or if there are no runs in the experiment yet, the table will remain
 empty. If an experiment is currently running, you can re-run the search to
 check for new runs and they will be added to the results table.
 
+When working on IDAaaS with the "Search Data Archive" setting set to "Off", only
+runs that are available in the ISIS Instrument Data Cache will appear in the
+search results. This does not take user permissions into account. The user must
+still have access to these files in order to process them, otherwise a "File Not
+Found" error will occur when the reduction is run.
+
 Note that some runs will be highlighted in blue. This indicates that they are
 not valid for reduction, e.g. transmission runs, or runs without a valid
 angle. Hover over the row to see a tooltip with the reason the run is invalid.
@@ -562,7 +571,7 @@ also be excluded from auto processing (see below).
 Excluding and annotating runs
 =============================
 
-You may with to exclude certain runs from reduction. This is especially useful
+You may wish to exclude certain runs from the reduction. This is especially useful
 for auto processing (see below). You can mark a run for exclusion by entering a
 reason into the `Exclude` column in the search results table. Double-click the
 cell to edit it and then press Enter or click off the cell when finished. The
@@ -574,7 +583,8 @@ the `Comments` column. This will not affect the reduction and is simply for
 user convenience.
 
 To save your annotations in the `Exclude` and `Comments` columns, save the
-whole batch via the `Batch->Save` menu.
+whole batch via the `Batch->Save` menu. You can also export the contents of the
+search results table to a CSV file by clicking the **Export** button.
 
 Note that your annotations will be preserved if you re-run the same search or
 run auto-processing. However, if you change the search settings, then the
@@ -594,7 +604,7 @@ searching for runs by investigation but takes out the manual steps for you. For
 more details on how searching works, see the `Search Interface` section.
 
 To start autoprocessing, specify the instrument and investigation ID, and
-optionally the cycle name. Then click `Autoprocess` to start autoproessing for
+optionally the cycle name. Then click `Autoprocess` to start autoprocessing for
 this investigation. This will:
 
 - Populate the search results list with runs that are part of the investigation.
@@ -829,7 +839,7 @@ Default transmission runs can be specified and each input can take a
 single run/workspace or a number of runs/workspaces that will be summed before
 processing. Specific spectra of interest can be specified for the input runs
 and separate spectra, if required, can be specified for the transmission runs -
-if the latter are not specified then the ``Run Spectra`` will also be used for
+if the latter are not specified then the ``ROI`` will also be used for
 the transmission runs. If both a First and Second tranmission input is
 specified, then they will be stitched using the options specified.
 
@@ -885,21 +895,23 @@ exactly the **same reduction** as a normal batch reduction, aside from the regio
 using the graphical selection tool.
 
 .. _refl_save_ascii:
+.. _refl_save:
 
-Save ASCII Tab
-~~~~~~~~~~~~~~
+Save Tab
+~~~~~~~~
 
-The **Save ASCII** tab allows for processed workspaces to be saved in specific
-ASCII formats. The filenames are saved in the form [Prefix][Workspace Name].[ext].
-See :ref:`algm-SaveReflectometryAscii` for a description of the formats.
+The **Save** tab allows for processed workspaces to be saved in specific
+formats. The filenames are saved in the form [Prefix][Workspace Name].[ext].
+See :ref:`algm-SaveReflectometryAscii` and :ref:`algm-SaveISISReflectometryORSO`
+for a description of the supported formats.
 
 .. figure:: /images/ISISReflectometryInterface/save_tab.png
   :class: screenshot
   :width: 800px
   :align: center
-  :alt: The save ASCII tab
+  :alt: The save tab
 
-  *The save ASCII tab*
+  *The save tab*
 
 +-------------------------------+------------------------------------------------------+
 | Name                          | Description                                          |
@@ -938,20 +950,39 @@ See :ref:`algm-SaveReflectometryAscii` for a description of the formats.
 |                               | to contain multiple parameter notes.                 |
 +-------------------------------+------------------------------------------------------+
 | File format                   | This dialog can save to ANSTO, ILL cosmos, 3-column, |
-|                               | and a customisable format. It doesn't save from      |
-|                               | the main interface's table, but from workspaces      |
-|                               | loaded into mantid. All algorithms are also          |
-|                               | available as save algorithms from mantid itself.     |
+|                               | ORSO Ascii, ORSO Nexus and a customisable format. It |
+|                               | doesn't save from the main interface's table, but    |
+|                               | from workspaces loaded into mantid. All algorithms   |
+|                               | are also available as save algorithms from mantid    |
+|                               | itself.                                              |
 +-------------------------------+------------------------------------------------------+
 | Custom Format Options         | When saving in 'Custom' this section allows you      |
 |                               | to specify if you want a Header and/or Q Resolution  |
 |                               | column as well as specifying the delimiter.          |
++-------------------------------+------------------------------------------------------+
+| ORSO Format Options           | You can save into either the ORSO Ascii or ORSO Nexus|
+|                               | format. For either format, you can specify whether to|
+|                               | include a Q Resolution column. You can also use the  |
+|                               | ``Additional columns (includes Q resolution)``       |
+|                               | option to request Q Resolution, Lambda, dLambda,     |
+|                               | Theta and dTheta columns (this is selected by        |
+|                               | default).                                            |
 +-------------------------------+------------------------------------------------------+
 | Automatic Save                | Automatically save the main output workspace for     |
 |                               | groups in the runs table. Note that the stitched     |
 |                               | group output will be saved if there is one or, for   |
 |                               | a single-row group, the ``IvsQ_binned`` row output   |
 |                               | will be saved instead.                               |
+|                               | Use the ``Include individual row outputs for groups``|
+|                               | option to also save the individual row outputs for a |
+|                               | stitched group.                                      |
+|                               | When the reduction completes, if there are multiple  |
+|                               | workspaces to save automatically then the            |
+|                               | ``Save multiple datasets to a single file`` option   |
+|                               | can be used to save them all into a single file.     |
+|                               | This option is only available when auto-saving into  |
+|                               | one of the ORSO formats, where it is selected by     |
+|                               | default.                                             |
 +-------------------------------+------------------------------------------------------+
 
 Troubleshooting

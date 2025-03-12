@@ -19,7 +19,7 @@ from mantidqt.plotting import functions
 from workbench.plotting.figuremanager import MantidFigureCanvas, FigureManagerWorkbench
 from workbench.plotting.toolbar import WorkbenchNavigationToolbar
 from mantid.plots.plotfunctions import plot
-from mantid.simpleapi import CreateSampleWorkspace
+from mantid.simpleapi import CreateSampleWorkspace, CreateMDHistoWorkspace
 
 
 @start_qapplication
@@ -52,6 +52,53 @@ class ToolBarTest(unittest.TestCase):
         self.assertTrue(self._is_button_enabled(fig, "waterfall_fill_area"))
 
     @patch("workbench.plotting.figuremanager.QAppThreadCall")
+    def test_fitbrowser_and_superplot_disabled_for_MDHisto_plots(self, mock_qappthread):
+        mock_qappthread.return_value = mock_qappthread
+        # make workspace
+        ws_histo = CreateMDHistoWorkspace(
+            SignalInput="1,1",
+            ErrorInput="1,1",
+            Dimensionality=3,
+            Extents="-1,1,-1,1,-1,1",
+            NumberOfBins="2,1,1",
+            Names="H,K,L",
+            Units="rlu,rlu,rlu",
+        )
+
+        fig, axes = plt.subplots(subplot_kw={"projection": "mantid"})
+        axes.plot(ws_histo)
+
+        self.assertFalse(self._is_button_enabled(fig, "toggle_fit"))
+        self.assertFalse(self._is_button_enabled(fig, "toggle_superplot"))
+
+    @patch("workbench.plotting.figuremanager.QAppThreadCall")
+    def test_fitbrowser_and_superplot_disabled_for_non_MantidAxes(self, mock_qappthread):
+        mock_qappthread.return_value = mock_qappthread
+
+        fig, axes = plt.subplots()
+        axes.plot([-10, 10], [1, 2])
+
+        self.assertFalse(self._is_button_enabled(fig, "toggle_fit"))
+        self.assertFalse(self._is_button_enabled(fig, "toggle_superplot"))
+
+    @patch("workbench.plotting.figuremanager.QAppThreadCall")
+    def test_line_color_selection_buttons_correctly_enabled_for_contour_wireframe_plots(self, mock_qappthread):
+        """Checks that line_colour selection button is correctly enabled for wireframe and contour plots"""
+        mock_qappthread.return_value = mock_qappthread
+
+        plot_types = ["wireframe", "contour"]
+        for plot_type in plot_types:
+            ws = CreateSampleWorkspace()
+            plot_function = getattr(functions, f"plot_{plot_type}", None)
+            self.assertIsNotNone(plot_function)
+            fig = plot_function([ws])
+
+            # line_colour button should be enabled for contour and wireframe plots
+            self.assertTrue(self._is_button_enabled(fig, "line_colour"))
+            self.assertFalse(self._is_button_enabled(fig, "toggle_fit"))
+            self.assertFalse(self._is_button_enabled(fig, "toggle_superplot"))
+
+    @patch("workbench.plotting.figuremanager.QAppThreadCall")
     def test_button_unchecked_for_plot_with_no_grid(self, mock_qappthread):
         mock_qappthread.return_value = mock_qappthread
 
@@ -69,6 +116,15 @@ class ToolBarTest(unittest.TestCase):
         axes.grid()
         # Grid button should be ON because we enabled the grid.
         self.assertTrue(self._is_grid_button_checked(fig))
+
+    @patch("workbench.plotting.figuremanager.QAppThreadCall")
+    def test_button_checked_for_plot_with_no_crosshair(self, mock_qappthread):
+        mock_qappthread.return_value = mock_qappthread
+
+        fig, axes = plt.subplots(subplot_kw={"projection": "mantid"})
+        axes.plot([-10, 10], [1, 2])
+        # Grid button should be OFF because we have not enabled the crosshair.
+        self.assertFalse(self._is_crosshair_button_checked(fig))
 
     @patch("workbench.plotting.figuremanager.QAppThreadCall")
     def test_button_checked_for_plot_with_grid_using_kwargs(self, mock_qappthread):
@@ -129,6 +185,19 @@ class ToolBarTest(unittest.TestCase):
         axes[1][0].grid()
         # Grid button should be OFF because not all subplots have grids.
         self.assertFalse(self._is_grid_button_checked(fig))
+
+    @patch("workbench.plotting.figuremanager.QAppThreadCall")
+    def test_plot_script_generator_is_enabled_for_non_square_tiled_plots(self, mock_qappthread):
+        mock_qappthread.return_value = mock_qappthread
+
+        fig, axes = plt.subplots(ncols=2, nrows=2, subplot_kw={"projection": "mantid"})
+        # Simulate a 2x2 grid showing three plots
+        axes[0][0].plot([-10, 10], [1, 2])
+        axes[0][1].plot([-10, 10], [1, 2])
+        axes[1][0].plot([-10, 10], [1, 2])
+        axes[1][1].axis("off")
+
+        self.assertTrue(self._is_button_enabled(fig, "generate_plot_script"))
 
     def test_is_colorbar(self):
         """Verify the functionality of _is_colorbar, which determines whether a set of axes is a colorbar."""
@@ -205,6 +274,19 @@ class ToolBarTest(unittest.TestCase):
         # This is only called when show() is called on the figure manager, so we have to manually call it here.
         fig_manager.toolbar.set_buttons_visibility(fig)
         return fig_manager.toolbar._actions[button].isEnabled()
+
+    @classmethod
+    def _is_crosshair_button_checked(cls, fig):
+        """
+        Create the figure manager and check whether its toolbar is toggled on or off for the given figure.
+        We have to explicitly call set_button_visibility() here, which would otherwise be called within the show()
+        function.
+        """
+        canvas = MantidFigureCanvas(fig)
+        fig_manager = FigureManagerWorkbench(canvas, 1)
+        # This is only called when show() is called on the figure manager, so we have to manually call it here.
+        fig_manager.toolbar.set_buttons_visibility(fig)
+        return fig_manager.toolbar._actions["toggle_crosshair"].isChecked()
 
 
 if __name__ == "__main__":

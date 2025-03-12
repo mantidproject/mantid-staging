@@ -7,10 +7,24 @@
 import unittest
 
 from Direct.PropertyManager import PropertyManager
-from Direct.RunDescriptor import *
+from Direct.RunDescriptor import RunDescriptor
 
+import os
 from mantid import api
-from mantid.simpleapi import *
+from mantid.api import mtd
+from mantid.simpleapi import (
+    config,
+    AddSampleLog,
+    CloneWorkspace,
+    CompareWorkspaces,
+    ConvertToEventWorkspace,
+    CreateSampleWorkspace,
+    DeleteWorkspace,
+    ExtractMonitors,
+    LoadEmptyInstrument,
+    Rebin,
+    RenameWorkspace,
+)
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------
@@ -23,7 +37,7 @@ class RunDescriptorTest(unittest.TestCase):
         return super(RunDescriptorTest, self).__init__(methodName)
 
     def setUp(self):
-        if self.prop_man is None or type(self.prop_man) != type(PropertyManager):
+        if self.prop_man is None or type(self.prop_man) is not type(PropertyManager):
             self.prop_man = PropertyManager("MAR")
 
     def tearDown(self):

@@ -467,7 +467,7 @@ MatrixWorkspace_sptr NormaliseToMonitor::getMonitorWorkspace(const MatrixWorkspa
   m_workspaceIndexes = std::vector<size_t>(1, wsID);
   // In this case we need to test whether the bins in the monitor workspace
   // match
-  m_commonBins = (m_commonBins && WorkspaceHelpers::matchingBins(*inputWorkspace, *monitorWS, true));
+  m_commonBins = (m_commonBins && WorkspaceHelpers::matchingBins(inputWorkspace, monitorWS, true));
   // Copy the monitor spectrum because it will get changed
   return monitorWS;
 }
@@ -718,7 +718,7 @@ void NormaliseToMonitor::normaliseBinByBin(const MatrixWorkspace_sptr &inputWork
           // Now store the result
           YOut[k] = newY;
         } // end Workspace2D case
-      }   // end loop over current spectrum
+      } // end loop over current spectrum
 
       PARALLEL_END_INTERRUPT_REGION
     } // end loop over spectra

@@ -26,11 +26,12 @@ Guides
    DoxygenSetup
    NewStarterC++
    NewStarterPython
+   PythonAlgorithmsInExternalProjects
 
 :doc:`DeveloperAccounts`
    Details of the accounts required for developers.
 
-:doc:`GettingStarted <GettingStarted/GettingStarted>`
+:doc:`Getting Started <GettingStarted/GettingStarted>`
    Describes the process of obtaining and building the mantid code base.
 
 :doc:`Packaging`
@@ -118,6 +119,8 @@ Tools
 
    ToolsOverview
    ProfilingOverview
+   Timers
+   ProfilingWithPerf
    ProfilingWithValgrind
    FlowchartCreation
    VisualStudioBuildImpact
@@ -127,12 +130,16 @@ Tools
    Eclipse
    WindowsSubsystemForLinux
    ObtainingABenchmarkForMantidFitting
+   CondaPackageManager
 
 :doc:`ToolsOverview`
    Describes ``class_maker``, ``valgrind`` and related tools.
 
 :doc:`ProfilingOverview`
    There are a few different ways to profile Mantid code.
+
+:doc:`Timers`
+   Describes different ways of timing Mantid C++ code.
 
 :doc:`FlowchartCreation`
    Describes how to create a flow chart with dot.
@@ -158,6 +165,9 @@ Tools
 :doc:`ObtainingABenchmarkForMantidFitting`
    Guide for setting up an environment to perform a benchmark of Mantid fitting minimizers.
 
+:doc:`CondaPackageManager`
+   Guide on how to use the Conda package manager in Mantid, including tips and a ``pip`` policy.
+
 =======
 Testing
 =======
@@ -169,6 +179,7 @@ Testing
    DebuggingUnitTests
    UnitTestGoodPractice
    ReviewingAPullRequest
+   Gatekeeping
    WritingPerformanceTests
    SystemTests
    DataFilesForTesting
@@ -186,6 +197,9 @@ Testing
 
 :doc:`ReviewingAPullRequest`
    What to do when reviewing an individual contribution to mantid.
+
+:doc:`Gatekeeping`
+   Things to consider when merging a pull request to the main production branch.
 
 :doc:`WritingPerformanceTests`
    A walk through of how to write a performance test.
@@ -259,12 +273,13 @@ Component Overviews
 
    BatchWidget/index
    EnumeratedString
+   EnumeratedStringProperty
    EventWorkspaceDev
    HandlingXML
    IndexProperty
    IndirectDataAnalysisAddingFitType
    IndirectDataAnalysisFileStructure
-   InelasticDataManipulationFileStructure
+   InelasticDataProcessorFileStructure
    InstrumentViewer
    ISISReflectometryInterface
    ISISSANSReductionBackend
@@ -278,3 +293,4 @@ Component Overviews
    Widgets/Plotting
    WritingAnAlgorithm
    WritingCustomConvertToMDTransformation
+   ISISEnergyTransferTab

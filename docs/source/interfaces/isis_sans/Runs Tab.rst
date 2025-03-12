@@ -107,7 +107,13 @@ Table Columns
 +--------------------------+-------------------------------------------------------------------------------------------------+
 | **Options**              |   This column allows the user to provide row specific settings. Currently only                  |
 |                          |   **WavelengthMin**, **WavelengthMax**, **EventSlices** (see :ref:`ISIS_SANS_Settings_Tab-ref`  |
-|                          |   for details), **BackgroundWorkspace**, and **ScaleFactor** can be set (see below).            |
+|                          |   for details).                                                                                 |
++--------------------------+-------------------------------------------------------------------------------------------------+
+| **Background Workspace** |   This column allows the user to provide a workspace for scaled background subtraction          |
+|                          |   (see below). This can either be the name of a workspace already in the ADS or match the       |
+|                          |   Output Name from another row in the runs table.                                               |
++--------------------------+-------------------------------------------------------------------------------------------------+
+| **Scale Factor**         |   Scale factor to be used for scaled background subtraction (see below).                        |
 +--------------------------+-------------------------------------------------------------------------------------------------+
 
 .. _ISIS_SANS_scaled_background-ref:
@@ -115,15 +121,59 @@ Table Columns
 Scaled Background Subtraction
 +++++++++++++++++++++++++++++
 
-By setting **both** ``BackgroundWorkspace`` and ``ScaleFactor`` in the options a Scaled Background Subtraction will be
+Additional hidden columns can be shown on the table by checking the ``Scaled Background Subtraction`` checkbox above
+the table on the right hand side.
+
+By setting **both** ``Background Workspace`` and ``Scale Factor`` a Scaled Background Subtraction will be
 performed. Giving these values will perform a background subtraction where the ``BackgroundWorkspace`` (representing a
 reduced solution run) will be multiplied by the ``ScaleFactor`` and then subtracted from the reduced HAB, LAB, or Merged
 main output workspace. It is then saved to the ADS or to a file (based on the save options below) in addition to the
-normal reduction output.
+normal reduction output. The subtracted workspace will have the same name as the normal output workspace with ``_bgsub``
+appended to its name.
 
-The reduction will fail if only one of these values is set. Or, if the reduction mode is set to "All". This is because
-there is no way to determine if the workspace given as the ``BackgroundWorkspace`` is for the HAB or LAB, and so uses
-the value from the User File, therefore assuming that both reductions have used the same one.
+**Note:** The background subtraction workspace will be subtracted **in addition** to the normal subtraction
+performed when values are given in the Can columns. If you only wish to subtract the scaled background, leave the can
+cells blank.
+
+Examples:
+
+- Given Values: Sample (Scatter, Transmission, and Direct), and Can (Scatter, Transmission, and Direct)
+
+  - Output = Sample - Can
+
+- Given Values: Sample (Scatter, Transmission, and Direct), Can (Scatter, Transmission, and Direct), and  Scaled
+  Background Workspace
+
+  - Output = Sample - Can
+  - Output_bgsub = Sample - Can - (Background Workspace * Scale Factor)
+
+- Given Values: Sample (Scatter, Transmission, and Direct) and Scaled Background Workspace
+
+  - Output = Sample
+  - Output_bgsub = Sample - (Background Workspace * Scale Factor)
+
+The reduction will fail if only one of ``Background Workspace`` and ``Scale Factor`` is set. Or, if the reduction mode
+is set to "All". This is because there is no way to determine if the workspace given as the ``BackgroundWorkspace`` is
+for the HAB or LAB, and so uses the value from the User File, therefore assuming that both reductions have used the same
+one.
+
+**Using scaled background subtraction when time slicing a sample:**
+
+*Background workspace not time sliced*
+
+The specified ``Background Workspace`` will be scaled and subtracted from all sample slices.
+You must specify the exact name of the ``Background Workspace``.
+It is currently not supported to specify the ``Background Workspace`` using an Output Name (from another row in the runs table), although we plan to support this in a future version of Mantid.
+
+*Background workspace has been time sliced*
+
+A single ``Background Workspace`` slice will be scaled and subtracted from all sample slices.
+You can specify the ``Background Workspace`` slice using its full workspace name.
+Alternatively, if the background has been time sliced to match the sample workspace then you can specify the ``Background Workspace`` using an Output Name (from another row in the runs table).
+This will result in the first background slice being scaled and subtracted from each sample slice
+(i.e. for slicing t0_t600, t600_t1200, t1200_t1800, the background slice t0_t600 will be subtracted from each sample slice).
+
+It is **not** possible to perform a scaled background subtraction where each ``Background Workspace`` slice is subtracted from its corresponding sample slice.
 
 Save Options
 ------------
@@ -131,6 +181,7 @@ Save Options
 .. image::  /images/ISISSansInterface/runs_page_save_opts.png
    :align: center
    :width: 500px
+
 
 +--------------------------+-----------------------------------------------------------------------------------------+
 | **Save Other**           | Opens up the save a dialog box :ref:`Save Other <save-other>` which allows users        |
@@ -151,4 +202,7 @@ Save Options
 |                          | for each run in the table, speeding up processing considerably.                         |
 +--------------------------+-----------------------------------------------------------------------------------------+
 | **Plot results**         | If enabled, data is automatically plotted on a graph as it is processed.                |
+|                          | The check box is hidden by default, and can be enabled by adding                        |
+|                          | `sans.isis_sans.plotResults=On` in your mantid.user.properties, see                     |
+|                          | :ref:`Properties File` for more information                                             |
 +--------------------------+-----------------------------------------------------------------------------------------+

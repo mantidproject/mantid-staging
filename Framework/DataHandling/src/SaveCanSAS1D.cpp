@@ -69,7 +69,7 @@ void SaveCanSAS1D::init() {
   declareProperty(
       std::make_unique<API::WorkspaceProperty<>>("InputWorkspace", "", Kernel::Direction::Input,
                                                  std::make_shared<API::WorkspaceUnitValidator>("MomentumTransfer")),
-      "The input workspace, which must be in units of Q");
+      "The input workspace, which must be in units of Q. Must be a 1D workspace.");
   declareProperty(std::make_unique<API::FileProperty>("Filename", "", API::FileProperty::Save, ".xml"),
                   "The name of the xml file to save");
 
@@ -100,11 +100,9 @@ void SaveCanSAS1D::init() {
 
   // Collimation information
   std::vector<std::string> collimationGeometry{
-      "Cylinder",
-      "Flat plate",
-      "Disc",
+      "Cylinder", "FlatPlate", "Flat plate", "Disc", "Unknown",
   };
-  declareProperty("Geometry", "Disc", std::make_shared<Kernel::StringListValidator>(collimationGeometry),
+  declareProperty("Geometry", "Unknown", std::make_shared<Kernel::StringListValidator>(collimationGeometry),
                   "The geometry type of the collimation.");
   auto mustBePositiveOrZero = std::make_shared<Kernel::BoundedValidator<double>>();
   mustBePositiveOrZero->setLower(0);

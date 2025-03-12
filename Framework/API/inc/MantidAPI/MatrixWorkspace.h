@@ -32,6 +32,8 @@ namespace Geometry {
 class ParameterMap;
 }
 
+const std::vector<std::string> validPlotTypes{"plot", "marker", "histogram", "errorbar_x", "errorbar_y", "errorbar_xy"};
+
 namespace API {
 class Axis;
 class SpectrumDetectorMapping;
@@ -134,6 +136,21 @@ public:
   /// Gets MatrixWorkspace title (same as Run object run_title property)
   const std::string getTitle() const override;
 
+  /// Sets MatrixWorkspace plot_type
+  void setPlotType(const std::string &);
+  /// Gets MatrixWorkspace plot_type
+  std::string getPlotType() const;
+
+  /// Set the marker style for plotting
+  void setMarkerStyle(const std::string &markerType);
+  /// Get the marker style for plotting
+  std::string getMarkerStyle() const;
+
+  /// Set the size of the marker for plotting
+  void setMarkerSize(const float markerSize);
+  /// Get the size of the marker for plotting
+  float getMarkerSize() const;
+
   virtual Types::Core::DateAndTime getFirstPulseTime() const;
   Types::Core::DateAndTime getLastPulseTime() const;
 
@@ -233,6 +250,8 @@ public:
   void setSharedE(const size_t index, const Kernel::cow_ptr<HistogramData::HistogramE> &e) & {
     getSpectrumWithoutInvalidation(index).setSharedE(e);
   }
+  void resizeHistogram(const size_t index, size_t n) & { getSpectrum(index).resize(n); }
+  size_t histogramSize(const size_t index) const { return getSpectrum(index).size(); }
   // Methods for getting read-only access to the data.
   // Just passes through to the virtual dataX/Y/E function (const version)
   /// Deprecated, use x() instead. Returns a read-only (i.e. const) reference to
@@ -497,7 +516,7 @@ private:
   /// Flag indicating if the common bins flag is in a valid state
   mutable std::atomic<bool> m_isCommonBinsFlagValid{false};
   /// Flag indicating whether the data has common bins
-  mutable bool m_isCommonBinsFlag{false};
+  mutable std::atomic<bool> m_isCommonBinsFlag{false};
   /// A mutex protecting the update of m_isCommonBinsFlag.
   mutable std::mutex m_isCommonBinsMutex;
 
@@ -510,6 +529,10 @@ private:
 
   mutable std::atomic<bool> m_indexInfoNeedsUpdate{true};
   mutable std::mutex m_indexInfoMutex;
+
+  // Marker style and size, used for plotting
+  std::string m_marker;
+  float m_marker_size;
 
 protected:
   /// Getter for the dimension id based on the axis.

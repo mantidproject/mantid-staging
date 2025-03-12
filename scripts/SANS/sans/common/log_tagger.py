@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The elements of this module manage and add specific entries in the sample log."""
+"""The elements of this module manage and add specific entries in the sample log."""
 
 # pylint: disable=invalid-name
 
@@ -21,7 +21,7 @@ def get_hash_value(value):
     """
     hash_value = sha224(str(value).encode("utf8")).hexdigest()
     if not hash_value or hash_value is None:
-        raise RuntimeError("SANSLogTagger: Something went wrong when trying to get the hash" " for {0}.".format(str(value)))
+        raise RuntimeError("SANSLogTagger: Something went wrong when trying to get the hash for {0}.".format(str(value)))
     return hash_value
 
 

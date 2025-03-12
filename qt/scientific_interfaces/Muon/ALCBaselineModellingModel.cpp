@@ -91,10 +91,7 @@ void ALCBaselineModellingModel::fit(IFunction_const_sptr function, const std::ve
   m_sections = sections;
 }
 
-void ALCBaselineModellingModel::setData(MatrixWorkspace_sptr data) {
-  m_data = std::move(data);
-  emit dataChanged();
-}
+void ALCBaselineModellingModel::setData(MatrixWorkspace_sptr data) { m_data = std::move(data); }
 
 /**
  * Disable points in the workpsace in the way that points which are not included
@@ -153,20 +150,14 @@ void ALCBaselineModellingModel::enableDisabledPoints(const MatrixWorkspace_sptr 
  */
 void ALCBaselineModellingModel::setErrorsAfterFit(const MatrixWorkspace_sptr &data) { data->mutableE(2) = data->e(0); }
 
-MatrixWorkspace_sptr ALCBaselineModellingModel::exportWorkspace() {
-  if (m_data && m_data->getNumberHistograms() == 3) {
-
-    // Export results only if data have been fit, that is,
-    // if m_data has three histograms
+MatrixWorkspace_sptr ALCBaselineModellingModel::exportWorkspace() const {
+  if (m_data) {
     return std::const_pointer_cast<MatrixWorkspace>(m_data);
-
-  } else {
-
-    return MatrixWorkspace_sptr();
   }
+  return nullptr;
 }
 
-ITableWorkspace_sptr ALCBaselineModellingModel::exportSections() {
+ITableWorkspace_sptr ALCBaselineModellingModel::exportSections() const {
   if (!m_sections.empty()) {
 
     ITableWorkspace_sptr table = WorkspaceFactory::Instance().createTable("TableWorkspace");
@@ -174,7 +165,7 @@ ITableWorkspace_sptr ALCBaselineModellingModel::exportSections() {
     table->addColumn("double", "Start X");
     table->addColumn("double", "End X");
 
-    for (auto &section : m_sections) {
+    for (auto const &section : m_sections) {
       TableRow newRow = table->appendRow();
       newRow << section.first << section.second;
     }
@@ -187,7 +178,7 @@ ITableWorkspace_sptr ALCBaselineModellingModel::exportSections() {
   }
 }
 
-ITableWorkspace_sptr ALCBaselineModellingModel::exportModel() {
+ITableWorkspace_sptr ALCBaselineModellingModel::exportModel() const {
   if (m_parameterTable) {
 
     return m_parameterTable;
@@ -198,14 +189,10 @@ ITableWorkspace_sptr ALCBaselineModellingModel::exportModel() {
   }
 }
 
-void ALCBaselineModellingModel::setCorrectedData(MatrixWorkspace_sptr data) {
-  m_data = std::move(data);
-  emit correctedDataChanged();
-}
+void ALCBaselineModellingModel::setCorrectedData(MatrixWorkspace_sptr data) { m_data = std::move(data); }
 
 void ALCBaselineModellingModel::setFittedFunction(IFunction_const_sptr function) {
   m_fittedFunction = std::move(function);
-  emit fittedFunctionChanged();
 }
 
 MatrixWorkspace_sptr ALCBaselineModellingModel::data() const {

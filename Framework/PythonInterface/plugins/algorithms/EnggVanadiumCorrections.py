@@ -4,8 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import mtd, AlgorithmFactory, ITableWorkspaceProperty, MatrixWorkspaceProperty, Progress, PropertyMode, PythonAlgorithm
+from mantid.kernel import Direction, IntBoundedValidator
 import mantid.simpleapi as mantid
 
 import numpy as np
@@ -35,7 +35,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
     def PyInit(self):
         self.declareProperty(
             MatrixWorkspaceProperty("Workspace", "", Direction.InOut, PropertyMode.Optional),
-            "Workspace with the diffraction data to correct. The Vanadium corrections " "will be applied on it.",
+            "Workspace with the diffraction data to correct. The Vanadium corrections will be applied on it.",
         )
 
         self.declareProperty(
@@ -58,7 +58,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
             "SplineBreakPoints",
             defaultValue=50,
             validator=IntBoundedValidator(10),
-            doc="Number of break points used when fitting the bank profiles with a spline " "function.",
+            doc="Number of break points used when fitting the bank profiles with a spline function.",
         )
 
         out_vana_grp = "Output parameters (for when calculating corrections)"
@@ -68,7 +68,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
 
         self.declareProperty(
             ITableWorkspaceProperty("IntegrationWorkspace", "", Direction.Input, PropertyMode.Optional),
-            "Workspace with the integrated values for every spectra of the reference " "Vanadium diffraction data. One row per spectrum.",
+            "Workspace with the integrated values for every spectra of the reference Vanadium diffraction data. One row per spectrum.",
         )
 
         self.declareProperty(
@@ -99,7 +99,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
         The sums and fits are done in d-spacing.
         """
         mantid.logger.warning(
-            "EnggVanadiumCorrections is deprecated as of May 2021. Please use a workflow with the " "Integration algorithm instead."
+            "EnggVanadiumCorrections is deprecated as of May 2021. Please use a workflow with the Integration algorithm instead."
         )
         ws = self.getProperty("Workspace").value
         vanadium_ws = self.getProperty("VanadiumWorkspace").value
@@ -222,7 +222,6 @@ class EnggVanadiumCorrections(PythonAlgorithm):
 
         vanadium_integration_ws = mantid.Integration(InputWorkspace=vanadium_ws, StoreInADS=False)
         if 1 != vanadium_integration_ws.blocksize() or vanadium_integration_ws.getNumberHistograms() < vanadium_ws.getNumberHistograms():
-
             raise RuntimeError(
                 "Error while integrating vanadium workspace, the Integration algorithm "
                 "produced a workspace with %d bins and %d spectra. The workspace "
@@ -314,7 +313,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
         self.log().information("Fitting Vanadium curve for bank %s, using function '%s', result: %s" % (bank, function_descriptor, success))
 
         failure_msg = (
-            "It seems that this algorithm failed to to fit a function to the summed " "spectra of a bank. The function definiton was: '%s'"
+            "It seems that this algorithm failed to to fit a function to the summed spectra of a bank. The function definiton was: '%s'"
         ) % function_descriptor
 
         output_params_prop_name = "OutputParameters"
@@ -351,7 +350,7 @@ class EnggVanadiumCorrections(PythonAlgorithm):
         workspace / bank
         """
         if 0 == len(curves_dict):
-            raise RuntimeError("Expecting a dictionary with fitting workspaces from 'Fit' but got an " "empty dictionary")
+            raise RuntimeError("Expecting a dictionary with fitting workspaces from 'Fit' but got an empty dictionary")
         if 1 == len(curves_dict):
             return list(curves_dict.values())[0]
 

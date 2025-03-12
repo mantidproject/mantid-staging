@@ -4,6 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+# ruff: noqa: E741  # Ambiguous variable name
 from mantid.api import PythonAlgorithm, AlgorithmFactory, IMDHistoWorkspaceProperty, PropertyMode, WorkspaceProperty, Progress
 from mantid.kernel import (
     Direction,
@@ -152,12 +153,6 @@ class DeltaPDF3D(PythonAlgorithm):
         sphereMax = self.getProperty("SphereMax").value
         if len(sphereMax) != 1 and len(sphereMax) != 3:
             issues["SphereMax"] = "Must provide 1 or 3 diameters"
-
-        if self.getProperty("WindowFunction").value == "Tukey":
-            import scipy.signal
-
-            if not hasattr(scipy.signal, "tukey"):
-                issues["WindowFunction"] = "Tukey window requires scipy >= 0.16.0"
 
         return issues
 
@@ -383,7 +378,7 @@ class DeltaPDF3D(PythonAlgorithm):
 
         sigma is based on the dat being in a range 0 to 1
         """
-        from scipy.signal import gaussian
+        from scipy.signal.windows import gaussian
 
         return (
             gaussian(width[0], sigma * width[0]).reshape((-1, 1, 1))
@@ -406,7 +401,7 @@ class DeltaPDF3D(PythonAlgorithm):
         alpha = 0 becomes rectangular
         alpha = 1 becomes a Hann window
         """
-        from scipy.signal import tukey
+        from scipy.signal.windows import tukey
 
         return tukey(width[0], alpha).reshape((-1, 1, 1)) * tukey(width[1], alpha).reshape((-1, 1)) * tukey(width[2], alpha)
 

@@ -4,9 +4,9 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.kernel import *
-from mantid.api import *
-from mantid.simpleapi import *
+from mantid.api import AlgorithmFactory, ITableWorkspaceProperty, PythonAlgorithm
+from mantid.kernel import Direction
+from mantid.simpleapi import ConvertTableToMatrixWorkspace, Fit
 
 
 class EnggFitTOFFromPeaks(PythonAlgorithm):
@@ -20,10 +20,9 @@ class EnggFitTOFFromPeaks(PythonAlgorithm):
         return "EnggFitPeaks"
 
     def summary(self):
-        return "The algorithm fits an expected diffraction pattern to a workpace spectrum by " "performing single peak fits."
+        return "The algorithm fits an expected diffraction pattern to a workpace spectrum by performing single peak fits."
 
     def PyInit(self):
-
         self.declareProperty(
             ITableWorkspaceProperty("FittedPeaks", "", Direction.Input),
             doc="Information on fitted peaks, in the format produced by EnggFitPeaks. "
@@ -64,7 +63,6 @@ class EnggFitTOFFromPeaks(PythonAlgorithm):
         return errors
 
     def PyExec(self):
-
         peaks = self.getProperty("FittedPeaks").value
 
         difa, difc, tzero = self._fit_dSpacingTOF(peaks)

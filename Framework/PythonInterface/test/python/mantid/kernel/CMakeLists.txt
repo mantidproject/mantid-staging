@@ -39,6 +39,7 @@ set(TEST_PY_FILES
     RebinParamsValidatorTest.py
     StatisticsTest.py
     StringContainsValidatorTest.py
+    test_funcinspect.py
     TimeSeriesPropertyTest.py
     QuatTest.py
     UnitConversionTest.py
@@ -49,6 +50,7 @@ set(TEST_PY_FILES
     V3DTest.py
     VisibleWhenPropertyTest.py
     VMDTest.py
+    AmendConfigTest.py
 )
 
 check_tests_valid(${CMAKE_CURRENT_SOURCE_DIR} ${TEST_PY_FILES})

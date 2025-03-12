@@ -88,14 +88,15 @@ class PlotsLoader(object):
 
         if len(creation_args) == 0:
             logger.information(
-                "A plot could not be loaded from the save file, as it did not have creation_args. "
-                "The original plot title was: {}".format(plot_dict["label"])
+                "A plot could not be loaded from the save file, as it did not have creation_args. The original plot title was: {}".format(
+                    plot_dict["label"]
+                )
             )
             return
 
         for sublist in creation_args:
             for cargs_dict in sublist:
-                if "norm" in cargs_dict and type(cargs_dict["norm"]) is dict:
+                if "norm" in cargs_dict and isinstance(cargs_dict["norm"], dict):
                     cargs_dict["norm"] = self.restore_normalise_obj_from_dict(cargs_dict["norm"])
         fig, axes_matrix, _, _ = create_subplots(len(creation_args))
         axes_list = axes_matrix.flatten().tolist()

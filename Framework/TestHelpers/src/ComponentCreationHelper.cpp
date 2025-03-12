@@ -30,6 +30,7 @@
 #include "MantidGeometry/Objects/ShapeFactory.h"
 #include "MantidKernel/ConfigService.h"
 #include "MantidKernel/DateAndTime.h"
+#include "MantidKernel/FloatingPointComparison.h"
 #include "MantidKernel/Matrix.h"
 #include "MantidKernel/Quat.h"
 #include "MantidKernel/UnitFactory.h"
@@ -426,11 +427,7 @@ createCylInstrumentWithVerticalOffsetsSpecified(size_t nTubes, std::vector<doubl
  */
 bool double_cmprsn(double x1, double x2) {
   const double TOL(1.e-4);
-  if (std::fabs(x1 + x2) < TOL) {
-    return (std::fabs(x1 - x2) < TOL);
-  } else {
-    return (std::fabs((x1 - x2) / (x1 + x2)) < TOL / 2);
-  }
+  return Mantid::Kernel::withinRelativeDifference(x1, x2, TOL);
 }
 Mantid::Geometry::Instrument_sptr createCylInstrumentWithDetInGivenPositions(const std::vector<double> &L2,
                                                                              const std::vector<double> &polar,
@@ -536,10 +533,12 @@ void addRectangularBank(Instrument &testInstrument, int idStart, int pixels, dou
  * @param pixelSpacing :: padding between pixels
  * @param bankDistanceFromSample :: How far the bank is from the sample
  * @param addMonitor :: whether to add a monitor detector to the instrument
+ * @param instrumentName :: the name of the new instrument
  */
 Instrument_sptr createTestInstrumentRectangular(int num_banks, int pixels, double pixelSpacing,
-                                                double bankDistanceFromSample, bool addMonitor) {
-  auto testInst = std::make_shared<Instrument>("basic_rect");
+                                                double bankDistanceFromSample, bool addMonitor,
+                                                const std::string &instrumentName) {
+  auto testInst = std::make_shared<Instrument>(instrumentName);
 
   for (int banknum = 1; banknum <= num_banks; banknum++) {
     // Make a new bank

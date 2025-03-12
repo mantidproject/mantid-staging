@@ -4,9 +4,9 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, Progress, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import logger, Direction, StringArrayProperty, StringListValidator
 from mantid.simpleapi import CreateWorkspace, GroupWorkspaces
-from mantid.kernel import *
-from mantid.api import *
 
 import numpy as np
 import scipy.constants as sc
@@ -22,14 +22,13 @@ SLICE_HEADER_REGEX = re.compile(r"#slice:\[([0-9]+)[A-z]*\]")
 
 
 class LoadNMoldyn4Ascii1D(PythonAlgorithm):
-
     data_directory = None
 
     def category(self):
         return "Simulation; Inelastic\\DataHandling"
 
     def summary(self):
-        return "Imports 1D dos and vac functions from an nMolDyn 4 output file," "convoluting it with a resolution function if required."
+        return "Imports 1D dos and vac functions from an nMolDyn 4 output file,convoluting it with a resolution function if required."
 
     def PyInit(self):
         self.declareProperty(FileProperty("Directory", "", action=FileAction.Directory), doc=("Path to directory containing dat files"))

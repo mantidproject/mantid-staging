@@ -6,7 +6,8 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init
 import systemtesting
-from mantid.simpleapi import *
+from mantid.api import mtd
+from mantid.simpleapi import CreateWorkspace, Fit, Load, LoadInstrument, LoadSINQFile, PoldiAutoCorrelation, PoldiTruncateData
 import numpy as np
 
 
@@ -63,7 +64,7 @@ class POLDIAutoCorrelationTest(systemtesting.MantidSystemTest):
 
             relativeSlopeError = fitResult.cell(1, 2) / slope
             self.assertLessThan(
-                relativeSlopeError, 5e-4, "Relative error of slope is too large " "for %s (is: %d)" % (dataFile, relativeSlopeError)
+                relativeSlopeError, 5e-4, "Relative error of slope is too large for %s (is: %d)" % (dataFile, relativeSlopeError)
             )
 
             intercept = fitResult.cell(0, 1)
@@ -73,11 +74,11 @@ class POLDIAutoCorrelationTest(systemtesting.MantidSystemTest):
             self.assertLessThan(
                 relativeInterceptError,
                 1,
-                "Relative error of intercept is too large " "for %s (is: %d)" % (dataFile, relativeInterceptError),
+                "Relative error of intercept is too large for %s (is: %d)" % (dataFile, relativeInterceptError),
             )
 
             residuals = mtd[fitNameTemplate + "_Workspace"].dataY(2)
             maxAbsoluteResidual = np.max(np.abs(residuals))
             self.assertLessThan(
-                maxAbsoluteResidual, 1.0, "Maximum absolute residual is too large " "for %s (is: %d)" % (dataFile, maxAbsoluteResidual)
+                maxAbsoluteResidual, 1.0, "Maximum absolute residual is too large for %s (is: %d)" % (dataFile, maxAbsoluteResidual)
             )

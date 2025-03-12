@@ -29,7 +29,7 @@ for iws in range(len(ws_list)):
 
 class FittingPresenterTest(unittest.TestCase):
     def setUp(self):
-        self.view = mock.create_autospec(view.FittingView)
+        self.view = mock.create_autospec(view.FittingView, instance=True)
         self.presenter = presenter.FittingPresenter(self.view)
 
         self.call_in_progress = mock.call(
@@ -205,6 +205,21 @@ class FittingPresenterTest(unittest.TestCase):
         mock_manager.assert_has_calls(
             [mock.call.enable(), mock.call.progress_bar(fitprop_list), mock.call.fit_completed(fitprop_list, [], [], "")]
         )
+
+    def test_fit_done_call_order_failed_fit(self):
+        self.presenter.data_widget.presenter.model.get_all_log_workspaces_names = mock.MagicMock(return_value=[])
+        mock_manager = mock.Mock()
+        self.presenter.enable_view = mock.MagicMock()
+        self.presenter.plot_widget.set_final_state_progress_bar = mock.MagicMock()
+        self.presenter.plot_widget.fit_completed = mock.MagicMock()
+        mock_manager.enable, mock_manager.progress_bar = (
+            self.presenter.enable_view,
+            self.presenter.plot_widget.set_final_state_progress_bar,
+        )
+
+        self.presenter.fit_done([])
+        mock_manager.assert_has_calls([mock.call.enable(), mock.call.progress_bar(None, status="Failed, invalid fit.")])
+        self.presenter.plot_widget.fit_completed.assert_not_called()
 
     def test_enable_view_not_fit_all(self):
         self.presenter.data_widget.view.setEnabled = mock.MagicMock()

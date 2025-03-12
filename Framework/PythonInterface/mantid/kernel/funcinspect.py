@@ -5,79 +5,16 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 """
-    Defines functions that can be used to inspect the properties of a
-    function call. For example
+Defines functions that can be used to inspect the properties of a
+function call. For example
 
-        lhs_info() can be used to get retrieve the names and number of
-                   arguments that are being assigned to a function
-                   return
+    lhs_info() can be used to get retrieve the names and number of
+               arguments that are being assigned to a function
+               return
 """
 
 import inspect
 import dis
-
-
-def replace_signature(func, signature):
-    """
-    Replace the signature of the given function object with that given by
-    varnames
-    :param func: Function whose signature is to be replaced
-    :param signature: A tuple of names of arguments and local variables in Python 2
-                      or a Signature object in Python 3
-    """
-    if hasattr(signature, "parameters"):
-        # A new Signature object
-        setattr(func, "__signature__", signature)
-    else:
-        # Drop this code when we dro Python 2 support
-        # Code object is different in Python 3
-        if hasattr(func, "func_code"):
-            # Version 2
-            code_attr = "func_code"
-            f = func.func_code
-            c = f.__new__(
-                f.__class__,
-                f.co_argcount,
-                f.co_nlocals,
-                f.co_stacksize,
-                f.co_flags,
-                f.co_code,
-                f.co_consts,
-                f.co_names,
-                signature,
-                f.co_filename,
-                f.co_name,
-                f.co_firstlineno,
-                f.co_lnotab,
-                f.co_freevars,
-            )
-        else:
-            code_attr = "__code__"
-            f = func.__code__
-            new_args = [
-                f.__class__,
-                f.co_argcount,
-                f.co_kwonlyargcount,
-                f.co_nlocals,
-                f.co_stacksize,
-                f.co_flags,
-                f.co_code,
-                f.co_consts,
-                f.co_names,
-                signature,
-                f.co_filename,
-                f.co_name,
-                f.co_firstlineno,
-                f.co_lnotab,
-                f.co_freevars,
-            ]
-            # Python 3.8 supports positional-only arguments and has an extra
-            # keyword in the constructor
-            if hasattr(f, "co_posonlyargcount"):
-                new_args.insert(2, f.co_posonlyargcount)
-            c = f.__new__(*new_args)
-        # endif
-        setattr(func, code_attr, c)
 
 
 def customise_func(func, name, signature, docstring):
@@ -87,8 +24,7 @@ def customise_func(func, name, signature, docstring):
     function definition
     :param func: A function object holding the definition
     :param name: The name of the algorithm
-    :param signature: A new signature for the function. Expecting a 2-tuple
-                      of arguments and local variables. See _replace_signature
+    :param signature: A new signature for the function
     :param docstring: A string containing the function documentation
     """
     func.__name__ = str(name)
@@ -106,7 +42,7 @@ class LazyFunctionSignature(inspect.Signature):
     to reduce the time spent initialising algorithms.
     """
 
-    __slots__ = ("_alg_name", "__sig")
+    __slots__ = ("_alg_name", "__sig", "_include_self")
 
     def __init__(self, *args, **kwargs):
         if "alg_name" not in kwargs:
@@ -115,6 +51,11 @@ class LazyFunctionSignature(inspect.Signature):
         else:
             self._alg_name = kwargs.pop("alg_name")
             self.__sig = None
+
+        if "include_self" in kwargs:
+            self._include_self = kwargs.pop("include_self")
+        else:
+            self._include_self = True
 
     @property
     def _signature(self):
@@ -157,8 +98,9 @@ class LazyFunctionSignature(inspect.Signature):
                 # None is not quite accurate here, but we are reproducing the
                 # behavior found in the C++ code for SimpleAPI.
                 parameters.append(Parameter(name, pos_or_keyword, default=None))
-        # Add a self parameter since these are called from a class.
-        parameters.insert(0, Parameter("self", Parameter.POSITIONAL_ONLY))
+        if self._include_self:
+            # Add a self parameter since these are called from a class.
+            parameters.insert(0, Parameter("self", Parameter.POSITIONAL_ONLY))
         return parameters
 
 
@@ -188,7 +130,7 @@ def decompile(code_object):
     Taken from
     http://thermalnoise.wordpress.com/2007/12/30/exploring-python-bytecode/
 
-    Extracts dissasembly information from the byte code and stores it in
+    Extracts disassembly information from the byte code and stores it in
     a list for further use.
 
     Call signature(s):
@@ -219,9 +161,9 @@ def decompile(code_object):
     return instructions
 
 
-# A must list all of the operators that behave like a function calls in byte-code
+# We must list all of the operators that behave like a function calls in byte-code
 # This is for the lhs functionality
-__operator_names = {
+OPERATOR_NAMES = {
     "CALL_FUNCTION",
     "CALL_FUNCTION_VAR",
     "CALL_FUNCTION_KW",
@@ -263,6 +205,11 @@ __operator_names = {
     "CALL_FUNCTION_EX",
     "LOAD_METHOD",
     "CALL_METHOD",
+    "DICT_MERGE",
+    "DICT_UPDATE",
+    "LIST_EXTEND",
+    "SET_UPDATE",
+    "BUILD_CONST_KEY_MAP",
 }
 
 
@@ -289,40 +236,36 @@ def process_frame(frame):
     start_offset = 0
 
     for index, instruction in enumerate(ins_stack):
-        (offset, op, name, argument, argvalue) = instruction
-        if name in __operator_names:
+        offset, _, name, _, _ = instruction
+        if name in OPERATOR_NAMES:
             call_function_locs[start_offset] = (start_index, index)
             start_index = index
             start_offset = offset
 
-    (offset, op, name, argument, argvalue) = ins_stack[-1]
     # Append the index of the last entry to form the last boundary
     call_function_locs[start_offset] = (start_index, len(ins_stack) - 1)
 
-    # last_i should be the offset of a call_function_locs instruction.
-    # We use this to bracket the bit which we are interested in.
-    # Bug:
-    # Some types of call, eg
-    #    def foo(callableObj, *args, **kwargs):
-    #        x = callableObj(*args, **kwargs)
-    #
-    #     foo(FuncUsingLHS, 'Args')
-    #
-    # have the incorrect index at last_i due to the call being passed through
-    # an intermediate reference. Currently this method does not provide the
-    # correct answer and throws a KeyError. Ticket #4186
     output_var_names = []
-    max_returns = []
     last_func_offset = call_function_locs[last_i][0]
-    (offset, op, name, argument, argvalue) = ins_stack[last_func_offset + 1]
+    # On Windows since migrating to Python 3.10, the last instruction index appears
+    # to be one step behind where it should be. We think it's related to the comment
+    # here:
+    # https://github.com/python/cpython/blob/v3.8.3/Python/ceval.c#L1139
+    _, _, last_i_name, _, _ = ins_stack[last_func_offset]
+    next_instruction_offset, _, next_instruction_name, _, _ = ins_stack[last_func_offset + 1]
+    if last_i_name == "DICT_MERGE" and next_instruction_name in OPERATOR_NAMES:
+        last_func_offset += 1
+        last_i = next_instruction_offset
+
+    _, _, name, _, argvalue = ins_stack[last_func_offset + 1]
     if name == "POP_TOP":  # no return values
         pass
-    if name == "STORE_FAST" or name == "STORE_NAME":  # one return value
+    elif name == "STORE_FAST" or name == "STORE_NAME":  # one return value
         output_var_names.append(argvalue)
-    if name == "UNPACK_SEQUENCE":  # Many Return Values, One equal sign
+    elif name == "UNPACK_SEQUENCE":  # Many Return Values, One equal sign
         for index in range(argvalue):
-            (offset_, op_, name_, argument_, argvalue_) = ins_stack[last_func_offset + 2 + index]
-            output_var_names.append(argvalue_)
+            _, _, _, _, sequence_argvalue = ins_stack[last_func_offset + 2 + index]
+            output_var_names.append(sequence_argvalue)
     max_returns = len(output_var_names)
     if name == "DUP_TOP":  # Many Return Values, Many equal signs
         # The output here should be a multi-dim list which mimics the variable unpacking sequence.
@@ -333,24 +276,24 @@ def process_frame(frame):
         count = 0
         max_returns = 0  # Must count the max_returns ourselves in this case
         while count < len(ins_stack[call_function_locs[last_i][0] : call_function_locs[last_i][1]]):
-            (offset_, op_, name_, argument_, argvalue_) = ins_stack[call_function_locs[last_i][0] + count]
-            if name_ == "UNPACK_SEQUENCE":  # Many Return Values, One equal sign
+            _, _, multi_name, _, multi_argvalue = ins_stack[call_function_locs[last_i][0] + count]
+            if multi_name == "UNPACK_SEQUENCE":  # Many Return Values, One equal sign
                 hold = []
-                if argvalue_ > max_returns:
-                    max_returns = argvalue_
-                for index in range(argvalue_):
-                    (_offset_, _op_, _name_, _argument_, _argvalue_) = ins_stack[call_function_locs[last_i][0] + count + 1 + index]
-                    hold.append(_argvalue_)
-                count = count + argvalue_
+                if multi_argvalue > max_returns:
+                    max_returns = multi_argvalue
+                for index in range(multi_argvalue):
+                    _, _, _, _, sequence_argvalue = ins_stack[call_function_locs[last_i][0] + count + 1 + index]
+                    hold.append(sequence_argvalue)
+                count += multi_argvalue
                 output_var_names.append(hold)
             # Need to now skip the entries we just appended with the for loop.
-            if name_ == "STORE_FAST" or name_ == "STORE_NAME":  # One Return Value
-                if 1 > max_returns:
+            if multi_name == "STORE_FAST" or multi_name == "STORE_NAME":  # One Return Value
+                if max_returns == 0:
                     max_returns = 1
-                output_var_names.append(argvalue_)
-            count = count + 1
+                output_var_names.append(multi_argvalue)
+            count += 1
 
-    return (max_returns, tuple(output_var_names))
+    return max_returns, tuple(output_var_names)
 
 
 # -------------------------------------------------------------------------------
@@ -401,13 +344,11 @@ def lhs_info(output_type="both", frame=None):
         del frame
 
     if output_type == "nreturns":
-        ret_vals = ret_vals[0]
+        return ret_vals[0]
     elif output_type == "names":
-        ret_vals = ret_vals[1]
+        return ret_vals[1]
     else:
-        pass
-
-    return ret_vals
+        return ret_vals
 
 
 # -------------------------------------------------------------------------------

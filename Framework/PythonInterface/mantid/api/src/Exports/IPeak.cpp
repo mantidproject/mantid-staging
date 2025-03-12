@@ -11,9 +11,9 @@
 #include "MantidPythonInterface/core/GetPointer.h"
 #include "MantidPythonInterface/core/Policies/MatrixToNumpy.h"
 #include "MantidPythonInterface/core/Policies/RemoveConst.h"
-#include <boost/optional.hpp>
 #include <boost/python/class.hpp>
 #include <boost/python/register_ptr_to_python.hpp>
+#include <optional>
 
 using Mantid::Geometry::IPeak;
 using Mantid::Geometry::ReferenceFrame;
@@ -29,9 +29,10 @@ Mantid::Geometry::PeakShape_sptr getPeakShape(const IPeak &peak) {
   // Use clone to make a copy of the PeakShape.
   return Mantid::Geometry::PeakShape_sptr(peak.getPeakShape().clone());
 }
+void setPeakShape(IPeak &peak, Mantid::Geometry::PeakShape_sptr shape) { peak.setPeakShape(shape->clone()); }
 void setQLabFrame1(IPeak &peak, Mantid::Kernel::V3D qLabFrame) {
   // Set the q lab frame. No explicit detector distance.
-  return peak.setQLabFrame(qLabFrame, boost::none);
+  return peak.setQLabFrame(qLabFrame, std::nullopt);
 }
 void setQLabFrame2(IPeak &peak, Mantid::Kernel::V3D qLabFrame, double distance) {
   // Set the q lab frame. Detector distance specified.
@@ -40,7 +41,7 @@ void setQLabFrame2(IPeak &peak, Mantid::Kernel::V3D qLabFrame, double distance) 
 
 void setQSampleFrame1(IPeak &peak, Mantid::Kernel::V3D qSampleFrame) {
   // Set the qsample frame. No explicit detector distance.
-  return peak.setQSampleFrame(qSampleFrame, boost::none);
+  return peak.setQSampleFrame(qSampleFrame, std::nullopt);
 }
 
 void setQSampleFrame2(IPeak &peak, Mantid::Kernel::V3D qSampleFrame, double distance) {
@@ -81,13 +82,13 @@ void export_IPeak() {
       .def("setIntHKL", &IPeak::setIntHKL, (arg("self"), arg("hkl")), "Set the integer HKL for this peak")
       .def("getSamplePos", &IPeak::getSamplePos, arg("self"),
            "Get the cached samplePos as a :class:`~mantid.kernel.V3D` object")
-      .def("setHKL", (void (IPeak::*)(double, double, double)) & IPeak::setHKL,
+      .def("setHKL", (void(IPeak::*)(double, double, double)) & IPeak::setHKL,
            (arg("self"), arg("h"), arg("k"), arg("l")), "Set the HKL values of this peak")
-      .def("setSamplePos", (void (IPeak::*)(double, double, double)) & IPeak::setSamplePos,
+      .def("setSamplePos", (void(IPeak::*)(double, double, double)) & IPeak::setSamplePos,
            (arg("self"), arg("samX"), arg("samY"), arg("samZ")),
            "Set the samplePos value of this peak.  It does not set the "
            "instrument sample position.")
-      .def("setSamplePos", (void (IPeak::*)(const Mantid::Kernel::V3D &)) & IPeak::setSamplePos,
+      .def("setSamplePos", (void(IPeak::*)(const Mantid::Kernel::V3D &)) & IPeak::setSamplePos,
            (arg("self"), arg("newPos")),
            "Set the samplePos value of this peak.  It does not set the "
            "instrument sample position.")
@@ -181,6 +182,7 @@ void export_IPeak() {
            "Return the L2 flight path length (:class:`~mantid.api.Sample` to "
            ":class:`~mantid.geometry.Detector`), in meters.")
       .def("getPeakShape", getPeakShape, arg("self"), "Get the peak shape")
+      .def("setPeakShape", setPeakShape, (arg("self"), arg("shape")), "Set the peak shape")
       .def("getAbsorptionWeightedPathLength", &IPeak::getAbsorptionWeightedPathLength, arg("self"),
            "Get the absorption weighted path length")
       .def("getReferenceFrame", (std::shared_ptr<const ReferenceFrame>(IPeak::*)()) & IPeak::getReferenceFrame,

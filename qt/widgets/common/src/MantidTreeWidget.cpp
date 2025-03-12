@@ -127,7 +127,7 @@ void MantidTreeWidget::mouseDoubleClickEvent(QMouseEvent *e) {
     auto wsName = wsNames.front();
     Mantid::API::WorkspaceGroup_sptr grpWSPstr;
     grpWSPstr = std::dynamic_pointer_cast<WorkspaceGroup>(m_ads.retrieve(wsName.toStdString()));
-    if (!grpWSPstr) {
+    if (!grpWSPstr || grpWSPstr->isGroupPeaksWorkspaces()) {
       if (!wsName.isEmpty()) {
         m_doubleClickAction(wsName);
         return;
@@ -225,12 +225,9 @@ MantidWSIndexWidget::UserInput MantidTreeWidget::chooseSpectrumFromSelected(bool
   if (isAdvanced) {
     plotImmediately = selectedMatrixWsList.size() == 1 && selectedMatrixWsList[0]->getNumberHistograms() == 1;
   } else {
-    foreach (const auto selectedMatrixWs, selectedMatrixWsList) {
-      if (selectedMatrixWs->getNumberHistograms() != 1) {
-        plotImmediately = false;
-        break;
-      }
-    }
+    plotImmediately =
+        std::none_of(selectedMatrixWsList.cbegin(), selectedMatrixWsList.cend(),
+                     [](const auto &selectedMatrixWs) { return selectedMatrixWs->getNumberHistograms() != 1; });
   }
 
   // ... and if so, just return all workspace names mapped to workspace index 0;

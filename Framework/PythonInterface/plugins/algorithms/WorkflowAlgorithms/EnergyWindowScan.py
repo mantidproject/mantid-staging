@@ -4,30 +4,25 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import mtd, AlgorithmFactory, DataProcessorAlgorithm, FileAction, FileProperty, Progress, PropertyMode, WorkspaceProperty
+from mantid.kernel import (
+    logger,
+    Direction,
+    FloatArrayProperty,
+    IntArrayMandatoryValidator,
+    IntArrayProperty,
+    Property,
+    StringArrayProperty,
+    StringListValidator,
+)
 from mantid import config
 
 import os
 
 
-def _str_or_none(s):
-    if s != "":
-        return s
-    else:
-        return None
-
-
 def _ws_or_none(s):
     if s != "":
         return mtd[s]
-    else:
-        return None
-
-
-def _elems_or_none(l):
-    if len(l) != 0:
-        return l
     else:
         return None
 
@@ -136,12 +131,11 @@ class EnergyWindowScan(DataProcessorAlgorithm):
         self.declareProperty(name="ScanWorkspace", defaultValue="Scan", doc="Workspace for the scan results.")
 
     def PyExec(self):
-
         self._setup()
 
         process_prog = Progress(self, start=0.1, end=0.9, nreports=4)
         process_prog.report("Energy Transfer")
-        scan_alg = self.createChildAlgorithm("ISISIndirectEnergyTransferWrapper", 0.05, 0.95)
+        scan_alg = self.createChildAlgorithm("ISISIndirectEnergyTransfer", 0.05, 0.95)
         scan_alg.setProperty("InputFiles", self._data_files)
         scan_alg.setProperty("SumFiles", self._sum_files)
         scan_alg.setProperty("LoadLogFiles", self._load_logs)
@@ -158,7 +152,7 @@ class EnergyWindowScan(DataProcessorAlgorithm):
         scan_alg.setProperty("FoldMultipleFrames", self._fold_multiple_frames)
         scan_alg.setProperty("GroupingMethod", self._grouping_method)
         scan_alg.setProperty("GroupingWorkspace", self._grouping_ws)
-        scan_alg.setProperty("MapFile", self._grouping_map_file)
+        scan_alg.setProperty("GroupingFile", self._grouping_map_file)
         scan_alg.setProperty("UnitX", self._output_x_units)
         scan_alg.setProperty("OutputWorkspace", self._output_ws)
         scan_alg.execute()

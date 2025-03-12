@@ -5,13 +5,10 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import unittest
-import sys
 import math
 from testhelpers import create_algorithm, run_algorithm, can_be_instantiated, WorkspaceCreationHelper
 from mantid.api import (
     MatrixWorkspace,
-    MatrixWorkspaceProperty,
-    WorkspaceProperty,
     Workspace,
     ExperimentInfo,
     AnalysisDataService,
@@ -19,7 +16,7 @@ from mantid.api import (
     NumericAxis,
 )
 from mantid.geometry import Detector
-from mantid.kernel import Direction, V3D
+from mantid.kernel import V3D
 from mantid.simpleapi import CreateSampleWorkspace, Rebin
 import numpy as np
 
@@ -43,6 +40,7 @@ class MatrixWorkspaceTest(unittest.TestCase):
         self.assertEqual(self._test_ws.id(), "Workspace2D")
         self.assertEqual(self._test_ws.name(), "")
         self.assertEqual(self._test_ws.getTitle(), "Test histogram")
+        self.assertEqual(self._test_ws.getPlotType(), "plot")
         self.assertEqual(self._test_ws.getComment(), "")
         self.assertEqual(self._test_ws.isDirty(), False)
         self.assertGreater(self._test_ws.getMemorySize(), 0.0)
@@ -368,7 +366,7 @@ class MatrixWorkspaceTest(unittest.TestCase):
     def test_complex_binary_ops_do_not_leave_temporary_workspaces_behind(self):
         run_algorithm("CreateWorkspace", OutputWorkspace="ca", DataX=[1.0, 2.0, 3.0], DataY=[2.0, 3.0], DataE=[2.0, 3.0], UnitX="TOF")
         ads = AnalysisDataService
-        w1 = (ads["ca"] * 0.0) + 1.0
+        w1 = (ads["ca"] * 0.0) + 1.0  # noqa: F841
 
         self.assertTrue("w1" in ads)
         self.assertTrue("ca" in ads)
@@ -397,6 +395,21 @@ class MatrixWorkspaceTest(unittest.TestCase):
         ws1.setComment(comment)
         self.assertEqual(comment, ws1.getComment())
         AnalysisDataService.remove(ws1.name())
+
+    def test_setPlotType(self):
+        run_algorithm("CreateWorkspace", OutputWorkspace="ws1", DataX=[1.0, 2.0, 3.0], DataY=[2.0, 3.0], DataE=[2.0, 3.0], UnitX="TOF")
+        ws1 = AnalysisDataService["ws1"]
+
+        # test default
+        self.assertEqual("plot", ws1.getPlotType())
+
+        # test invalid doesn't take
+        ws1.setPlotType("invalid")
+        self.assertEqual("plot", ws1.getPlotType())
+
+        # test valid takes
+        ws1.setPlotType("marker")
+        self.assertEqual("marker", ws1.getPlotType())
 
     def test_setGetMonitorWS(self):
         run_algorithm("CreateWorkspace", OutputWorkspace="ws1", DataX=[1.0, 2.0, 3.0], DataY=[2.0, 3.0], DataE=[2.0, 3.0], UnitX="TOF")

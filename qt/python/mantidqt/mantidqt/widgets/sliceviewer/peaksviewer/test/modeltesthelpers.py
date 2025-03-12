@@ -4,8 +4,8 @@
 #     NScD Oak Ridge National Laboratory, European Spallation Source
 #     & Institut Laue - Langevin
 # SPDX - License - Identifier: GPL - 3.0 +
-"""A collection of functions to share creating models for tests
-"""
+"""A collection of functions to share creating models for tests"""
+
 # std imports
 from unittest.mock import MagicMock, create_autospec
 
@@ -45,7 +45,7 @@ def create_peaks_viewer_model(centers, fg_color, name=None):
     def remove_peak(peak_number: int):
         return peak_number
 
-    model = PeaksViewerModel(create_autospec(PeaksWorkspace), fg_color, "unused")
+    model = PeaksViewerModel(create_autospec(PeaksWorkspace, instance=True), fg_color, "unused")
     if name is not None:
         model.ws.name.return_value = name
     model.ws.__iter__.return_value = peaks

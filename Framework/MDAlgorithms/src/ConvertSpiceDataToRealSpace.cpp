@@ -347,7 +347,7 @@ void ConvertSpiceDataToRealSpace::readTableInfo(const TableWorkspace_const_sptr 
   for (size_t icol = 0; icol < colnames.size(); ++icol) {
     const std::string &colname = colnames[icol];
 
-    if (boost::starts_with(colname, anodelogprefix)) {
+    if (colname.starts_with(anodelogprefix)) {
       // anode
       std::vector<std::string> terms;
       boost::split(terms, colname, boost::is_any_of(anodelogprefix));
@@ -567,7 +567,7 @@ ConvertSpiceDataToRealSpace::createDataMDWorkspace(const std::vector<MatrixWorks
       data[2] = static_cast<float>(detPos.Z());
       inserter.insertMDEvent(signal, error * error, runnumber, 0, detid, data);
     } // ENDFOR(spectrum)
-  }   // ENDFOR (workspace)
+  } // ENDFOR (workspace)
 
   return outWs;
 }
@@ -639,7 +639,7 @@ ConvertSpiceDataToRealSpace::createMonitorMDWorkspace(const std::vector<MatrixWo
       data[2] = static_cast<float>(detPos.Z());
       inserter.insertMDEvent(signal, error * error, runnumber, 0, detid, data);
     } // ENDFOR(spectrum)
-  }   // ENDFOR (workspace)
+  } // ENDFOR (workspace)
 
   return outWs;
 }

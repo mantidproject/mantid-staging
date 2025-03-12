@@ -10,7 +10,7 @@ from unittest import mock
 from mantid.kernel import PropertyManagerDataService
 from mantid.kernel import config
 from sans.command_interface.batch_csv_parser import BatchCsvParser
-from sans.common.enums import SANSFacility, ReductionDimensionality, SaveType, RowState
+from sans.common.enums import SANSFacility, ReductionDimensionality, SaveType, RowState, OutputMode
 from sans.common.enums import SANSInstrument
 from sans.gui_logic.models.RowEntries import RowEntries
 from sans.gui_logic.models.file_loading import UserFileLoadException
@@ -83,13 +83,14 @@ class RunTabPresenterTest(unittest.TestCase):
         self._backup_instrument = config["default.instrument"]
         self._backup_datasearch_dirs = config["datasearch.directories"]
         self._backup_save_dir = config["defaultsave.directory"]
+        self._backup_sans_plot_results = config["sans.isis_sans.plotResults"]
 
         config["default.facility"] = "ISIS"
 
-        self._mock_model = mock.create_autospec(StateGuiModel, spec_set=True)
-        self.mock_run_tab_model = mock.create_autospec(RunTabModel(), spec_set=True)
-        self._mock_table = mock.create_autospec(TableModel, spec_set=True)
-        self._mock_csv_parser = mock.create_autospec(BatchCsvParser, spec_set=True)
+        self._mock_model = mock.create_autospec(StateGuiModel, spec_set=True, instance=True)
+        self.mock_run_tab_model = mock.create_autospec(RunTabModel(), spec_set=True, instance=True)
+        self._mock_table = mock.create_autospec(TableModel, spec_set=True, instance=True)
+        self._mock_csv_parser = mock.create_autospec(BatchCsvParser, spec_set=True, instance=True)
         self._mock_view = mock.Mock()
 
         self.view_observers = SansGuiObservable()
@@ -121,6 +122,7 @@ class RunTabPresenterTest(unittest.TestCase):
         config["default.instrument"] = self._backup_instrument
         config["datasearch.directories"] = self._backup_datasearch_dirs
         config["defaultsave.directory2"] = self._backup_save_dir
+        config["sans.isis_sans.plotResults"] = self._backup_sans_plot_results
 
     def test_that_will_load_user_file(self):
         # Setup self.presenter.and mock view
@@ -255,7 +257,6 @@ class RunTabPresenterTest(unittest.TestCase):
                 ConfigService=mock.DEFAULT,
                 os=mock.DEFAULT,
             ) as mock_datasearch:
-
                 mock_datasearch["add_dir_to_datasearch"].return_value = (mock.Mock(), mock.Mock())
                 self.presenter.on_batch_file_load()
 
@@ -278,7 +279,7 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertEqual(self.mock_run_tab_model.get_save_types.return_value, self._mock_view.save_types)
 
     def test_observers_subscribed_to(self):
-        mocked_view_observers = mock.create_autospec(SansGuiObservable())
+        mocked_view_observers = mock.create_autospec(SansGuiObservable, instance=True)
         self._mock_view.get_observable = mock.Mock(return_value=mocked_view_observers)
         presenter = RunTabPresenter(facility=SANSFacility.ISIS, run_tab_model=self.mock_run_tab_model, view=self._mock_view)
 
@@ -290,9 +291,18 @@ class RunTabPresenterTest(unittest.TestCase):
         self.view_observers.save_options.notify_subscribers()
         self.mock_run_tab_model.update_save_types.assert_called_once_with(self._mock_view.save_types)
 
-    def test_on_reduction_options_changed_called(self):
+    def test_on_reduction_options_changed(self):
+        self._mock_view.output_mode = OutputMode.SAVE_TO_FILE
         self.view_observers.reduction_dim.notify_subscribers()
         self.mock_run_tab_model.update_reduction_mode.assert_called_once_with(self._mock_view.reduction_dimensionality)
+        self._mock_view.enable_can_sas_1D_button.assert_called_once()
+
+    def test_on_reduction_options_changed_called_2D(self):
+        self._mock_view.output_mode = OutputMode.SAVE_TO_FILE
+        self._mock_view.reduction_dimensionality = ReductionDimensionality.TWO_DIM
+        self.view_observers.reduction_dim.notify_subscribers()
+        self.mock_run_tab_model.update_reduction_mode.assert_called_once_with(self._mock_view.reduction_dimensionality)
+        self._mock_view.disable_can_sas_1D_button.assert_called_once()
 
     def test_on_reduction_options_changed_updates_save_opts(self):
         self.view_observers.reduction_dim.notify_subscribers()
@@ -345,7 +355,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter.update_view_from_table_model.assert_called_with()
 
     def test_that_all_columns_shown_when_multi_period_is_true(self):
-
         self.presenter.set_view(mock.MagicMock())
 
         self.presenter.on_multiperiod_changed(True)
@@ -353,12 +362,25 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._view.show_period_columns.assert_called_once_with()
 
     def test_that_period_columns_hidden_when_multi_period_is_false(self):
-
         self.presenter.set_view(mock.MagicMock())
 
         self.presenter.on_multiperiod_changed(False)
 
         self.presenter._view.hide_period_columns.assert_called_once_with()
+
+    def test_that_all_columns_shown_when_background_subtraction_is_true(self):
+        self.presenter.set_view(mock.MagicMock())
+
+        self.presenter.on_background_subtraction_view_changed(True)
+
+        self.presenter._view.show_background_subtraction.assert_called_once_with()
+
+    def test_that_all_columns_hidden_when_background_subtraction_is_false(self):
+        self.presenter.set_view(mock.MagicMock())
+
+        self.presenter.on_background_subtraction_view_changed(False)
+
+        self.presenter._view.hide_background_subtraction.assert_called_once_with()
 
     def test_on_data_changed_updates_table_model(self):
         self.presenter._beam_centre_presenter = mock.Mock()
@@ -382,7 +404,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter.update_view_from_table_model.assert_called_with()
 
     def test_setup_instrument_specific_settings(self):
-
         self.presenter.set_view(mock.MagicMock())
         self.presenter._beam_centre_presenter = mock.MagicMock()
         self.presenter._workspace_diagnostic_presenter = mock.MagicMock()
@@ -507,7 +528,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertEqual(self.presenter._view.progress_bar_value, 1)
 
     def test_that_update_progress_sets_correctly(self):
-
         view = mock.MagicMock()
         self.presenter.set_view(view)
 
@@ -517,7 +537,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertEqual(view.progress_bar_maximum, 200)
 
     def test_that_notify_progress_updates_state_and_tooltip_of_row(self):
-
         view = mock.MagicMock()
         self.presenter.set_view(view)
         self.presenter.on_row_appended()
@@ -528,7 +547,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertEqual(self.presenter._table_model.get_row(0).tool_tip, None)
 
     def test_that_process_selected_does_nothing_if_no_states_selected(self):
-
         view = mock.MagicMock()
         view.get_selected_rows = mock.MagicMock(return_value=[])
         self.presenter.set_view(view)
@@ -568,7 +586,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._process_rows.assert_called_with(expected)
 
     def test_that_process_selected_ignores_all_empty_rows(self):
-
         view = mock.MagicMock()
         view.get_selected_rows = mock.MagicMock(return_value=[0, 1])
         self.presenter.set_view(view)
@@ -587,7 +604,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._process_rows.assert_called_with([populated_row])
 
     def test_that_process_all_ignores_empty_rows(self):
-
         view = mock.MagicMock()
         view.get_selected_rows = mock.MagicMock(return_value=[0, 1])
         self.presenter.set_view(view)
@@ -630,7 +646,7 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertEqual(
             self._mock_csv_parser.save_batch_file.call_count,
             0,
-            "_save_batch_file should not have been called." " It was called {} times.".format(self.presenter._export_table.call_count),
+            "_save_batch_file should not have been called. It was called {} times.".format(self.presenter._export_table.call_count),
         )
 
     def test_buttons_enabled_after_export_table_fails(self):
@@ -673,7 +689,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._view.add_runs_presenter.handle_new_save_directory.assert_called_once_with("a_new_directory")
 
     def test_that_validate_output_modes_raises_if_no_file_types_selected_for_file_mode(self):
-
         view = mock.MagicMock()
 
         view.save_types = [SaveType.NO_TYPE]
@@ -698,7 +713,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.assertRaises(ValueError, self.presenter._validate_output_modes)
 
     def test_that_validate_output_modes_does_not_raise_if_no_file_types_selected_for_memory_mode(self):
-
         view = mock.MagicMock()
         view.save_types = [SaveType.NO_TYPE]
 
@@ -710,7 +724,7 @@ class RunTabPresenterTest(unittest.TestCase):
         try:
             self.presenter._validate_output_modes()
         except RuntimeError:
-            self.fail("Did not expect _validate_output_modes to fail when no file types are selected " "for memory output mode.")
+            self.fail("Did not expect _validate_output_modes to fail when no file types are selected for memory output mode.")
 
     def test_that_switching_to_memory_mode_disables_all_file_type_buttons(self):
         """This tests that all file type buttons are disabled when memory mode is selected."""
@@ -729,7 +743,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._view.enable_file_type_buttons.assert_called_once()
 
     def test_that_on_reduction_mode_changed_calls_update_front_if_selection_is_HAB(self):
-
         self.presenter._beam_centre_presenter = mock.MagicMock()
 
         self.presenter.on_reduction_mode_selection_has_changed("Hab")
@@ -740,7 +753,6 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._beam_centre_presenter.update_front_selected.assert_called_once_with()
 
     def test_that_on_reduction_mode_changed_calls_update_rear_if_selection_is_LAB(self):
-
         self.presenter._beam_centre_presenter = mock.MagicMock()
 
         self.presenter.on_reduction_mode_selection_has_changed("rear")
@@ -757,6 +769,23 @@ class RunTabPresenterTest(unittest.TestCase):
         self.presenter._beam_centre_presenter.reset_mock()
         self.presenter.on_reduction_mode_selection_has_changed("rear-detector")
         self.presenter._beam_centre_presenter.update_rear_selected.assert_called_once_with()
+
+    def test_plot_results_visibility_on(self):
+        self._test_plot_results_visibility("On", True)
+
+    def test_plot_results_visibility_off(self):
+        self._test_plot_results_visibility("Off", False)
+
+    def test_plot_results_visibility_when_not_set(self):
+        self._test_plot_results_visibility("", False)
+
+    def _test_plot_results_visibility(self, config_value, expected_visibility):
+        config.setString("sans.isis_sans.plotResults", config_value)
+
+        self.presenter._view.set_plot_results_checkbox_visibility = mock.Mock()
+        self.presenter.hide_or_show_plot_results_checkbox_based_on_user_properties()
+
+        self.presenter._view.set_plot_results_checkbox_visibility.assert_called_once_with(expected_visibility)
 
     @staticmethod
     def _clear_property_manager_data_service():

@@ -92,7 +92,7 @@ void QtMainWindowView::initLayout() {
       RunsPresenterFactory(std::move(makeRunsTablePresenter), thetaTolerance, instruments, messageHandler, fileHandler);
 
   auto makeEventPresenter = EventPresenterFactory();
-  auto makeSaveSettingsPresenter = SavePresenterFactory();
+  auto makeSaveSettingsPresenter = SavePresenterFactory(fileHandler);
   auto makeExperimentPresenter = ExperimentPresenterFactory(fileHandler, thetaTolerance);
   auto makeInstrumentPresenter = InstrumentPresenterFactory(fileHandler, messageHandler);
   auto makePreviewPresenter = PreviewPresenterFactory();
@@ -261,7 +261,11 @@ bool QtMainWindowView::fileExists(std::string const &filepath) const {
 }
 
 std::string QtMainWindowView::getFullFilePath(const std::string &filename) const {
-  return FileFinder::Instance().getFullPath(filename);
+  try {
+    return FileFinder::Instance().getFullPath(filename);
+  } catch (const Poco::PathSyntaxException &) {
+    return "";
+  }
 }
 
 } // namespace CustomInterfaces::ISISReflectometry

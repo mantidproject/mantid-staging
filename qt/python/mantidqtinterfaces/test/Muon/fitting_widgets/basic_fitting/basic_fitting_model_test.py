@@ -131,7 +131,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_current_dataset_index_will_raise_if_the_index_is_greater_than_or_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.current_dataset_index = 2
 
     def test_that_current_dataset_index_will_set_the_current_dataset_index_as_expected(self):
@@ -163,7 +163,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_setting_the_start_xs_will_raise_if_the_number_of_xs_is_not_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.start_xs = [0.0]
 
     def test_that_it_is_possible_to_set_the_current_start_x_as_expected(self):
@@ -195,7 +195,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_setting_the_end_xs_will_raise_if_the_number_of_xs_is_not_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.end_xs = [10.0]
 
     def test_that_it_is_possible_to_set_the_current_end_x_as_expected(self):
@@ -246,7 +246,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_setting_the_single_fit_function_will_raise_if_the_number_of_functions_is_not_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.single_fit_functions = [self.fit_function]
 
     def test_that_clear_single_fit_functions_will_clear_the_single_fit_functions_as_expected(self):
@@ -312,7 +312,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_setting_the_fit_statuses_will_raise_if_the_number_of_fit_statuses_is_not_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.fit_statuses = ["success"]
 
     def test_it_is_possible_to_set_the_currently_selected_fit_status(self):
@@ -326,7 +326,7 @@ class BasicFittingModelTest(unittest.TestCase):
 
     def test_that_setting_the_chi_squared_will_raise_if_the_number_of_chi_squared_is_not_equal_to_the_number_of_datasets(self):
         self.model.dataset_names = self.dataset_names
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(AssertionError):
             self.model.chi_squared = [0.0]
 
     def test_it_is_possible_to_set_the_currently_selected_chi_squared(self):
@@ -507,15 +507,15 @@ class BasicFittingModelTest(unittest.TestCase):
         self.model._double_pulse_enabled = mock.Mock(return_value=False)
         self.model._get_plot_guess_name = mock.Mock(return_value=guess_workspace_name)
         with mock.patch(
-            "mantidqtinterfaces.Muon.GUI.Common.fitting_widgets.basic_fitting." "basic_fitting_model.EvaluateFunction"
+            "mantidqtinterfaces.Muon.GUI.Common.fitting_widgets.basic_fitting.basic_fitting_model.evaluate_function", autospec=True
         ) as mock_evaluate:
             self.model._get_guess_parameters = mock.Mock(return_value=["func", "ws"])
             self.model.update_plot_guess()
             mock_evaluate.assert_called_with(
-                InputWorkspace=mock.ANY, Function=self.model.current_single_fit_function, OutputWorkspace=guess_workspace_name
+                input_ws_name=mock.ANY, fun=self.model.current_single_fit_function, out_ws_name=guess_workspace_name
             )
 
-    @mock.patch("mantidqtinterfaces.Muon.GUI.Common.fitting_widgets.basic_fitting.basic_fitting_model.EvaluateFunction")
+    @mock.patch("mantidqtinterfaces.Muon.GUI.Common.fitting_widgets.basic_fitting.basic_fitting_model.evaluate_function", autospec=True)
     def test_update_plot_guess_notifies_subscribers_with_the_guess_workspace_name_if_plot_guess_is_true(self, mock_evaluate):
         guess_workspace_name = "__frequency_domain_analysis_fitting_guessName1"
         self.model.dataset_names = self.dataset_names
@@ -532,9 +532,8 @@ class BasicFittingModelTest(unittest.TestCase):
         self.mock_context_guess_workspace_name = mock.PropertyMock(return_value=guess_workspace_name)
         type(self.model.fitting_context).guess_workspace_name = self.mock_context_guess_workspace_name
         self.model.update_plot_guess()
-
         mock_evaluate.assert_called_with(
-            InputWorkspace=mock.ANY, Function=self.model.current_single_fit_function, OutputWorkspace=guess_workspace_name
+            input_ws_name=mock.ANY, fun=self.model.current_single_fit_function, out_ws_name=guess_workspace_name
         )
 
         self.assertEqual(1, self.mock_context_guess_workspace_name.call_count)
@@ -915,7 +914,6 @@ class BasicFittingModelTest(unittest.TestCase):
         make_group.assert_called_once_with(["ws"], "group")
 
     def test_set_current_start_and_end_x_as_expected(self):
-
         self.model.dataset_names = self.dataset_names
         self.model.current_dataset_index = 0
         self.model.start_xs = [0.0, 0.0]
@@ -931,7 +929,6 @@ class BasicFittingModelTest(unittest.TestCase):
         self.assertEqual(self.model.current_end_x, new_end_x)
 
     def test_set_current_start_and_end_x_with_start_bigger_end(self):
-
         self.model.dataset_names = self.dataset_names
         self.model.current_dataset_index = 0
         self.model.start_xs = [0.0, 0.0]
@@ -947,7 +944,6 @@ class BasicFittingModelTest(unittest.TestCase):
         self.assertEqual(self.model.current_end_x, new_end_x)
 
     def test_set_current_start_and_end_x_fail(self):
-
         self.model.dataset_names = self.dataset_names
         self.model.current_dataset_index = 0
         self.model.start_xs = [0.0, 0.0]

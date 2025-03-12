@@ -4,7 +4,8 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" This module contains bundle definitions for passing reduction settings between functions."""
+"""This module contains bundle definitions for passing reduction settings between functions."""
+
 from collections import namedtuple
 
 # The ReductionSettingBundle contains the information and data for starting a SANSReductionCore reduction.
@@ -19,7 +20,7 @@ from collections import namedtuple
 # 8. A handle to the direct workspace (sample or can)
 from typing import List
 
-from mantid.py36compat import dataclass
+from dataclasses import dataclass
 from sans.state.StateObjects.wavelength_interval import WavRange
 
 ReductionSettingBundle = namedtuple(
@@ -52,10 +53,10 @@ OutputBundle = namedtuple("OutputBundle", "state, data_type, reduction_mode, out
 # 4. Handle to the partial output workspace which contains the counts.
 # 5. Handle to the partial output workspace which contains the normalization.
 
-OutputPartsBundle = namedtuple("OutputPartsBundle", "state, data_type, reduction_mode, " "output_workspace_count, output_workspace_norm")
+OutputPartsBundle = namedtuple("OutputPartsBundle", "state, data_type, reduction_mode, output_workspace_count, output_workspace_norm")
 
 OutputTransmissionBundle = namedtuple(
-    "OutputTransmissionBundle", "state, data_type, calculated_transmission_workspace," " unfitted_transmission_workspace"
+    "OutputTransmissionBundle", "state, data_type, calculated_transmission_workspace, unfitted_transmission_workspace"
 )
 
 # Bundles for event slice data

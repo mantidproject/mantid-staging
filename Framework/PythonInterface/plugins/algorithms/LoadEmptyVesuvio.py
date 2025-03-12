@@ -5,8 +5,8 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init
-from mantid.kernel import *
-from mantid.api import *
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm, WorkspaceProperty
+from mantid.kernel import config, Direction
 
 import os
 
@@ -118,7 +118,7 @@ class LoadEmptyVesuvio(PythonAlgorithm):
         try:
             return IP_HEADERS[len(columns)]
         except KeyError:
-            raise ValueError("Unknown format for IP file. Currently support 5/6 column " "variants. ncols=%d" % (len(columns)))
+            raise ValueError("Unknown format for IP file. Currently support 5/6 column variants. ncols=%d" % (len(columns)))
 
 
 # ----------------------------------------------------------------------------------------

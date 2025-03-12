@@ -6,8 +6,10 @@
 // SPDX - License - Identifier: GPL - 3.0 +
 #pragma once
 
+#include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidAPI/Run.h"
 #include "MantidDataHandling/DllConfig.h"
+#include "MantidKernel/Quat.h"
 #include "MantidNexus/NexusClasses.h"
 
 namespace Mantid {
@@ -55,8 +57,8 @@ NeXus::NXDouble getDoubleDataset(const NeXus::NXEntry &, const std::string &);
 
 void replaceZeroErrors(const API::MatrixWorkspace_sptr &, double);
 
-void recurseAndAddNexusFieldsToWsRun(NXhandle nxfileID, API::Run &runDetails, std::string &parent_name,
-                                     std::string &parent_class, int level, bool useFullPath);
+void recurseAndAddNexusFieldsToWsRun(NXhandle nxfileID, API::Run &runDetails, const std::string &parent_name,
+                                     const std::string &parent_class, int level, bool useFullPath);
 } // namespace LoadHelper
 } // namespace DataHandling
 } // namespace Mantid

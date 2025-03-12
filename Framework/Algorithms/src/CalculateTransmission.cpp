@@ -130,7 +130,7 @@ void CalculateTransmission::exec() {
   const bool usingSameInstrument = sampleWS->getInstrument()->getName() == directWS->getInstrument()->getName();
   if (!usingSameInstrument)
     throw std::invalid_argument("The input workspaces do not come from the same instrument.");
-  if (!WorkspaceHelpers::matchingBins(*sampleWS, *directWS))
+  if (!WorkspaceHelpers::matchingBins(sampleWS, directWS))
     throw std::invalid_argument("The input workspaces do not have matching bins.");
 
   bool usingMonitor = !isEmpty(transMonitorID);
@@ -301,7 +301,7 @@ API::MatrixWorkspace_sptr CalculateTransmission::fit(const API::MatrixWorkspace_
 
     // Now fit this to a straight line
     output = fitData(output, grad, offset);
-  }                                 // logFit true
+  } // logFit true
   else if (fitMethod == "Linear") { // Linear fit
     g_log.debug("Fitting directly to the data (i.e. linearly)");
     output = fitData(output, grad, offset);

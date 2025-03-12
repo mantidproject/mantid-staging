@@ -43,7 +43,6 @@ set(PYTHON_PLUGINS
     algorithms/DNSFlippingRatioCorr.py
     algorithms/DNSMergeRuns.py
     algorithms/DPDFreduction.py
-    algorithms/DSFinterp.py
     algorithms/DakotaChiSquared.py
     algorithms/DeltaPDF3D.py
     algorithms/LoadElementalAnalysisData.py
@@ -70,6 +69,8 @@ set(PYTHON_PLUGINS
     algorithms/FindGoniometerFromUB.py
     algorithms/FindGlobalBMatrix.py
     algorithms/FindSatellitePeaks.py
+    algorithms/FindSXPeaksConvolve.py
+    algorithms/FindMultipleUMatrices.py
     algorithms/FitGaussian.py
     algorithms/FitIncidentSpectrum.py
     algorithms/GSASIIRefineFitPeaks.py
@@ -90,8 +91,10 @@ set(PYTHON_PLUGINS
     algorithms/IndexSatellitePeaks.py
     algorithms/IndirectTransmission.py
     algorithms/InelasticEMUauReduction.py
+    algorithms/IntegratePeaks1DProfile.py
     algorithms/IntegratePeaksProfileFitting.py
     algorithms/IntegratePeaksSkew.py
+    algorithms/IntegratePeaksShoeboxTOF.py
     algorithms/LRAutoReduction.py
     algorithms/LRDirectBeamSort.py
     algorithms/LRPeakSelection.py
@@ -169,6 +172,8 @@ set(PYTHON_PLUGINS
     algorithms/SaveGSSCW.py
     algorithms/SaveHKLCW.py
     algorithms/SaveINS.py
+    algorithms/SaveISISReflectometryORSO.py
+    algorithms/SaveMDHistoToVTK.py
     algorithms/SaveNexusPD.py
     algorithms/SaveP2D.py
     algorithms/SavePlot1DAsJson.py
@@ -184,6 +189,7 @@ set(PYTHON_PLUGINS
     algorithms/CNCSSuggestTIB.py
     algorithms/HYSPECSuggestTIB.py
     algorithms/Symmetrise.py
+    algorithms/SymmetriseMDHisto.py
     algorithms/TOFTOFCropWorkspace.py
     algorithms/TOFTOFMergeRuns.py
     algorithms/TestWorkspaceGroupProperty.py
@@ -208,7 +214,10 @@ set(PYTHON_PLUGINS
     algorithms/WorkflowAlgorithms/AddSampleLogMultiple.py
     algorithms/WorkflowAlgorithms/ApplyPaalmanPingsCorrection.py
     algorithms/WorkflowAlgorithms/BayesQuasi.py
+    algorithms/WorkflowAlgorithms/BayesQuasi2.py
     algorithms/WorkflowAlgorithms/BayesStretch.py
+    algorithms/WorkflowAlgorithms/BayesStretch2.py
+    algorithms/WorkflowAlgorithms/quickBayesHelper.py
     algorithms/WorkflowAlgorithms/CalculateMonteCarloAbsorption.py
     algorithms/WorkflowAlgorithms/ConvertMultipleRunsToSingleCrystalMD.py
     algorithms/WorkflowAlgorithms/CorelliPowderCalibrationCreate.py
@@ -232,11 +241,11 @@ set(PYTHON_PLUGINS
     algorithms/WorkflowAlgorithms/FindPeaksAutomatic.py
     algorithms/WorkflowAlgorithms/FitGaussianPeaks.py
     algorithms/WorkflowAlgorithms/FlatPlatePaalmanPingsCorrection.py
+    algorithms/WorkflowAlgorithms/HFIRGoniometerIndependentBackground.py
     algorithms/WorkflowAlgorithms/HFIRSANSReduction.py
     algorithms/WorkflowAlgorithms/ILL_utilities.py
     algorithms/WorkflowAlgorithms/ISISIndirectDiffractionReduction.py
     algorithms/WorkflowAlgorithms/ISISIndirectEnergyTransfer.py
-    algorithms/WorkflowAlgorithms/ISISIndirectEnergyTransferWrapper.py
     algorithms/WorkflowAlgorithms/IndirectAnnulusAbsorption.py
     algorithms/WorkflowAlgorithms/IndirectAnnulusAbsorption2.py
     algorithms/WorkflowAlgorithms/IndirectCalibration.py
@@ -255,6 +264,7 @@ set(PYTHON_PLUGINS
     algorithms/WorkflowAlgorithms/IndirectSampleChanger.py
     algorithms/WorkflowAlgorithms/IndirectTransmissionMonitor.py
     algorithms/WorkflowAlgorithms/IndirectTwoPeakFit.py
+    algorithms/WorkflowAlgorithms/InterpolateBackground.py
     algorithms/WorkflowAlgorithms/IqtFitMultiple.py
     algorithms/WorkflowAlgorithms/LoadWAND.py
     algorithms/WorkflowAlgorithms/LagrangeILLReduction.py
@@ -282,6 +292,7 @@ set(PYTHON_PLUGINS
     algorithms/WorkflowAlgorithms/ReflectometryISISLoadAndProcess.py
     algorithms/WorkflowAlgorithms/ReflectometryISISSumBanks.py
     algorithms/WorkflowAlgorithms/ReflectometryISISCalibration.py
+    algorithms/WorkflowAlgorithms/ReflectometryISISCreateTransmission.py
     algorithms/WorkflowAlgorithms/ResNorm2.py
     algorithms/WorkflowAlgorithms/SANS/SANSBeamCentreFinder.py
     algorithms/WorkflowAlgorithms/SANS/SANSBeamCentreFinderCore.py
@@ -296,6 +307,8 @@ set(PYTHON_PLUGINS
     algorithms/WorkflowAlgorithms/SANS/SANSSingleReduction.py
     algorithms/WorkflowAlgorithms/SANS/SANSSingleReduction2.py
     algorithms/WorkflowAlgorithms/SANS/SANSSingleReductionBase.py
+    algorithms/WorkflowAlgorithms/SANS/SANSTubeCalibration.py
+    algorithms/WorkflowAlgorithms/SANS/SANSTubeMerge.py
     algorithms/WorkflowAlgorithms/SANSAbsoluteScale.py
     algorithms/WorkflowAlgorithms/SANSAzimuthalAverage1D.py
     algorithms/WorkflowAlgorithms/SANSBeamSpreaderTransmission.py
@@ -337,12 +350,12 @@ set(PYTHON_PLUGINS
     functions/ChudleyElliot.py
     functions/CombGaussLorentzKT.py
     functions/CompositePCRmagnet.py
-    functions/DSFinterp1DFit.py
     functions/DampedBessel.py
     functions/EISFDiffCylinder.py
     functions/EISFDiffSphere.py
     functions/EISFDiffSphereAlkyl.py
     functions/FickDiffusion.py
+    functions/FlatTopPeak.py
     functions/FmuF.py
     functions/GauBroadGauKT.py
     functions/GaussBessel.py
@@ -364,11 +377,13 @@ set(PYTHON_PLUGINS
     functions/PCRmagnetZFKT.py
     functions/PCRmagnetfnorm.py
     functions/PEARLTransVoigt.py
+    functions/PearsonIV.py
     functions/Porod.py
     functions/PrimStretchedExpFT.py
     functions/RFresonance.py
     functions/Redfield.py
     functions/SCgapSwave.py
+    functions/SpinDiffusion.py
     functions/SpinGlass.py
     functions/StandardSC.py
     functions/StaticLorentzianKT.py
@@ -377,6 +392,7 @@ set(PYTHON_PLUGINS
     functions/StretchedKT.py
     functions/TFMuonium.py
     functions/TeixeiraWater.py
+    functions/TeixeiraWaterIqt.py
     functions/ZFMuonium.py
     functions/ZFdipole.py
     functions/ZFelectronDipole.py

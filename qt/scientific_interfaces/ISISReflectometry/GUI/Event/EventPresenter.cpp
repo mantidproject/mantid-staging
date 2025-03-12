@@ -9,6 +9,7 @@
 #include "GUI/Batch/IBatchPresenter.h"
 #include "IEventPresenter.h"
 #include "IEventView.h"
+#include "MantidKernel/WarningSuppressions.h"
 #include <boost/algorithm/string.hpp>
 
 namespace MantidQt::CustomInterfaces::ISISReflectometry {
@@ -88,6 +89,8 @@ void EventPresenter::notifyAutoreductionPaused() { updateWidgetEnabledState(); }
 
 void EventPresenter::notifyAutoreductionResumed() { updateWidgetEnabledState(); }
 
+GNU_DIAG_OFF("maybe-uninitialized")
+
 void EventPresenter::setUniformSlicingByTimeFromView() {
   m_slicing = UniformSlicingByTime(m_view->uniformSliceLength());
 }
@@ -98,9 +101,9 @@ void EventPresenter::setUniformSlicingByNumberOfSlicesFromView() {
 
 void EventPresenter::setCustomSlicingFromView() {
   auto maybeCustomBreakpoints = parseList(m_view->customBreakpoints(), parseNonNegativeDouble);
-  if (maybeCustomBreakpoints.is_initialized()) {
+  if (maybeCustomBreakpoints.has_value()) {
     m_view->showCustomBreakpointsValid();
-    m_slicing = CustomSlicingByList(maybeCustomBreakpoints.get());
+    m_slicing = CustomSlicingByList(maybeCustomBreakpoints.value());
   } else {
     m_view->showCustomBreakpointsInvalid();
     m_slicing = InvalidSlicing();
@@ -114,9 +117,9 @@ void EventPresenter::setLogValueSlicingFromView() {
   // more than one item in the list then show that as invalid. We intend to add
   // this though which is why this is still a free text field rather than a
   // spin box
-  if (maybeBreakpoints.is_initialized() && maybeBreakpoints.get().size() <= 1) {
+  if (maybeBreakpoints.has_value() && maybeBreakpoints.value().size() <= 1) {
     m_view->showLogBreakpointsValid();
-    m_slicing = SlicingByEventLog(maybeBreakpoints.get(), blockName);
+    m_slicing = SlicingByEventLog(maybeBreakpoints.value(), blockName);
   } else {
     m_view->showLogBreakpointsInvalid();
     m_slicing = InvalidSlicing();
@@ -144,6 +147,8 @@ void EventPresenter::setSlicingFromView() {
     throw std::runtime_error("Unrecognized slice type.");
   }
 }
+
+GNU_DIAG_ON("maybe-uninitialized")
 
 bool EventPresenter::isProcessing() const { return m_mainPresenter->isProcessing(); }
 

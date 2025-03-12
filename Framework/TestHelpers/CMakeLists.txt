@@ -41,6 +41,7 @@ set(INC_FILES
     inc/MantidFrameworkTestHelpers/JSONGeometryParserTestHelper.h
     inc/MantidFrameworkTestHelpers/MDAlgorithmsTestHelper.h
     inc/MantidFrameworkTestHelpers/MDEventsTestHelper.h
+    inc/MantidFrameworkTestHelpers/MockAlgorithm.h
     inc/MantidFrameworkTestHelpers/MultiDomainFunctionHelper.h
     inc/MantidFrameworkTestHelpers/MuonGroupingXMLHelper.h
     inc/MantidFrameworkTestHelpers/MuonWorkspaceCreationHelper.h
@@ -81,7 +82,6 @@ target_link_libraries(
   FrameworkTestHelpers
   PRIVATE Mantid::API
           Boost::boost
-          Boost::filesystem
           Mantid::DataObjects
           Mantid::Catalog
           Mantid::DataHandling

@@ -43,7 +43,7 @@ function fixup_bundle() {
   echo "Fixing up bundle so it is self contained"
   # Fix absolute paths in Qt and our own startup script
   fixup_qt "$bundle_conda_prefix" "$HERE"/../common/qt.conf
-  sed -i -e "s@$bundle_prefix_absolute/@\$INSTALLDIR/@" $bundle_prefix_absolute/bin/mantidworkbench
+  sed -i -e "s@$bundle_prefix_absolute/@\$INSTALLDIR/@" $bundle_prefix_absolute/bin/launch_mantidworkbench
 }
 
 # Create a tarball out of the installed conda environment
@@ -134,7 +134,7 @@ bundle_conda_prefix="$bundle_contents"
 
 echo "Creating Conda environment in '$bundle_conda_prefix'"
 "$CONDA_EXE" create --quiet --prefix "$bundle_conda_prefix" --copy \
-  --channel "$conda_channel" --channel conda-forge --yes \
+  --channel "$conda_channel" --channel conda-forge --channel mantid --yes \
   mantidworkbench \
   jq  # used for processing the version string
 echo
@@ -147,6 +147,9 @@ echo
 
 # Remove jq
 "$CONDA_EXE" remove --quiet --prefix "$bundle_conda_prefix" --yes jq
+
+# Pip install quickBayes until there's a conda package
+$bundle_conda_prefix/bin/python -m pip install quickBayes==1.0.0b15
 
 # Trim and fixup bundle
 trim_conda "$bundle_conda_prefix"

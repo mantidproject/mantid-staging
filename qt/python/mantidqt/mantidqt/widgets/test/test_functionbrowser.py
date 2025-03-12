@@ -16,23 +16,25 @@ from unittest.mock import MagicMock, call
 from mantidqt.utils.qt.testing.gui_window_test import GuiWindowTest, not_on_windows, get_child, click_on
 from mantidqt.widgets.functionbrowser import FunctionBrowser
 
-skip = unittest.skipIf(not_on_windows(), "It works on windows. I cannot spend too much time trying to " "fix the other platforms.")
+skip = unittest.skipIf(not_on_windows(), "It works on windows. I cannot spend too much time trying to fix the other platforms.")
 
 
 class TestFunctionBrowser(GuiWindowTest):
     is_multi = False
 
     def create_widget(self):
-        return FunctionBrowser(None, self.is_multi)
+        widget = FunctionBrowser(None, self.is_multi)
+        # widget.resize(500, 500)  # The tests will fail when run on a high-resolution screen locally
+        return widget
 
     def view_set_parameter(self, param_name, value):
         view = self.widget.view()
         rect = view.getVisualRectParameterProperty(param_name)
         pos = rect.center()
         if self.is_multi:
-            pos -= QPoint(rect.width() / 5, 0)
+            pos -= QPoint(int(rect.width() / 5), 0)
         else:
-            pos += QPoint(rect.width() / 4, 0)
+            pos += QPoint(int(rect.width() / 4), 0)
         tree = view.treeWidget().viewport()
         QTest.mouseMove(tree, pos)
         yield

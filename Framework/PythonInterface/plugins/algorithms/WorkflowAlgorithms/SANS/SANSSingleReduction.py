@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 
-""" SANSSingleReduction algorithm performs a single reduction."""
+"""SANSSingleReduction algorithm performs a single reduction."""
 
 from SANSSingleReductionBase import SANSSingleReductionBase
 
@@ -40,10 +40,12 @@ class SANSSingleReduction(SANSSingleReductionBase):
             WorkspaceGroupProperty("OutputWorkspaceLAB", "", optional=PropertyMode.Optional, direction=Direction.Output),
             doc="The output workspace for the low-angle bank.",
         )
-        self.declareProperty(
-            WorkspaceGroupProperty("OutputWorkspaceHAB", "", optional=PropertyMode.Optional, direction=Direction.Output),
-            doc="The output workspace for the high-angle bank.",
-        ),
+        (
+            self.declareProperty(
+                WorkspaceGroupProperty("OutputWorkspaceHAB", "", optional=PropertyMode.Optional, direction=Direction.Output),
+                doc="The output workspace for the high-angle bank.",
+            ),
+        )
         self.declareProperty(
             WorkspaceGroupProperty("OutputWorkspaceHABScaled", "", optional=PropertyMode.Optional, direction=Direction.Output),
             doc="The scaled output HAB workspace when merging",
@@ -227,7 +229,7 @@ class SANSSingleReduction(SANSSingleReductionBase):
                         hab_groups.addWorkspace(output_workspace)
                     else:
                         raise RuntimeError(
-                            "SANSSingleReduction: The reduction mode {0} should not" " be set with a can.".format(reduction_mode)
+                            "SANSSingleReduction: The reduction mode {0} should not be set with a can.".format(reduction_mode)
                         )
 
         self._set_prop_if_group_has_data("OutputWorkspaceLABCan", lab_groups)
@@ -265,7 +267,7 @@ class SANSSingleReduction(SANSSingleReductionBase):
                         hab_can_norms.addWorkspace(output_workspace_norm)
                     else:
                         raise RuntimeError(
-                            "SANSSingleReduction: The reduction mode {0} should not" " be set with a partial can.".format(reduction_mode)
+                            "SANSSingleReduction: The reduction mode {0} should not be set with a partial can.".format(reduction_mode)
                         )
 
         self._set_prop_if_group_has_data("OutputWorkspaceLABCanCount", lab_can_counts)
@@ -293,7 +295,7 @@ class SANSSingleReduction(SANSSingleReductionBase):
                         hab_cans.addWorkspace(output_workspace)
                     else:
                         raise RuntimeError(
-                            "SANSSingleReduction: The reduction mode {0} should not" " be set with a can.".format(reduction_mode)
+                            "SANSSingleReduction: The reduction mode {0} should not be set with a can.".format(reduction_mode)
                         )
             elif bundle.output_bundle.data_type is DataType.SAMPLE:
                 if output_workspace is not None and not does_can_workspace_exist_on_ads(output_workspace):
@@ -303,7 +305,7 @@ class SANSSingleReduction(SANSSingleReductionBase):
                         hab_samples.addWorkspace(output_workspace)
                     else:
                         raise RuntimeError(
-                            "SANSSingleReduction: The reduction mode {0} should not" " be set with a sample.".format(reduction_mode)
+                            "SANSSingleReduction: The reduction mode {0} should not be set with a sample.".format(reduction_mode)
                         )
         self._set_prop_if_group_has_data("OutputWorkspaceLABCan", lab_cans)
         self._set_prop_if_group_has_data("OutputWorkspaceHABCan", hab_cans)
@@ -339,7 +341,7 @@ class SANSSingleReduction(SANSSingleReductionBase):
                     unfit_sample.addWorkspace(unfitted_transmission_workspace)
             else:
                 raise RuntimeError(
-                    "SANSSingleReduction: The data type {0} should be" " sample or can.".format(bundle.transmission_bundle.data_type)
+                    "SANSSingleReduction: The data type {0} should be sample or can.".format(bundle.transmission_bundle.data_type)
                 )
 
         self._set_prop_if_group_has_data("OutputWorkspaceCalculatedTransmission", calc_sample)

@@ -4,10 +4,11 @@
 //   NScD Oak Ridge National Laboratory, European Spallation Source,
 //   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 // SPDX - License - Identifier: GPL - 3.0 +
-//----------------------------------------------------------------------
-// Includes
-//----------------------------------------------------------------------
 #include "MantidNexus/NexusClasses.h"
+
+#include "MantidKernel/Exception.h"
+#include "MantidKernel/PropertyWithValue.h"
+
 #include <memory>
 #include <utility>
 
@@ -87,18 +88,11 @@ std::string NXObject::name() const {
 void NXObject::getAttributes() {
   NXname pName;
   int iLength, iType;
-#ifndef NEXUS43
   int rank;
   int dims[4];
-#endif
   std::vector<char> buff(128);
 
-#ifdef NEXUS43
-  while (NXgetnextattr(m_fileID, pName, &iLength, &iType) != NX_EOD) {
-#else
   while (NXgetnextattra(m_fileID, pName, &rank, dims, &iType) != NX_EOD) {
-#endif
-#ifndef NEXUS43
     if (rank > 1) { // mantid only supports single value attributes
       throw std::runtime_error("Encountered attribute with multi-dimensional array value");
     }
@@ -106,7 +100,6 @@ void NXObject::getAttributes() {
     if (iType != NX_CHAR && iLength != 1) {
       throw std::runtime_error("Encountered attribute with array value");
     }
-#endif
 
     switch (iType) {
     case NX_CHAR: {
@@ -151,6 +144,7 @@ NXClass::NXClass(const NXClass &parent, const std::string &name) : NXObject(pare
 NXClassInfo NXClass::getNextEntry() {
   NXClassInfo res;
   char nxname[NX_MAXNAMELEN], nxclass[NX_MAXNAMELEN];
+  // cppcheck-suppress argumentSize
   res.stat = NXgetnextentry(m_fileID, nxname, nxclass, &res.datatype);
   if (res) // Check if previous call was successful
   {
@@ -198,7 +192,7 @@ void NXClass::open() {
 }
 
 /** It is fast, but the parent of this class must be open at
- * the time of calling. openNXClass uses open() (the slow one). To open calss
+ * the time of calling. openNXClass uses open() (the slow one). To open class
  * using openLocal() do:
  *    NXTheClass class(parent,name);
  *    class.openLocal();
@@ -271,13 +265,8 @@ int NXClass::getInt(const std::string &name) const {
  *  @return true if the name is found and false otherwise
  */
 bool NXClass::containsGroup(const std::string &query) const {
-  std::vector<NXClassInfo>::const_iterator end = m_groups->end();
-  for (std::vector<NXClassInfo>::const_iterator i = m_groups->begin(); i != end; ++i) {
-    if (i->nxname == query) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(m_groups->cbegin(), m_groups->cend(),
+                     [&query](const auto &group) { return group.nxname == query; });
 }
 
 /**
@@ -286,11 +275,12 @@ bool NXClass::containsGroup(const std::string &query) const {
  *  @return NXInfo::stat is set to NX_ERROR if the dataset does not exist
  */
 NXInfo NXClass::getDataSetInfo(const std::string &name) const {
-  NXInfo info;
-  for (std::vector<NXInfo>::const_iterator it = datasets().begin(); it != datasets().end(); ++it) {
-    if (it->nxname == name)
-      return *it;
+  const auto it = std::find_if(datasets().cbegin(), datasets().cend(),
+                               [&name](const auto &dataset) { return dataset.nxname == name; });
+  if (it != datasets().cend()) {
+    return *it;
   }
+  NXInfo info;
   info.stat = NX_ERROR;
   return info;
 }
@@ -411,10 +401,10 @@ NXEntry NXRoot::openFirstEntry() {
   if (groups().empty()) {
     throw std::runtime_error("NeXus file has no entries");
   }
-  for (std::vector<NXClassInfo>::const_iterator grp = groups().begin(); grp != groups().end(); ++grp) {
-    if (grp->nxclass == "NXentry") {
-      return openEntry(grp->nxname);
-    }
+  const auto it =
+      std::find_if(groups().cbegin(), groups().cend(), [](const auto &group) { return group.nxclass == "NXentry"; });
+  if (it != groups().cend()) {
+    return openEntry(it->nxname);
   }
   throw std::runtime_error("NeXus file has no entries");
 }

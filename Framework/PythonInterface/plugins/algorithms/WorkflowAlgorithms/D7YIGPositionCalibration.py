@@ -5,9 +5,34 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 
-from mantid.simpleapi import *
-from mantid.kernel import Direction, FloatBoundedValidator, StringListValidator
+from mantid.simpleapi import (
+    ChangeBinOffset,
+    ConjoinWorkspaces,
+    ConjoinXRuns,
+    ConvertAxisByFormula,
+    ConvertToPointData,
+    ClearInstrumentParameters,
+    CloneWorkspace,
+    CreateSingleValuedWorkspace,
+    CreateWorkspace,
+    DeleteWorkspace,
+    DeleteWorkspaces,
+    Divide,
+    Fit,
+    EvaluateFunction,
+    ExtractSpectra,
+    GroupWorkspaces,
+    LoadAndMerge,
+    LoadParameterFile,
+    MaskBinsIf,
+    RemoveSpectra,
+    RenameWorkspace,
+    ReplaceSpecialValues,
+)
+from mantid.kernel import config, ConfigService, Direction, FloatBoundedValidator, StringListValidator
 from mantid.api import (
+    mtd,
+    AlgorithmFactory,
     FileAction,
     FileProperty,
     MatrixWorkspaceProperty,
@@ -27,7 +52,6 @@ import xml.etree.ElementTree as ET
 
 
 class D7YIGPositionCalibration(PythonAlgorithm):
-
     # helper conversions
     _RAD_2_DEG = 180.0 / np.pi
     _DEG_2_RAD = 1.0 / _RAD_2_DEG
@@ -469,6 +493,7 @@ class D7YIGPositionCalibration(PythonAlgorithm):
                         CheckOverlapping=False,
                         YAxisLabel="TwoTheta_fit",
                         YAxisUnit="degrees",
+                        CheckMatchingBins=False,
                     )
                 except ValueError:
                     RenameWorkspace(InputWorkspace="ws", OutputWorkspace=conjoined_peak_fit_name)
@@ -514,9 +539,7 @@ class D7YIGPositionCalibration(PythonAlgorithm):
         constraint_list = ["{0}<f0.lambda<{1}".format(1 - lambda_constr, 1 + lambda_constr)]
         function = "name=UserFunction, \
         Formula = {0} * m * ( 2.0 * asin( lambda * sin( 0.5 * {1} * x ) ) + offset+ bank_offset), \
-        lambda= 1.0, m = 1.0, offset = {2}, bank_offset = {3}, $domains=i".format(
-            self._RAD_2_DEG, self._DEG_2_RAD, 0, 0
-        )
+        lambda= 1.0, m = 1.0, offset = {2}, bank_offset = {3}, $domains=i".format(self._RAD_2_DEG, self._DEG_2_RAD, 0, 0)
         function_list = mtd[ws].getNumberHistograms() * [function]
 
         for pixel_no in range(mtd[ws].getNumberHistograms()):
@@ -562,11 +585,11 @@ class D7YIGPositionCalibration(PythonAlgorithm):
                 IgnoreInvalidData=True,
                 CreateOutput=True,
                 Output="det_fit_out_{}".format(fit_output_name),
-                **fit_kwargs
+                **fit_kwargs,
             )
         except RuntimeError as e:
             raise RuntimeError(
-                "Fitting detector positions and wavelength failed due to {}." "\nConsider changing initial parameters.".format(e)
+                "Fitting detector positions and wavelength failed due to {}.\nConsider changing initial parameters.".format(e)
             )
         param_table = fit_output.OutputParameters
         self._created_ws_names.append("det_fit_out_{}_Workspaces".format(fit_output_name))

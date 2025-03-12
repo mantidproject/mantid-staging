@@ -25,8 +25,9 @@
 #
 
 import systemtesting
-from mantid.simpleapi import *
-from mantid.api import MatrixWorkspace
+from mantid.api import mtd, MatrixWorkspace
+from mantid.kernel import logger
+from mantid.simpleapi import Fit, LoadAscii
 
 import unittest
 
@@ -93,7 +94,7 @@ def compare_relative_errors(values_fitted, reference_values, tolerance=1e-6):
             )
             logger.error("These were the values found:         {0}".format(values_fitted))
             logger.error(" and these are the reference values: {0}".format(reference_values))
-            raise RuntimeError("Some results were not as accurate as expected. Please check the log " "messages for details")
+            raise RuntimeError("Some results were not as accurate as expected. Please check the log messages for details")
 
 
 def load_fitting_test_file_ascii(filename):
@@ -104,7 +105,7 @@ def load_fitting_test_file_ascii(filename):
     """
     wks = LoadAscii(Filename=filename)
     if not wks or not isinstance(wks, MatrixWorkspace):
-        raise RuntimeError("Input workspace from file {0} not available as a MatrixWorkspace. " "Cannot continue.".format(filename))
+        raise RuntimeError("Input workspace from file {0} not available as a MatrixWorkspace. Cannot continue.".format(filename))
 
     return wks
 
@@ -119,16 +120,12 @@ class TwoGaussPeaksEVSData(unittest.TestCase):
     Representative of a processed Vesuvio dataset that contains a couple of peaks.
     """
 
-    filename = "EVS14188-90_processed.txt"
-    workspace = None
-    function_template = "name=Gaussian, {0} ; name=LinearBackground,A0=0,A1=0;" "name=Gaussian, {1}"
+    function_template = "name=Gaussian, {0} ; name=LinearBackground,A0=0,A1=0;name=Gaussian, {1}"
 
-    # Using this workaround as we still support Python 2.6 on rhel6, where setUpClass()
-    # is not available
-    def setUp(self):
-
-        if not self.__class__.workspace:
-            self.__class__.workspace = load_fitting_test_file_ascii(self.filename)
+    @classmethod
+    def setUpClass(cls) -> None:
+        filename = "EVS14188-90_processed.txt"
+        cls.workspace = load_fitting_test_file_ascii(filename)
 
     def test_good_initial_guess(self):
         """
@@ -181,13 +178,12 @@ class SineLikeMuonExperimentAsymmetry(unittest.TestCase):
     Any local minimizer should be very sensitive to the initial guess.
     """
 
-    filename = "sine_fitting_test_muon_asymmetry.txt"
-    workspace = None
     function_template = "name=UserFunction, Formula=sin(w*x), w={0}"
 
-    def setUp(self):
-        if not self.__class__.workspace:
-            self.__class__.workspace = load_fitting_test_file_ascii(self.filename)
+    @classmethod
+    def setUpClass(cls) -> None:
+        filename = "sine_fitting_test_muon_asymmetry.txt"
+        cls.workspace = load_fitting_test_file_ascii(filename)
 
     def test_bad_initial_guess(self):
         """
@@ -219,13 +215,12 @@ class VanadiumPatternFromENGINXSmoothing(unittest.TestCase):
     a spline with 20-50 knots. This is used for calibration.
     """
 
-    filename = "fitting_test_vanadium_pattern_enginx236516_bank1.txt"
-    workspace = None
     spline_user_def_function = "name=BSpline, Uniform=true, Order=3, StartX=0, EndX=5.5, NBreak={0}"
 
-    def setUp(self):
-        if not self.__class__.workspace:
-            self.__class__.workspace = load_fitting_test_file_ascii(self.filename)
+    @classmethod
+    def setUpClass(cls) -> None:
+        filename = "fitting_test_vanadium_pattern_enginx236516_bank1.txt"
+        cls.workspace = load_fitting_test_file_ascii(filename)
 
     def test_50breaks(self):
         """
@@ -318,7 +313,6 @@ class VanadiumPatternFromENGINXSmoothing(unittest.TestCase):
 
 
 class WeightedLeastSquaresTest(systemtesting.MantidSystemTest):
-
     _success = False
 
     def runTest(self):

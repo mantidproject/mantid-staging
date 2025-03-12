@@ -18,9 +18,10 @@ from mantid.simpleapi import (
     SetInstrumentParameter,
     ConvertUnits,
 )
-from IntegratePeaksSkew import InstrumentArrayConverter
+from plugins.algorithms.IntegratePeaksSkew import InstrumentArrayConverter
 from testhelpers import WorkspaceCreationHelper
 from numpy import array, sqrt, arange, ones, zeros
+import json
 
 
 class IntegratePeaksSkewTest(unittest.TestCase):
@@ -74,9 +75,27 @@ class IntegratePeaksSkewTest(unittest.TestCase):
             IntegrateIfOnEdge=False,
             OutputWorkspace="out0",
         )
-        # check peaks in bank 1 were not integrated (mask touches edge)
+        # check peaks in bank 1 were not integrated (mask touches masked pixel)
         for ipk, pk in enumerate(out):
             self.assertEqual(pk.getIntensity(), 0)
+            self.assertEqual(pk.getPeakShape().shapeName(), "none")
+
+    def test_integrate_on_edge_option_respects_detector_masking(self):
+        ws_masked = CloneWorkspace(InputWorkspace=self.ws)
+        det_info = ws_masked.detectorInfo()
+        det_info.setMasked(det_info.indexOf(self.peaks.getPeak(0).getDetectorID()), True)
+        out = IntegratePeaksSkew(
+            InputWorkspace=ws_masked,
+            PeaksWorkspace=self.peaks,
+            ThetaWidth=0,
+            BackscatteringTOFResolution=0.3,
+            IntegrateIfOnEdge=False,
+            NRowsEdge=0,
+            NColsEdge=0,
+            OutputWorkspace="out0_masked",
+        )
+        # check peaks in bank 1 were not integrated (mask touches edge)
+        self.assertEqual(out.getPeak(0).getIntensity(), 0)
 
     def test_integrate_use_nearest_peak_false_update_peak_position_false(self):
         out = IntegratePeaksSkew(
@@ -196,7 +215,7 @@ class IntegratePeaksSkewTest(unittest.TestCase):
 
     def test_print_output_file(self):
         out_file = path.join(self._test_dir, "out.pdf")
-        out = IntegratePeaksSkew(
+        IntegratePeaksSkew(
             InputWorkspace=self.ws,
             PeaksWorkspace=self.peaks,
             ThetaWidth=0,
@@ -238,7 +257,7 @@ class IntegratePeaksSkewTest(unittest.TestCase):
         for ipk, pk in enumerate(out):
             self.assertEqual(pk.getIntensity(), 0)
 
-    def test_peak_mask_validation_with_ncol_max(self):
+    def test_peak_mask_validation_after_ncol_max_increase(self):
         out = IntegratePeaksSkew(
             InputWorkspace=self.ws,
             PeaksWorkspace=self.peaks,
@@ -367,7 +386,7 @@ class IntegratePeaksSkewTest(unittest.TestCase):
             OutputWorkspace="out8",
         )
         self.assertGreater(out.getPeak(0).getIntensityOverSigma(), 0)
-        self.assertAlmostEqual(out.getPeak(0).getIntensityOverSigma(), 10.84209, delta=1e-4)
+        self.assertAlmostEqual(out.getPeak(0).getIntensityOverSigma(), 8.8002, delta=1e-4)
         out = IntegratePeaksSkew(
             InputWorkspace=self.ws,
             PeaksWorkspace=self.peaks,
@@ -495,6 +514,30 @@ class IntegratePeaksSkewTest(unittest.TestCase):
         det_edges_expected = zeros((5, 7), dtype=bool)
         det_edges_expected[:, -1] = True  # last tube in window is second from end of bank and ncols_edge=2
         self.assertTrue((peak_data.det_edges == det_edges_expected).all())
+
+    def test_shapeof_valid_peaks(self):
+        out = IntegratePeaksSkew(
+            InputWorkspace=self.ws,
+            PeaksWorkspace=self.peaks,
+            ThetaWidth=0,
+            BackscatteringTOFResolution=0.3,
+            IntegrateIfOnEdge=True,
+            UseNearestPeak=False,
+            UpdatePeakPosition=False,
+            LorentzCorrection=False,
+            OutputWorkspace="out10",
+        )
+        # check shape of the only valid peak
+        pk = out.getPeak(0)
+        self.assertEqual(pk.getPeakShape().shapeName(), "detectorbin")
+        self.assertEqual(pk.getPeakShape().algorithmName(), "IntegratePeaksSkew")
+        pk_shape_dict = json.loads(pk.getPeakShape().toJSON())
+        self.assertEqual(len(pk_shape_dict["detectors"]), 6)
+        for det in pk_shape_dict["detectors"]:
+            self.assertEqual(det["startX"], 3)
+            self.assertEqual(det["endX"], 8)
+        for i in [1, 2]:
+            self.assertEqual(out.getPeak(i).getPeakShape().shapeName(), "none")
 
 
 if __name__ == "__main__":

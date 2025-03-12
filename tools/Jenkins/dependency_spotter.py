@@ -11,8 +11,8 @@ for which it uses the build artifacts.
 Example use:
 dependency_spotter -f 593 -s 598
 dependency_spotter -f 593 -s 598 -os win-64
-dependency_spotter -f 593 -s 598 --pipeline main_nightly_deployment_prototype
-This will compare builds 593 and 598 from the "main_nightly_deployment_prototype" pipeline
+dependency_spotter -f 593 -s 598 --pipeline main_nightly_deployment
+This will compare builds 593 and 598 from the "main_nightly_deployment" pipeline
 """
 
 import argparse
@@ -27,7 +27,7 @@ def dependency_spotter(os_name: str, first_build: int, second_build: int, pipeli
     :param os_name: Operating string label, e.g. linux-64
     :param first_build: Build number of the first build for comparison
     :param second_build: Build number of the second build for comparison
-    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment_prototype
+    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment
     :param log_file: Name of the file to compare, e.g. mantid_build_environment.txt
     """
     if second_build < first_build:
@@ -52,7 +52,7 @@ def dependency_spotter(os_name: str, first_build: int, second_build: int, pipeli
     print("Files available for comparison:")
     if len(files_in_both_builds) > 0:
         for i, file in enumerate(files_in_both_builds):
-            print(f"{i+1}) {file}")
+            print(f"{i + 1}) {file}")
     else:
         print("None")
     print("")
@@ -93,12 +93,12 @@ def extract_available_log_files(os_name: str, build_number: int, pipeline: str) 
     available files, e.g. mantid_build_environment.txt. Returns a list of these filenames
     :param os_name: Operating string label, e.g. linux-64
     :param build_number: Build number
-    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment_prototype
+    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment
     :return: List of log file names
     """
     url = form_url_for_build_artifact(build_number, os_name, pipeline, "")
     build_log_files = []
-    regex_logfile = r"(mantid(docs)?[\w]+environment\.txt)"
+    regex_logfile = r"((mantid|package-conda)[\w]+environment\.txt)"
     # Log files for first build
     with urllib.request.urlopen(url) as file:
         for line in file.readlines():
@@ -115,12 +115,15 @@ def compare_dependencies_for_file(os_name: str, first_build: int, second_build: 
     :param os_name: Operating string label, e.g. linux-64
     :param first_build: Build number of the first build for comparison
     :param second_build: Build number of the second build for comparison
-    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment_prototype
+    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment
     :param log_file: Name of the file to compare, e.g. mantid_build_environment.txt
     """
     # Form URLs for each build artifact file
     first_build_output_path = form_url_for_build_artifact(first_build, os_name, pipeline, log_file)
+    print(f"Path to first build: {first_build_output_path}")
     second_build_output_path = form_url_for_build_artifact(second_build, os_name, pipeline, log_file)
+    print(f"Path to second build: {second_build_output_path}")
+    print("")
 
     # Read in the packages used, with versions
     first_output_packages = extract_package_versions(first_build_output_path, os_name)
@@ -131,13 +134,13 @@ def compare_dependencies_for_file(os_name: str, first_build: int, second_build: 
     packages_removed = []
     packages_changed = {}
     for package in first_output_packages:
-        if second_output_packages[package] is None:
-            packages_removed.extend(package)
+        if package not in second_output_packages:
+            packages_removed.append(package)
         elif second_output_packages[package] != first_output_packages[package]:
             packages_changed[package] = first_output_packages[package] + "  ->  " + second_output_packages[package]
     for package in second_output_packages:
-        if first_output_packages[package] is None:
-            packages_added.extend(package)
+        if package not in first_output_packages:
+            packages_added.append(package)
 
     # Output
     output_package_changes_to_console(packages_added, packages_removed, packages_changed)
@@ -171,7 +174,7 @@ def form_url_for_build_artifact(build_number: int, os_name: str, pipeline: str, 
     Form Jenkins URL from specified info.
     :param build_number: Build number
     :param os_name: Operating string label, e.g. linux-64
-    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment_prototype
+    :param pipeline: Name of the Jenkins pipeline, e.g. main_nightly_deployment
     :param log_file: Name of the file to compare, e.g. mantid_build_environment.txt
     :return: URL for build artifact
     """
@@ -193,6 +196,8 @@ def extract_package_versions(url: str, os_name: str) -> Dict[str, str]:
             regex_result = re.search(pattern=regex_pattern, string=line.decode("utf-8"))
             if regex_result is not None and len(regex_result.groups()) == 3:
                 package_name = regex_result.group(1)
+                if package_name.startswith("mantid"):
+                    continue
                 version = regex_result.group(2)
                 package_version_dict[package_name] = version
     return package_version_dict
@@ -201,9 +206,9 @@ def extract_package_versions(url: str, os_name: str) -> Dict[str, str]:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Script for checking dependency changes between two Jenkins builds")
     parser.add_argument("-os", help="Operating system string, e.g. linux-64", default="linux-64", type=str)
-    parser.add_argument("--first", "-f", help="First (usually passing) build number", type=int)
-    parser.add_argument("--second", "-s", help="Second (usually failing) build number", type=int)
-    parser.add_argument("--pipeline", "-p", help="Build pipeline", default="main_nightly_deployment_prototype", type=str)
+    parser.add_argument("--first", "-f", help="First (usually passing) build number", type=int, required=True)
+    parser.add_argument("--second", "-s", help="Second (usually failing) build number", type=int, required=True)
+    parser.add_argument("--pipeline", "-p", help="Build pipeline", default="main_nightly_deployment", type=str)
     parser.add_argument(
         "--logfile",
         "-l",

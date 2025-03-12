@@ -17,49 +17,64 @@ lambda_min = 0.8
 
 
 class WishSX(BaseSX):
-    def __init__(self, vanadium_runno=None, ext=".raw"):
-        super().__init__(vanadium_runno)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sphere_shape = """<sphere id="sphere">
                                <centre x="0.0"  y="0.0" z="0.0" />
                                <radius val="0.0025"/>
                                </sphere>"""  # sphere radius 2.5mm  - used for vanadium and NaCl
-        self.ext = ext  # allow to load .nxs for testing purposes
+        self.beam_width = 0.2  # cm
+        self.beam_height = 0.4  # cm
 
     def process_data(self, runs: Sequence[str], *args):
         """
-        Loads runs, set goniometer (based on positional args), normalises by vanadium and corrects for absorption
-        :param runs: list of run numbers (string or int)
-        :param args: positonal args (require one for each goniometer axis) - can be motor names or lists of angles (one for each run)
-        :return: name of last loaded workspaces
+        Function to load and normalise a sequence of runs
+        :param runs: sequence of run numbers (can be ints or string)
+        :param args: goniometer angles - one positional arg for each goniometer axis/motor
+        :return: workspace name of last run loaded
+
+        Examples for providing goniometer angles (passed to SetGoniometer)
+        e.g. using motor names for 2 axes defined sxd.set_goniometer_axes for 3 runs
+        wish.process_data(range(3), "wccr", "ewald_pos")
+        e.g. using a sequence of angles for each motor
+        wish.process_data(range(3), [1,2,3], [4,5,6]])  # e.g. for the first run wccr=1 and ewald_pos=4
         """
         gonio_angles = args
         for irun, run in enumerate(runs):
-            wsname = self.load_run(run, self.ext)
+            wsname = self.load_run(run, self.file_ext)
             # set goniometer
             if self.gonio_axes is not None:
                 if len(gonio_angles) != len(self.gonio_axes):
                     logger.warning("No goniometer will be applied as the number of goniometer angles doesn't match the number of axes set.")
                 elif isinstance(gonio_angles[0], str):
-                    # gonio_angles are a list of motor strings (same for all runs)
                     self._set_goniometer_on_ws(wsname, gonio_angles)
                 else:
-                    # gonio_angles is a list of individual or tuple motor angles for each run
-                    self._set_goniometer_on_ws(wsname, gonio_angles[irun])
+                    if len(gonio_angles[0]) == len(runs):
+                        # gonio_angles is a list of individual or tuple motor angles for each run
+                        self._set_goniometer_on_ws(wsname, [angles[irun] for angles in gonio_angles])
+                    else:
+                        logger.warning(
+                            "No goniometer will be applied as the number of goniometer angles for each motor doesn't "
+                            "match the number of runs."
+                        )
             # correct for empty counts and normalise by vanadium
             self._divide_workspaces(wsname, self.van_ws)  # van_ws has been converted to TOF
             # set sample (must be done after gonio to rotate shape) and correct for attenuation
             if self.sample_dict is not None:
                 mantid.SetSample(wsname, EnableLogging=False, **self.sample_dict)
-                mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="Wavelength", EnableLogging=False)
-                if "<sphere" in ADS.retrieve(wsname).sample().getShape().getShapeXML():
-                    transmission = mantid.SphericalAbsorption(InputWorkspace=wsname, OutputWorkspace="transmission", EnableLogging=False)
-                else:
-                    transmission = mantid.MonteCarloAbsorption(
-                        InputWorkspace=wsname, OutputWorkspace="transmission", EventsPerPoint=self.n_mcevents, EnableLogging=False
-                    )
-                self._divide_workspaces(wsname, transmission)
-                mantid.DeleteWorkspace(transmission)
-                mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="TOF", EnableLogging=False)
+                if not self.scale_integrated:
+                    mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="Wavelength", EnableLogging=False)
+                    if "<sphere" in ADS.retrieve(wsname).sample().getShape().getShapeXML():
+                        transmission = mantid.SphericalAbsorption(
+                            InputWorkspace=wsname, OutputWorkspace="transmission", EnableLogging=False
+                        )
+                    else:
+                        transmission = mantid.MonteCarloAbsorption(
+                            InputWorkspace=wsname, OutputWorkspace="transmission", EventsPerPoint=self.n_mcevents, EnableLogging=False
+                        )
+                    self._divide_workspaces(wsname, transmission)
+                    mantid.DeleteWorkspace(transmission)
+                    mantid.ConvertUnits(InputWorkspace=wsname, OutputWorkspace=wsname, Target="TOF", EnableLogging=False)
             # save results in dictionary
             self.set_ws(run, wsname)
         return wsname
@@ -67,7 +82,7 @@ class WishSX(BaseSX):
     @staticmethod
     def mask_detector_edges(ws, nedge=16, ntubes=2):
         # mask pixels on ends of tubes
-        mantid.MaskBTP(Workspace=ws, Pixel=f"1-{nedge},{512-nedge}-512")
+        mantid.MaskBTP(Workspace=ws, Pixel=f"1-{nedge},{512 - nedge}-512")
         # only mask tubes on panels with edge facing beam in/out
         tubes = np.r_[152 - (ntubes - 1) // 2 : 153, 76 - ntubes // 2 + 1 : 77]
         mantid.MaskBTP(Workspace=ws, Bank="5-6", Tube=",".join(str(tube) for tube in tubes))
@@ -81,7 +96,7 @@ class WishSX(BaseSX):
 
     def process_vanadium(self):
         # vanadium
-        self.van_ws = self.load_run(self.van_runno, ext=self.ext)
+        self.van_ws = self.load_run(self.van_runno, file_ext=self.file_ext)
         mantid.SmoothNeighbours(InputWorkspace=self.van_ws, OutputWorkspace=self.van_ws, Radius=3)
         mantid.SmoothData(InputWorkspace=self.van_ws, OutputWorkspace=self.van_ws, NPoints=301)
         # correct vanadium for absorption
@@ -97,10 +112,10 @@ class WishSX(BaseSX):
         mantid.ConvertUnits(InputWorkspace=self.van_ws, OutputWorkspace=self.van_ws, Target="TOF", EnableLogging=False)
 
     @staticmethod
-    def load_run(runno, ext=".raw"):
+    def load_run(runno, file_ext=".raw"):
         wsname = "WISH000" + str(runno)
         mon_name = wsname + "_monitors"
-        mantid.Load(Filename=wsname + ext, OutputWorkspace=wsname)
+        mantid.Load(Filename=wsname + file_ext, OutputWorkspace=wsname)
         mantid.ExtractMonitors(InputWorkspace=wsname, DetectorWorkspace=wsname, MonitorWorkspace=mon_name)
         mantid.CropWorkspace(InputWorkspace=wsname, OutputWorkspace=wsname, XMin=tof_min, XMax=tof_max)
         mantid.CropWorkspace(InputWorkspace=mon_name, OutputWorkspace=mon_name, XMin=tof_min, XMax=tof_max)
@@ -118,7 +133,7 @@ class WishSX(BaseSX):
         wsname = WishSX.retrieve(ws).name()
         ws_rb = wsname + "_rb"
         mantid.Rebunch(InputWorkspace=ws, OutputWorkspace=ws_rb, NBunch=nbunch, EnableLogging=False)
-        WishSX.mask_detector_edges(ws_rb, nedge=16, ntube=3)
+        WishSX.mask_detector_edges(ws_rb, nedge=16, ntubes=3)
         WishSX.crop_ws(ws_rb, lambda_min, lambda_max, xunit="Wavelength")
         if out_peaks is None:
             out_peaks = wsname + "_peaks"  # need to do this so not "_rb_peaks"
@@ -127,20 +142,20 @@ class WishSX(BaseSX):
         return out_peaks
 
     @staticmethod
-    def remove_peaks_on_edge(peaks, nedge_tube=2, nedge_pix=16):
+    def remove_peaks_on_detector_edge(peaks, nedge=16, ntubes=2):
         peaks = WishSX.retrieve(peaks)
         # filter peaks on edge of tubes
         row = np.array(peaks.column("Row"))
-        iremove = np.where(np.logical_or(row < nedge_pix, row > 512 - nedge_pix))[0]
+        iremove = np.where(np.logical_or(row < nedge, row > 512 - nedge))[0]
         mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove)
         # filter out peaks on tubes at edge of detector banks
         col = np.array(peaks.column("Col"))
         bank = np.array([int(name[-2:]) for name in peaks.column("BankName")])
-        iremove = np.where(np.logical_and(col < nedge_tube, bank == 1))[0]
+        iremove = np.where(np.logical_and(col < ntubes, bank == 1))[0]
         mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove)
-        iremove = np.where(np.logical_and(col > 152 - nedge_tube, bank == 5))[0]
+        iremove = np.where(np.logical_and(col > 152 - ntubes, bank == 5))[0]
         mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove)
-        iremove = np.where(np.logical_and(col < nedge_tube, bank == 10))[0]
+        iremove = np.where(np.logical_and(col < ntubes, bank == 10))[0]
         mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove)
-        iremove = np.where(np.logical_and(col > 152 - nedge_tube, bank == 6))[0]
+        iremove = np.where(np.logical_and(col > 152 - ntubes, bank == 6))[0]
         mantid.DeleteTableRows(TableWorkspace=peaks, Rows=iremove)

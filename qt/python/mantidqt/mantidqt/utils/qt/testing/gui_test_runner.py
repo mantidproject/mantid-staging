@@ -19,7 +19,7 @@ from mantidqt.utils.qt.testing.application import get_application
 def split_qualified_name(qualified_name):
     parts = qualified_name.split(".")
     if len(parts) < 2:
-        raise RuntimeError("Qualified name must include name of the module in which it is defined," " found: {0}".format(qualified_name))
+        raise RuntimeError("Qualified name must include name of the module in which it is defined, found: {0}".format(qualified_name))
     module_name = ".".join(parts[:-1])
     name = parts[-1]
     return module_name, name
@@ -121,7 +121,6 @@ class ScriptRunner(object):
 
 
 def open_in_window(widget_or_name, script, attach_debugger=True, pause=0, close_on_finish=False, is_cli=False, in_workbench=False):
-
     """
     Displays a widget in a window.
     :param widget_or_name: A widget to display.

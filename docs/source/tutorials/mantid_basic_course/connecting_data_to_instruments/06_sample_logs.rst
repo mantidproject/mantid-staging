@@ -25,7 +25,7 @@ To access these:
 - Right-clicking on a log (e.g. SampleTemp) you can produce a normal workbench plot of the selected log, or print its
   values to the Messages Box:
 
-.. code-block:: python
+.. code-block:: none
 
     # SampleTemp
     2010-Mar-25 16:09:27.620000000  279.904
@@ -130,8 +130,8 @@ This can be performed directly with :ref:`algm-FilterByTime` or indirectly with 
 	axes[2][0].set_xlim(temp_x_limit)
 	axes[2][0].set_ylim(temp_y_limit)
 
-	plt.tight_layout()
-	plt.show()
+	fig.tight_layout()
+	fig.show()
 
 
 Interface

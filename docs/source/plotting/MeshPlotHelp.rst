@@ -4,7 +4,7 @@
 3D Mesh Plots for Sample Shapes
 ===============================
 
-`3D plotting in Matplotlib <https://matplotlib.org/mpl_toolkits/mplot3d/tutorial.html>`_
+`3D plotting in Matplotlib <https://matplotlib.org/stable/users/explain/toolkits/mplot3d.html>`_
 
 **Other Plot Docs**
 
@@ -19,7 +19,7 @@
     :local:
 
 
-Here the mesh is plotted as a Poly3DCollection `Polygon <https://matplotlib.org/stable/tutorials/toolkits/mplot3d.html#polygon-plots>`_.
+Here the mesh is plotted as a Poly3DCollection `Polygon <https://matplotlib.org/stable/users/explain/toolkits/mplot3d.html#polygon-plots>`_.
 
 These sample shapes can be created with :ref:`algm-SetSample`, :ref:`algm-LoadSampleShape` or
 :ref:`algm-LoadSampleEnvironment` and copied using :ref:`algm-CopySample`.
@@ -114,7 +114,7 @@ Note Component index 0 is usually the Container.
    sample = ws.getInstrument().getSample().getPos() - source
    arrow(axes, sample, origin=(0,0,-0.04))
    axes.view_init(vertical_axis='y', elev=30, azim=-135)
-   plt.show()
+   fig.show()
 
 
 Plot a cuboid sample shape, rotate it by the goniometer and add lattice vector arrows.
@@ -192,11 +192,11 @@ Plot a cuboid sample shape, rotate it by the goniometer and add lattice vector a
       arrow(axes, reciprocal_lattice[:,i], color = colors[i], linestyle = '--')
 
    axes.view_init(vertical_axis='y', elev=27, azim=50)
-   plt.show()
+   fig.show()
 
 
 **Other Plotting Documentation**
 
 * :ref:`plotting`
-* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/3.1.1/users/navigation_toolbar.html#navigation-keyboard-shortcuts>`_
+* `Matplotlib Keyboard Shortcuts <https://matplotlib.org/stable/users/explain/figure/interactive.html#navigation-keyboard-shortcuts>`_
 * See :ref:`here <plotting>` for custom color cycles and colormaps

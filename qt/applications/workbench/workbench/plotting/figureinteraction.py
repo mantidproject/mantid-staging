@@ -9,6 +9,7 @@
 """
 Defines interaction behaviour for plotting.
 """
+
 # std imports
 import numpy as np
 from contextlib import contextmanager
@@ -17,7 +18,6 @@ from copy import copy
 from functools import partial
 
 # third party imports
-from matplotlib.axes import Axes
 from matplotlib.container import ErrorbarContainer
 from matplotlib.contour import QuadContourSet
 from qtpy.QtCore import Qt
@@ -29,7 +29,7 @@ from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 # mantid imports
 from mantid.api import AnalysisDataService as ads
-from mantid.plots import datafunctions, MantidAxes, axesfunctions
+from mantid.plots import datafunctions, MantidAxes, axesfunctions, MantidAxes3D, LegendProperties
 from mantid.plots.utility import zoom, MantidAxType, legend_set_draggable
 from mantidqt.plotting.figuretype import FigureType, figure_type
 from mantidqt.plotting.markers import SingleMarker
@@ -101,6 +101,7 @@ class FigureInteraction(object):
         self._cids.append(canvas.mpl_connect("resize_event", self.mpl_redraw_annotations))
         self._cids.append(canvas.mpl_connect("figure_leave_event", self.on_leave))
         self._cids.append(canvas.mpl_connect("scroll_event", self.on_scroll))
+        self._cids.append(canvas.mpl_connect("key_press_event", self.on_key_press))
 
         self.canvas = canvas
         self.toolbar_manager = ToolbarStateManager(self.canvas.toolbar)
@@ -111,6 +112,8 @@ class FigureInteraction(object):
         self.valid_lines = VALID_LINE_STYLE
         self.valid_colors = VALID_COLORS
         self.default_marker_name = "marker"
+        self.double_click_event = None
+        self.marker_selected_in_double_click_event = None
 
     @property
     def nevents(self):
@@ -134,6 +137,9 @@ class FigureInteraction(object):
             and len(event.inaxes.lines) == 0
         ):
             return
+
+        self._correct_for_scroll_event_on_legend(event)
+
         zoom_factor = 1.05 + abs(event.step) / 6
         if event.button == "up":  # zoom in
             zoom(event.inaxes, event.xdata, event.ydata, factor=zoom_factor)
@@ -141,6 +147,33 @@ class FigureInteraction(object):
             zoom(event.inaxes, event.xdata, event.ydata, factor=1 / zoom_factor)
         self.redraw_annotations()
         event.canvas.draw()
+
+    def on_key_press(self, event):
+        ax = event.inaxes
+        if ax is None or isinstance(ax, Axes3D) or len(ax.get_images()) == 0 and len(ax.get_lines()) == 0:
+            return
+
+        if event.key == "k":
+            current_xscale = ax.get_xscale()
+            next_xscale = self._get_next_axis_scale(current_xscale)
+            self._quick_change_axes((next_xscale, ax.get_yscale()), ax)
+
+        if event.key == "l":
+            current_yscale = ax.get_yscale()
+            next_yscale = self._get_next_axis_scale(current_yscale)
+            self._quick_change_axes((ax.get_xscale(), next_yscale), ax)
+
+    def _get_next_axis_scale(self, current_scale):
+        if current_scale == "linear":
+            return "log"
+        return "linear"
+
+    def _correct_for_scroll_event_on_legend(self, event):
+        # Corrects default behaviour in Matplotlib where legend is picked up by scroll event
+        legend = event.inaxes.axes.get_legend()
+        if legend is not None and legend.get_draggable() and legend.contains(event):
+            legend_set_draggable(legend, False)
+            legend_set_draggable(legend, True)
 
     def on_mouse_button_press(self, event):
         """Respond to a MouseEvent where a button was pressed"""
@@ -169,13 +202,13 @@ class FigureInteraction(object):
             else:
                 self._show_markers_menu(marker_selected, event)
         elif event.dblclick and event.button == canvas.buttond.get(Qt.LeftButton):
-            if not marker_selected:
-                if not self._show_axis_editor(event):
-                    # Don't run inside 3D+ plots, as there is already matplotlib behaviour here.
-                    if not hasattr(event.inaxes, "zaxis"):
-                        self._show_plot_options(event)
-            elif len(marker_selected) == 1:
-                self._edit_marker(marker_selected[0])
+            # Double-clicking will open a dialog depending on where the mouse event is located. However, if the dialog
+            # is opened here, mpl will not process the mouse release event after the dialog closes, and will not end any
+            # panning/zooming/rotating drag events that are in progress. Therefore, we store the event data to use in
+            # the mouse release callback.
+            self.double_click_event = event
+            self.marker_selected_in_double_click_event = marker_selected
+
         elif event.button == canvas.buttond.get(Qt.MiddleButton):
             if self.toolbar_manager.is_zoom_active():
                 self.toolbar_manager.emit_sig_home_clicked()
@@ -215,6 +248,36 @@ class FigureInteraction(object):
 
             self.stop_markers(x_pos, y_pos)
 
+        # If the mouse is released after a double click event, check whether we need to open a settings dialog.
+        if self.double_click_event:
+            self._open_double_click_dialog(self.double_click_event, self.marker_selected_in_double_click_event)
+            self.marker_selected_in_double_click_event = None
+            self.double_click_event = None
+
+        self.legend_bounds_check(event)
+
+    @staticmethod
+    def legend_bounds_check(event):
+        fig = event.canvas.figure
+
+        for ax in fig.get_axes():
+            legend1 = ax.get_legend()
+            if legend1 is None:
+                continue
+
+            bbox_fig = fig.get_window_extent()
+            bbox_legend = legend1.get_window_extent()
+
+            outside_window = (
+                bbox_legend.x1 < bbox_fig.x0 or bbox_legend.x0 > bbox_fig.x1 or bbox_legend.y1 < bbox_fig.y0 or bbox_legend.y0 > bbox_fig.y1
+            )
+
+            # Snap back legend
+            if outside_window:
+                props = LegendProperties.from_legend(legend1)
+                LegendProperties.create_legend(props, legend1.axes)
+                fig.canvas.draw_idle()
+
     def on_leave(self, event):
         """
         When leaving the axis or canvas, restore cursor to default one
@@ -240,6 +303,19 @@ class FigureInteraction(object):
                 marker.set_move_cursor(None, x_pos, y_pos)
                 marker.add_all_annotations()
             marker.mouse_move_stop()
+
+    def _open_double_click_dialog(self, event, marker_selected=None):
+        """
+        Opens a settings dialog based on the event location.
+        @param event: the object representing the double click event
+        """
+        if not marker_selected:
+            if not self._show_axis_editor(event):
+                # Don't run inside 3D+ plots, as there is already matplotlib behaviour here.
+                if not hasattr(event.inaxes, "zaxis"):
+                    self._show_plot_options(event)
+        elif len(marker_selected) == 1:
+            self._edit_marker(marker_selected[0])
 
     def _show_axis_editor(self, event):
         """
@@ -271,7 +347,7 @@ class FigureInteraction(object):
             elif ax.xaxis.contains(event)[0] or any(tick.contains(event)[0] for tick in ax.get_xticklabels()):
                 move_and_show(XAxisEditor(canvas, ax))
             elif ax.yaxis.contains(event)[0] or any(tick.contains(event)[0] for tick in ax.get_yticklabels()):
-                if type(ax) == Axes:
+                if "colorbar" in ax._label:
                     move_and_show(ColorbarAxisEditor(canvas, ax))
                 else:
                     move_and_show(YAxisEditor(canvas, ax))
@@ -281,7 +357,7 @@ class FigureInteraction(object):
                 elif ax.zaxis.contains(event)[0] or any(tick.contains(event)[0] for tick in ax.get_zticklabels()):
                     move_and_show(ZAxisEditor(canvas, ax))
             elif ax.get_legend() is not None and ax.get_legend().contains(event)[0]:
-                # We have to set the legend as non draggable else we hold onto the legend
+                # We have to set the legend as non-draggable else we hold onto the legend
                 # until the mouse button is clicked again
                 legend_set_draggable(ax.get_legend(), False)
                 legend_texts = ax.get_legend().get_texts()
@@ -303,6 +379,10 @@ class FigureInteraction(object):
         return action_taken
 
     def _show_plot_options(self, event):
+        """
+        Opens the plot settings dialog and switches to the curves tab.
+        @param event: the object representing the mouse event
+        """
         if not event.inaxes:
             return
 
@@ -377,7 +457,8 @@ class FigureInteraction(object):
                 self._add_normalization_option_menu(menu, event.inaxes)
                 self._add_colorbar_axes_scale_menu(menu, event.inaxes)
         elif fig_type == FigureType.Surface:
-            self._add_colorbar_axes_scale_menu(menu, event.inaxes)
+            if isinstance(event.inaxes, MantidAxes3D):
+                self._add_colorbar_axes_scale_menu(menu, event.inaxes)
         elif fig_type != FigureType.Wireframe:
             if self.fit_browser.tool is not None:
                 self.fit_browser.add_to_menu(menu)
@@ -436,7 +517,7 @@ class FigureInteraction(object):
         images = ax.get_images() + [col for col in ax.collections if isinstance(col, Collection)]
         for label, scale_type in COLORBAR_SCALE_MENU_OPTS.items():
             action = axes_menu.addAction(label, partial(self._change_colorbar_axes, scale_type))
-            if type(images[0].norm) == scale_type:
+            if type(images[0].norm) is scale_type:
                 action.setCheckable(True)
                 action.setChecked(True)
             axes_actions.addAction(action)
@@ -801,10 +882,10 @@ class FigureInteraction(object):
                     if "wkspIndex" in arg_set:
                         arg_set["specNum"] = workspace.getSpectrum(arg_set.pop("wkspIndex")).getSpectrumNo()
                     else:
-                        raise RuntimeError("No spectrum number associated with plot of " "workspace '{}'".format(workspace.name()))
+                        raise RuntimeError("No spectrum number associated with plot of workspace '{}'".format(workspace.name()))
 
                 arg_set_copy = copy(arg_set)
-                for key in ["function", "workspaces", "autoscale_on_update", "norm"]:
+                for key in ["function", "workspaces", "autoscale_on_update", "norm", "argType"]:
                     try:
                         del arg_set_copy[key]
                     except KeyError:
@@ -818,13 +899,12 @@ class FigureInteraction(object):
 
                         # This check is to prevent the contour lines being re-plotted using the colorfill plot args.
                         if isinstance(ws_artist._artists[0], QuadContourSet):
-                            contour_line_colour = ws_artist._artists[0].collections[0].get_edgecolor()
+                            contour_line_colour = ws_artist._artists[0].get_edgecolor()
 
                             ws_artist.replace_data(workspace, None)
 
                             # Re-apply the contour line colour
-                            for col in ws_artist._artists[0].collections:
-                                col.set_color(contour_line_colour)
+                            ws_artist._artists[0].set_color(contour_line_colour)
                         else:
                             ws_artist.replace_data(workspace, arg_set_copy)
 

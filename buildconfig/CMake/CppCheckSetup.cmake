@@ -11,18 +11,25 @@ if(CPPCHECK_EXECUTABLE)
     "${CPPCHECK_BUILD_DIR}/CppCheck_Suppressions.txt"
   )
 
-  # Set up the standard arguments --inline-suppr appears to be ignored if --suppresions-list is specified. Cppcheck >=
+  # Set up the standard arguments --inline-suppr appears to be ignored if --suppressions-list is specified. Cppcheck >=
   # 2.10 requires all "file" entries within a compile_commands.json to exist whereas previously only a warning was
   # emitted if an entry didn't exist. Files such as qrc_*, moc_* files from Qt are listed but don't exist as they are
   # made by build rules. We filter the raw cmake-generated compile_commands.json below before executing cppcheck.
   set(CPPCHECK_ARGS
       --enable=all
+      # 2.12 has missingInclude switched on by default if running with multiple cores but it doesn't appear to work
+      # correctly. It was flagging many stl and other external header files as missing.
+      --disable=missingInclude
+      # Adding qt here helps with mis-identifying Qt macros as unknownMacro defects.
+      --library=qt
+      --check-level=exhaustive
       --inline-suppr
       --max-configs=120
       --std=c++${CMAKE_CXX_STANDARD} # use the standard from cmake
       --cppcheck-build-dir="${CPPCHECK_BUILD_DIR}/cache"
       --suppressions-list="${CPPCHECK_BUILD_DIR}/CppCheck_Suppressions.txt"
       --project="${CMAKE_BINARY_DIR}/compile_commands_cppcheck.json"
+      --checkers-report=${CMAKE_BINARY_DIR}/cppcheck_checkers_reports.txt
       -i"${CMAKE_BINARY_DIR}"
       # Force cppcheck to check when we use project-wide macros
       -DDLLExport=
@@ -52,6 +59,13 @@ if(CPPCHECK_EXECUTABLE)
   else(CPPCHECK_GENERATE_XML)
     list(APPEND _cppcheck_xml_args "${_cppcheck_source_dirs}")
   endif(CPPCHECK_GENERATE_XML)
+
+  if(NOT WIN32)
+    message(STATUS "cppcheck configured to run (ignoring xml arguments)")
+    message(STATUS "remove the project argument to supply files to check")
+    list(JOIN _cppcheck_args " " _cppcheck_args_for_printing)
+    message(STATUS "${CPPCHECK_EXECUTABLE} ${_cppcheck_args_for_printing}")
+  endif()
 
   # generate the target
   if(NOT TARGET cppcheck)

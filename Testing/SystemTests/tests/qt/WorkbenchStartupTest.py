@@ -5,7 +5,6 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import os
-import psutil
 import subprocess
 import sys
 import systemtesting
@@ -14,7 +13,11 @@ from mantid.kernel import ConfigService
 from tempfile import NamedTemporaryFile
 
 TEST_MESSAGE = "Hello Mantid!"
-EXECUTABLE_SWITCHER = {"linux": ["launch_mantidworkbench.sh", "mantidworkbench"], "darwin": ["workbench"], "win32": ["workbench.exe"]}
+EXECUTABLE_SWITCHER = {
+    "linux": ["launch_mantidworkbench.sh", "workbench"],
+    "darwin": ["workbench"],
+    "win32": ["workbench"],
+}
 SUBPROCESS_TIMEOUT_SECS = 300
 
 
@@ -25,33 +28,10 @@ def get_mantid_executables_for_platform(platform):
     return workbench_executables
 
 
-def get_mantid_executable_path(platform):
-    directory = ConfigService.getPropertiesDir().replace("\\", "/")
-    for executable in get_mantid_executables_for_platform(platform):
-        workbench_exe = os.path.join(directory, executable)
-        if os.path.exists(workbench_exe):
-            return workbench_exe
-    raise RuntimeError(f"Could not find path to {workbench_exe}. Tried {get_mantid_executables_for_platform(platform)}")
-
-
 def start_and_wait_for_completion(args_list):
-    pids_before_open = set(psutil.pids())
     process = subprocess.Popen(args_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     exitcode = process.wait(timeout=SUBPROCESS_TIMEOUT_SECS)
-    if sys.platform == "win32":
-        # The setuptools generated .exe starts a new process using 'pythonw workbench-script.pyw'
-        # but this outer process does not wait for the child to finish so completes leaving workbench
-        # to continue. We attempt to find the python child process by looking at the created pids
-        # and we wait on that. A timeout is set just in case we pick the wrong process and we wait forever
-        pids_after_open = set(psutil.pids())
-        new_pids_created = pids_after_open - pids_before_open
-        for pid in new_pids_created:
-            proc = psutil.Process(pid)
-            if "python" in proc.exe():
-                print(f"Found Python subprocess {proc.exe()}. Pid={pid}. Waiting for completion...")
-                proc.wait(timeout=SUBPROCESS_TIMEOUT_SECS)
-
-    return exitcode
+    return exitcode, process.stderr.read().decode()
 
 
 def write_test_script(test_script, test_file):
@@ -78,18 +58,28 @@ class WorkbenchStartupTest(systemtesting.MantidSystemTest):
 
         self._test_file = NamedTemporaryFile(suffix=".txt", delete=False).name.replace("\\", "/")
         self._test_script = NamedTemporaryFile(suffix=".py", delete=False).name.replace("\\", "/")
-        self._executable = get_mantid_executable_path(sys.platform)
+        self._executables = get_mantid_executables_for_platform(sys.platform)
         write_test_script(self._test_script, self._test_file)
 
     def runTest(self):
-        exitcode = start_and_wait_for_completion([self._executable, "--execute", self._test_script, "--quit"])
+        directory = ConfigService.getPropertiesDir().replace("\\", "/")
+        for executable in self._executables:
+            file_path = os.path.join(directory, executable)
+            executable, module = (file_path, False) if os.path.exists(file_path) else (executable, True)
+            arg_list = [executable, "--execute", self._test_script, "--quit"]
+            if module:
+                arg_list = ["python", "-m"] + arg_list
 
-        # Was the process successful
-        self.assertEqual(0, exitcode)
-        # Assert that the test script runs successfully by writing to a .txt file
-        with open(self._test_file, "r") as file:
-            self.assertEqual(TEST_MESSAGE, file.readline())
+            exitcode, stderr = start_and_wait_for_completion(arg_list)
+            # Was the process successful
+            self.assertEqual(0, exitcode)
+            # Check for no warnings or errors on startup
+            error_warning_lines = [line for line in stderr.split("\n") if "[Error]" in line or "[Warning]" in line]
+            self.assertEqual([], error_warning_lines, f"stderr was warning / error output: {error_warning_lines}")
+            # Assert that the test script runs successfully by writing to a .txt file
+            with open(self._test_file, "r") as file:
+                self.assertEqual(TEST_MESSAGE, file.readline())
+            remove_file(self._test_file)
 
     def cleanup(self):
         remove_file(self._test_script)
-        remove_file(self._test_file)

@@ -75,7 +75,7 @@ def get_value(log):
     else:
         # convert to numpy array to fix some issues converting _kernel.std_vector_dbl to string
         opt = np.get_printoptions()
-        np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+        np.set_printoptions(threshold=500, edgeitems=50, linewidth=np.inf)
         s = str(np.array(log.value))
         np.set_printoptions(**opt)  # reset the default options
         return s
@@ -231,10 +231,10 @@ class SampleLogsModel:
                 item.setToolTip("All of the values in the log are marked invalid, none of them are filtered.")
             elif invalid_value_count > 0:
                 saturation = 10 + (170 * (invalid_value_count / (log_size + invalid_value_count)))
-                item.setData(QColor.fromHsv(0, saturation, 255), Qt.BackgroundRole)
+                item.setData(QColor.fromHsv(0, int(saturation), 255), Qt.BackgroundRole)
                 aux_verb = "is" if invalid_value_count == 1 else "are"
                 item.setToolTip(
-                    f"{invalid_value_count}/{log_size+invalid_value_count} of the values in the log"
+                    f"{invalid_value_count}/{log_size + invalid_value_count} of the values in the log"
                     f" {aux_verb} marked invalid, and {aux_verb} filtered."
                 )
             try:

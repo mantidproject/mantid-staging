@@ -12,9 +12,10 @@
 #include "MantidAPI/IFileLoader.h"
 #include "MantidAPI/ITableWorkspace_fwd.h"
 #include "MantidAPI/MatrixWorkspace_fwd.h"
+#include "MantidAPI/NexusFileLoader.h"
+#include "MantidAPI/Sample.h"
 #include "MantidDataHandling/DllConfig.h"
 #include "MantidHistogramData/BinEdges.h"
-#include "MantidKernel/NexusDescriptor.h"
 #include "MantidKernel/cow_ptr.h"
 #include "MantidNexus/NexusClasses.h"
 #include <map>
@@ -40,7 +41,7 @@ Required Properties:
 <LI> InputWorkspace - The name of the workspace to put the data </LI>
 </UL>
 */
-class MANTID_DATAHANDLING_DLL LoadNexusProcessed : public API::IFileLoader<Kernel::NexusDescriptor> {
+class MANTID_DATAHANDLING_DLL LoadNexusProcessed : public API::NexusFileLoader {
 
 public:
   /// Default constructor
@@ -64,7 +65,7 @@ public:
   const std::string category() const override { return "DataHandling\\Nexus"; }
 
   /// Returns a confidence value that this algorithm can load a file
-  int confidence(Kernel::NexusDescriptor &descriptor) const override;
+  int confidence(Kernel::NexusHDF5Descriptor &descriptor) const override;
 
 protected:
   /// Read the spectra
@@ -78,7 +79,7 @@ private:
   /// Overwrites Algorithm method.
   void init() override;
   /// Overwrites Algorithm method
-  void exec() override;
+  void execLoader() override;
 
   /// Create the workspace name if it's part of a group workspace
   std::string buildWorkspaceName(const std::string &name, const std::string &baseName, size_t wsIndex);
@@ -93,10 +94,12 @@ private:
   std::string loadWorkspaceName(Mantid::NeXus::NXRoot &root, const std::string &entry_name);
 
   /// Load nexus geometry and apply to workspace
-  virtual bool loadNexusGeometry(Mantid::API::Workspace &, const int, Kernel::Logger &,
-                                 const std::string &) { /*do nothing*/
-    return false;
+  virtual bool loadNexusGeometry(Mantid::API::Workspace & /* ws */, size_t /* entryNumber */,
+                                 Kernel::Logger & /* logger */,
+                                 const std::string & /* filePath */) { /* args not used */
+    return false;                                                      /*do nothing*/
   }
+
   /// Load a single entry
   API::Workspace_sptr loadEntry(Mantid::NeXus::NXRoot &root, const std::string &entry_name, const double &progressStart,
                                 const double &progressRange);
@@ -116,9 +119,9 @@ private:
   /// Loads a V3D column to the TableWorkspace.
   void loadV3DColumn(Mantid::NeXus::NXDouble &data, const API::ITableWorkspace_sptr &tableWs);
 
-  API::Workspace_sptr loadPeaksEntry(Mantid::NeXus::NXEntry &entry);
+  API::Workspace_sptr loadPeaksEntry(const Mantid::NeXus::NXEntry &entry);
 
-  API::Workspace_sptr loadLeanElasticPeaksEntry(Mantid::NeXus::NXEntry &entry);
+  API::Workspace_sptr loadLeanElasticPeaksEntry(const Mantid::NeXus::NXEntry &entry);
 
   API::MatrixWorkspace_sptr loadEventEntry(Mantid::NeXus::NXData &wksp_cls, Mantid::NeXus::NXDouble &xbins,
                                            const double &progressStart, const double &progressRange);
@@ -160,7 +163,7 @@ private:
                  const API::MatrixWorkspace_sptr &local_workspace);
 
   /// Load the data from a non-spectra axis (Numeric/Text) into the workspace
-  void loadNonSpectraAxis(const API::MatrixWorkspace_sptr &local_workspace, Mantid::NeXus::NXData &data);
+  void loadNonSpectraAxis(const API::MatrixWorkspace_sptr &local_workspace, const Mantid::NeXus::NXData &data);
 
   /// Validates the optional 'spectra to read' properties, if they have been set
   void checkOptionalProperties(const std::size_t numberofspectra);

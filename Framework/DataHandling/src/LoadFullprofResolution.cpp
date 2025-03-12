@@ -18,7 +18,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/iter_find.hpp>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
 #include <Poco/DOM/AutoPtr.h>
@@ -225,27 +224,18 @@ void LoadFullprofResolution::exec() {
  * @param lines :: vector of strings for each non-empty line in .irf file
  */
 void LoadFullprofResolution::loadFile(const string &filename, vector<string> &lines) {
-  string line;
-
-  // the variable of type ifstream:
   ifstream myfile(filename.c_str());
 
-  // check to see if the file is opened:
   if (myfile.is_open()) {
-    // while there are still lines in the
-    // file, keep reading:
     while (!myfile.eof()) {
-      // place the line from myfile into the
-      // line variable:
+      string line;
       getline(myfile, line);
 
-      // display the line we gathered:
       boost::algorithm::trim(line);
       if (!line.empty())
         lines.emplace_back(line);
     }
 
-    // close the stream:
     myfile.close();
   } else {
     stringstream errmsg;
@@ -305,7 +295,6 @@ void LoadFullprofResolution::scanBanks(const vector<string> &lines, const bool u
 
       // Start the new pair
       startindex = static_cast<int>(i);
-      endindex = -1;
 
       // Get bank ID
       if (useFileBankIDs) { // Get bank ID from line
@@ -330,7 +319,7 @@ void LoadFullprofResolution::scanBanks(const vector<string> &lines, const bool u
 
   g_log.debug() << "[DB1112] Number of bank IDs = " << banks.size() << ", "
                 << "Number of ranges = " << bankstartindexmap.size() << '\n';
-  for (auto &bank : banks) {
+  for (const auto &bank : banks) {
     g_log.debug() << "Bank " << bank << " From line " << bankstartindexmap[bank] << " to " << bankendindexmap[bank]
                   << '\n';
   }
@@ -386,7 +375,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
     // Parse
     g_log.debug() << "Parse Line " << i << "\t\t" << line << "\n";
 
-    if (boost::starts_with(line, "TOFRG")) {
+    if (line.starts_with("TOFRG")) {
       // TOFRG tof-min step tof-max
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
@@ -400,7 +389,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["step"] = parseDoubleValue(terms[2], "step");
         parammap["tof-max"] = parseDoubleValue(terms[3], "tof-max");
       }
-    } else if (boost::starts_with(line, "D2TOF")) {
+    } else if (line.starts_with("D2TOF")) {
       // D2TOF Dtt1 Dtt2 Zero
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
@@ -420,7 +409,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         }
       }
     } // "D2TOF"
-    else if (boost::starts_with(line, "ZD2TOF")) {
+    else if (line.starts_with("ZD2TOF")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 3) {
@@ -434,7 +423,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Dtt2"] = 0.;
       }
     } // "ZD2TOF"
-    else if (boost::starts_with(line, "D2TOT")) {
+    else if (line.starts_with("D2TOT")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 6) {
@@ -450,7 +439,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Zerot"] = parseDoubleValue(terms[5], "Zerot");
       }
     } // "D2TOT"
-    else if (boost::starts_with(line, "ZD2TOT")) {
+    else if (line.starts_with("ZD2TOT")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 6) {
@@ -466,7 +455,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Width"] = parseDoubleValue(terms[5], "Width");
       }
     } // "ZD2TOT"
-    else if (boost::starts_with(line, "TWOTH")) {
+    else if (line.starts_with("TWOTH")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 2) {
@@ -478,7 +467,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["twotheta"] = parseDoubleValue(terms[1], "twotheta");
       }
     } // "TWOTH"
-    else if (boost::starts_with(line, "SIGMA")) {
+    else if (line.starts_with("SIGMA")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 4) {
@@ -492,7 +481,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Sig0"] = sqrt(parseDoubleValue(terms[3], "Sig0"));
       }
     } // "SIGMA"
-    else if (boost::starts_with(line, "GAMMA")) {
+    else if (line.starts_with("GAMMA")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 4) {
@@ -506,7 +495,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Gam0"] = parseDoubleValue(terms[3], "Gam0");
       }
     } // "GAMMA"
-    else if (boost::starts_with(line, "ALFBE")) {
+    else if (line.starts_with("ALFBE")) {
       // ALFBE alph0 beta0 alph1 beta1
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
@@ -522,7 +511,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Beta1"] = parseDoubleValue(terms[4], "Beta1");
       }
     } // "ALFBE"
-    else if (boost::starts_with(line, "ALFBT")) {
+    else if (line.starts_with("ALFBT")) {
       vector<string> terms;
       boost::split(terms, line, boost::is_any_of(" "), boost::token_compress_on);
       if (terms.size() != 5) {
@@ -537,7 +526,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
         parammap["Beta1t"] = parseDoubleValue(terms[4], "Beta1t");
       }
     } // "ALFBT"
-    else if (boost::starts_with(line, "END")) {
+    else if (line.starts_with("END")) {
       // Ignore END line
       g_log.debug("END line of bank.");
     } else {
@@ -548,7 +537,7 @@ void LoadFullprofResolution::parseResolutionStrings(map<string, double> &paramma
 }
 
 //----------------------------------------------------------------------------------------------
-/** Parse a line containig bank information
+/** Parse a line containing bank information
  */
 void LoadFullprofResolution::parseBankLine(string line, double &cwl, int &bankid) {
   // 1. Split along 'Bank'
@@ -688,7 +677,7 @@ TableWorkspace_sptr LoadFullprofResolution::genTableWorkspace(map<int, map<strin
       }
 
     } // END(j)
-  }   // END(i)
+  } // END(i)
 
   return tablews;
 }
@@ -962,9 +951,9 @@ void LoadFullprofResolution::getTableRowNumbers(const API::ITableWorkspace_sptr 
   size_t numrows = tablews->rowCount();
   for (size_t i = 0; i < numrows; ++i) {
     TableRow row = tablews->getRow(i);
-    std::string name;
-    row >> name;
-    parammap.emplace(name, i);
+    std::string paramName;
+    row >> paramName;
+    parammap.emplace(paramName, i);
   }
 }
 

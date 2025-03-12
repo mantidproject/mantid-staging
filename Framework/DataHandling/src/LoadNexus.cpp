@@ -112,7 +112,9 @@ void LoadNexus::exec() {
 }
 
 void LoadNexus::runLoadMuonNexus() {
-  auto loadMuonNexus = createChildAlgorithm("LoadMuonNexus", 0., 1.);
+  // The Load algorithm will choose the correct LoadMuonNexus algorithm
+  auto loadMuonNexus = createChildAlgorithm("Load", 0., 1.);
+
   // Pass through the same input filename
   loadMuonNexus->setPropertyValue("Filename", m_filename);
   // Set the workspace property
@@ -245,13 +247,13 @@ void LoadNexus::setOutputWorkspace(const API::IAlgorithm_sptr &loader) {
   for (size_t i = 0; i < count; ++i) {
     Property *prop = loaderProps[i];
     if (dynamic_cast<IWorkspaceProperty *>(prop) && prop->direction() == Direction::Output) {
-      const std::string &name = prop->name();
-      if (!this->existsProperty(name)) {
-        declareProperty(
-            std::make_unique<WorkspaceProperty<Workspace>>(name, loader->getPropertyValue(name), Direction::Output));
+      const std::string &propName = prop->name();
+      if (!this->existsProperty(propName)) {
+        declareProperty(std::make_unique<WorkspaceProperty<Workspace>>(propName, loader->getPropertyValue(propName),
+                                                                       Direction::Output));
       }
-      Workspace_sptr wkspace = loader->getProperty(name);
-      setProperty(name, wkspace);
+      Workspace_sptr wkspace = loader->getProperty(propName);
+      setProperty(propName, wkspace);
     }
   }
 }

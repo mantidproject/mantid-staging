@@ -22,7 +22,6 @@ class MuonGroup(object):
     """
 
     def __init__(self, group_name, detector_ids=(1,), periods=(1,)):
-
         self._group_name = group_name
         self._detector_ids = None
         self._periods = list(periods)
@@ -69,7 +68,7 @@ class MuonGroup(object):
     @name.setter
     def name(self, name):
         raise AttributeError(
-            "Attempting to change name from {} to {}. " "Cannot change name of MuonGroup " "object".format(self._group_name, name)
+            "Attempting to change name from {} to {}. Cannot change name of MuonGroup object".format(self._group_name, name)
         )
 
     @property
@@ -152,7 +151,6 @@ class MuonGroup(object):
                 and self._asymmetry_estimate_rebin[run_object].workspace_name
                 and not self._asymmetry_estimate_rebin[run_object].is_hidden
             ):
-
                 workspace_list.append(self._asymmetry_estimate_rebin[run_object].workspace_name)
 
         return workspace_list

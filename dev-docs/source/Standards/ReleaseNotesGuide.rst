@@ -73,6 +73,7 @@ Release note files need to be saved in the directory that best represents their 
 or ``Bugfixes`` directory. For example a Bugfix release note for Engineering Diffraction should sit within ``/Diffraction/Engineering/Bugfixes`` .
 
 Release notes should not be placed in any directory outside of ``New_features`` or ``Bugfixes`` e.g. do not place release notes in ``/Diffraction/Engineering``. You should also not save release notes in any directory titled ``Used`` as this is for notes that have already been collated into the release notes.
+The only exception to this is for Algorithms and Fit Functions in the Framework Directory that additionally have ``Deprecated`` and ``Removed``.
 
 If you are uncertain where your release note should be see the :ref:`Standard File Structure <ReleaseNoteFileStructure>`.
 
@@ -85,18 +86,19 @@ another sub-heading (e.g. Powder Diffraction, Algorithms, MSlice), you need to d
 - Add ``New_features`` and ``Bugfixes`` directories within your new directory. The automated script only works with these directories.
 - Update the top level release note file with your new heading and sub-headings. For each subheading you need to add an ``amalgamate`` statement with a link to each new directory to ensure the notes will be visible for users. For this example it may look something like this
 
-.. code-block:: python
+.. rstcheck: ignore-next-code-block
+.. code-block:: rst
 
-	Algorithms
-	----------
+   Algorithms
+   ----------
 
-	New features
-	############
-	.. amalgamate:: Workbench/Algorithm/New_features
+   New features
+   ############
+   .. amalgamate:: Workbench/Algorithm/New_features
 
-	Bugfixes
-	############
-	.. amalgamate:: Workbench/Algorithm/Bugfixes
+   Bugfixes
+   ############
+   .. amalgamate:: Workbench/Algorithm/Bugfixes
 
 
 Once all the directories are in place you can add your release note as a separate file as outlined above.
@@ -190,11 +192,15 @@ This is the basic directory structure that is available to you for release notes
 
 	  + New features
 	  + Bugfixes
+	  + Deprecated
+	  + Removed
 
   - Fit Functions (Sub-heading)
 
 	  + New features
 	  + Bugfixes
+	  + Deprecated
+	  + Removed
 
   - Data Objects (Sub-heading)
 
@@ -215,6 +221,16 @@ This is the basic directory structure that is available to you for release notes
 
 	  + New features
 	  + Bugfixes
+
+* Inelastic (Main Heading)
+
+  - New features
+  - Bugfixes
+
+  - Algorithms (Sub-heading)
+
+          + New features
+          + Bugfixes
 
 * Mantid Workbench (Main Heading)
 

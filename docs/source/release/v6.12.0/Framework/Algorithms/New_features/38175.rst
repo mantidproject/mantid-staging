@@ -1,0 +1,1 @@
+- The AlgoTimeRegister class is exposed to python to measure time taken by other algorithms to run.

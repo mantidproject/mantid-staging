@@ -9,6 +9,7 @@
 @author Spencer Howells, ISIS
 @date December 05, 2013
 """
+
 import math
 import numpy as np
 
@@ -17,7 +18,6 @@ from scipy import constants
 
 
 class HallRoss(IFunction1D):
-
     planck_constant = constants.Planck / constants.e * 1e15  # meV*psec
     hbar = planck_constant / (2 * np.pi)  # meV * ps  = ueV * ns
 
@@ -31,21 +31,21 @@ class HallRoss(IFunction1D):
 
     def function1D(self, xvals):
         tau = self.getParameterValue("Tau")
-        l = self.getParameterValue("L")
-        l = l**2 / 2
+        L = self.getParameterValue("L")
+        L = L**2 / 2
         xvals = np.array(xvals)
 
         with np.errstate(divide="ignore"):
-            hwhm = self.hbar * (1.0 - np.exp(-l * np.square(xvals))) / tau
+            hwhm = self.hbar * (1.0 - np.exp(-L * np.square(xvals))) / tau
         return hwhm
 
     def functionDeriv1D(self, xvals, jacobian):
         tau = self.getParameterValue("Tau")
-        l = self.getParameterValue("L")
-        l = l**2 / 2
+        L = self.getParameterValue("L")
+        L = L**2 / 2
 
         for i, x in enumerate(xvals, start=0):
-            ex = math.exp(-l * x * x)
+            ex = math.exp(-L * x * x)
             hwhm = self.hbar * (1.0 - ex) / tau
             jacobian.set(i, 0, -hwhm / tau)
             jacobian.set(i, 1, x * x * ex / tau)

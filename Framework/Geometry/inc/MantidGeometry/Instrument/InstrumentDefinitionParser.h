@@ -111,7 +111,7 @@ private:
     std::string idname;
 
     /// Constructor
-    IdList() : counted(0){};
+    IdList() : counted(0) {};
 
     /// return true if empty
     bool empty() { return vec.empty(); };
@@ -276,6 +276,9 @@ private:
 
   /// Name of the instrument
   std::string m_instName;
+
+  /// Store if xml text contains side-by-side-view-location string
+  bool m_sideBySideViewLocation_exists;
 
   /// XML document is lazy loaded
   Poco::AutoPtr<Poco::XML::Document> m_pDoc;

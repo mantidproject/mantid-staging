@@ -5,10 +5,12 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" Utility for generating a class file, header, and test file """
+"""Utility for generating a class file, header, and test file"""
+
 import argparse
 import datetime
-from cmakelists_utils import *
+import os
+from cmakelists_utils import add_to_cmake, find_basedir
 
 VERSION = "1.0"
 
@@ -54,14 +56,14 @@ private:
 // SPDX - License - Identifier: GPL - 3.0 +
 #pragma once
 
-#include "Mantid{subproject}/DllConfig.h"
 {alg_include}
+#include "Mantid{subproject}/DllConfig.h"
 
 namespace Mantid {{
 namespace {subproject} {{
 
 /** {classname} : TODO: DESCRIPTION
-*/
+ */
 class MANTID_{subproject_upper}_DLL {classname}{alg_class_declare} {{
 public:{algorithm_header}}};
 
@@ -86,14 +88,12 @@ def write_source(subproject, classname, filename, args):
     print("Writing source file to", filename)
     f = open(filename, "w")
 
-    algorithm_top = """using Mantid::Kernel::Direction;
-using Mantid::API::WorkspaceProperty;
+    algorithm_top = """using Mantid::API::WorkspaceProperty;
+using Mantid::Kernel::Direction;
 
 // Register the algorithm into the AlgorithmFactory
 DECLARE_ALGORITHM({})
-""".format(
-        classname
-    )
+""".format(classname)
     algorithm_source = """
 //----------------------------------------------------------------------------------------------
 
@@ -104,27 +104,19 @@ const std::string {algname}::name() const {{ return "{algname}"; }}
 int {algname}::version() const {{ return 1; }}
 
 /// Algorithm's category for identification. @see Algorithm::category
-const std::string {algname}::category() const {{
-  return "TODO: FILL IN A CATEGORY";
-}}
+const std::string {algname}::category() const {{ return "TODO: FILL IN A CATEGORY"; }}
 
 /// Algorithm's summary for use in the GUI and help. @see Algorithm::summary
-const std::string {algname}::summary() const {{
-  return "TODO: FILL IN A SUMMARY";
-}}
+const std::string {algname}::summary() const {{ return "TODO: FILL IN A SUMMARY"; }}
 
 //----------------------------------------------------------------------------------------------
 /** Initialize the algorithm's properties.
  */
 void {algname}::init() {{
-  declareProperty(
-      std::make_unique<WorkspaceProperty<API::Workspace>>("InputWorkspace", "",
-                                                             Direction::Input),
-      "An input workspace.");
-  declareProperty(
-      std::make_unique<WorkspaceProperty<API::Workspace>>("OutputWorkspace", "",
-                                                             Direction::Output),
-      "An output workspace.");
+  declareProperty(std::make_unique<WorkspaceProperty<API::Workspace>>("InputWorkspace", "", Direction::Input),
+                  "An input workspace.");
+  declareProperty(std::make_unique<WorkspaceProperty<API::Workspace>>("OutputWorkspace", "", Direction::Output),
+                  "An output workspace.");
 }}
 
 //----------------------------------------------------------------------------------------------
@@ -133,9 +125,7 @@ void {algname}::init() {{
 void {algname}::exec() {{
   // TODO Auto-generated execute stub
 }}
-""".format(
-        algname=classname
-    )
+""".format(algname=classname)
 
     if not args.alg:
         algorithm_top = ""
@@ -174,27 +164,26 @@ def write_test(subproject, classname, filename, args):
     f = open(filename, "w")
 
     algorithm_test = """
-  void test_Init()
-  {{
+  void test_Init() {{
     {algname} alg;
-    TS_ASSERT_THROWS_NOTHING( alg.initialize() )
-    TS_ASSERT( alg.isInitialized() )
+    TS_ASSERT_THROWS_NOTHING(alg.initialize())
+    TS_ASSERT(alg.isInitialized())
   }}
 
-  void test_exec()
-  {{
-    // Create test input if necessary
-    MatrixWorkspace_sptr inputWS = //-- Fill in appropriate code. Consider using TestHelpers/WorkspaceCreationHelpers.h --
+  void test_exec() {{
+    // Create test input if necessary by filling in appropriate code below.
+    // Consider using MantidFrameworkTestHelpers/WorkspaceCreationHelper.h
+    // MatrixWorkspace_sptr inputWS =
 
     {algname} alg;
     // Don't put output in ADS by default
     alg.setChild(true);
-    TS_ASSERT_THROWS_NOTHING( alg.initialize() )
-    TS_ASSERT( alg.isInitialized() )
-    TS_ASSERT_THROWS_NOTHING( alg.setProperty("InputWorkspace", inputWS) );
-    TS_ASSERT_THROWS_NOTHING( alg.setPropertyValue("OutputWorkspace", "_unused_for_child") );
-    TS_ASSERT_THROWS_NOTHING( alg.execute(); );
-    TS_ASSERT( alg.isExecuted() );
+    TS_ASSERT_THROWS_NOTHING(alg.initialize())
+    TS_ASSERT(alg.isInitialized())
+    TS_ASSERT_THROWS_NOTHING(alg.setProperty("InputWorkspace", inputWS));
+    TS_ASSERT_THROWS_NOTHING(alg.setPropertyValue("OutputWorkspace", "_unused_for_child"));
+    TS_ASSERT_THROWS_NOTHING(alg.execute(););
+    TS_ASSERT(alg.isExecuted());
 
     // Retrieve the workspace from the algorithm. The type here will probably need to change. It should
     // be the type using in declareProperty for the "OutputWorkspace" type.
@@ -203,9 +192,7 @@ def write_test(subproject, classname, filename, args):
     TS_ASSERT(outputWS);
     TS_FAIL("TODO: Check the results and remove this line");
   }}
-  """.format(
-        algname=classname
-    )
+""".format(algname=classname)
 
     if not args.alg:
         algorithm_test = ""
@@ -229,19 +216,11 @@ public:
   // This pair of boilerplate methods prevent the suite being created statically
   // This means the constructor isn't called when running other tests
   static {classname}Test *createSuite() {{ return new {classname}Test(); }}
-  static void destroySuite( {classname}Test *suite ) {{ delete suite; }}
-
+  static void destroySuite({classname}Test *suite) {{ delete suite; }}
 {algorithm_test}
-  void test_Something()
-  {{
-    TS_FAIL( "You forgot to write a test!");
-  }}
-
-
+  void test_Something() {{ TS_FAIL("You forgot to write a test!"); }}
 }};
-""".format(
-        year=get_year(), subproject=subproject, subfolder=args.subfolder, classname=classname, algorithm_test=algorithm_test
-    )
+""".format(year=get_year(), subproject=subproject, subfolder=args.subfolder, classname=classname, algorithm_test=algorithm_test)
     f.write(s)
     f.close()
 
@@ -297,16 +276,13 @@ Output:
 
 .. sourcelink::
 
-""".format(
-        algname=classname
-    )
+""".format(algname=classname)
 
     f.write(s)
     f.close()
 
 
 def generate(subproject, classname, overwrite, args):
-
     # Directory at base of subproject
     basedir, header_folder = find_basedir(args.project, subproject)
 
@@ -353,8 +329,7 @@ def generate(subproject, classname, overwrite, args):
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description="Utility to create Mantid class files: header, source and test. " "version " + VERSION)
+    parser = argparse.ArgumentParser(description="Utility to create Mantid class files: header, source and test. version " + VERSION)
     parser.add_argument("subproject", metavar="SUBPROJECT", type=str, help="The subproject under Framework/; e.g. Kernel")
     parser.add_argument("classname", metavar="CLASSNAME", type=str, help="Name of the class to create")
     parser.add_argument(
@@ -382,7 +357,7 @@ if __name__ == "__main__":
         "--subfolder",
         dest="subfolder",
         default="",
-        help="Put the source under a subfolder below the main part of the project, e.g. " "Geometry/Instrument.",
+        help="Put the source under a subfolder below the main part of the project, e.g. Geometry/Instrument.",
     )
     parser.add_argument(
         "--project", dest="project", default="Framework", help="The project in which this goes. Default: Framework. Can be MantidQt"

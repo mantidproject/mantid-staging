@@ -29,11 +29,10 @@
 #include "MantidKernel/MDUnitFactory.h"
 #include "MantidKernel/Memory.h"
 #include "MantidKernel/PropertyWithValue.h"
-#include "MantidKernel/System.h"
 #include "MantidMDAlgorithms/SetMDFrame.h"
+#include "MantidNexusCpp/NeXusException.hpp"
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
-#include <nexus/NeXusException.hpp>
 #include <vector>
 
 using namespace Mantid::Kernel;
@@ -198,8 +197,8 @@ void LoadMD::execLoader() {
     // Use the factory to make the workspace of the right type
     IMDEventWorkspace_sptr ws;
     if (m_visualNormalizationHisto && m_visualNormalization) {
-      ws = MDEventFactory::CreateMDWorkspace(m_numDims, eventType, m_visualNormalization.get(),
-                                             m_visualNormalizationHisto.get());
+      ws = MDEventFactory::CreateMDWorkspace(m_numDims, eventType, m_visualNormalization.value(),
+                                             m_visualNormalizationHisto.value());
     } else {
       ws = MDEventFactory::CreateMDWorkspace(m_numDims, eventType);
     }
@@ -285,7 +284,7 @@ void LoadMD::loadHisto() {
   MDHistoWorkspace_sptr ws;
   // If display normalization has been provided. Use that.
   if (m_visualNormalization) {
-    ws = std::make_shared<MDHistoWorkspace>(m_dims, m_visualNormalization.get());
+    ws = std::make_shared<MDHistoWorkspace>(m_dims, m_visualNormalization.value());
   } else {
     ws = std::make_shared<MDHistoWorkspace>(m_dims); // Whatever MDHistoWorkspace defaults to.
   }
@@ -406,7 +405,7 @@ void LoadMD::loadDimensions2() {
 }
 
 void LoadMD::loadVisualNormalization(const std::string &key,
-                                     boost::optional<Mantid::API::MDNormalization> &normalization) {
+                                     std::optional<Mantid::API::MDNormalization> &normalization) {
   try {
     uint32_t readVisualNormalization(0);
     m_file->readData(key, readVisualNormalization);

@@ -5,9 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.api import *
+from mantid.api import mtd, AlgorithmFactory, PythonAlgorithm, MatrixWorkspace, MatrixWorkspaceProperty
+from mantid.kernel import Direction, FloatArrayProperty, Property
 from mantid.simpleapi import ConjoinWorkspaces, Rebin, DeleteWorkspace, ExtractSpectra
-from mantid.kernel import *
 import numpy as np
 
 
@@ -83,13 +83,13 @@ class RebinRagged(PythonAlgorithm):
         if len(xmins) == 0 or len(xmaxs) == 1 or len(deltas) == 0:
             return False
         # is there (effectively) only one xmin?
-        if not (len(xmins) == 1 or np.alltrue(xmins == xmins[0])):
+        if not (len(xmins) == 1 or np.all(xmins == xmins[0])):
             return False
         # is there (effectively) only one xmin?
-        if not (len(xmaxs) == 1 or np.alltrue(xmaxs == xmaxs[0])):
+        if not (len(xmaxs) == 1 or np.all(xmaxs == xmaxs[0])):
             return False
         # is there (effectively) only one xmin?
-        if not (len(deltas) == 1 or np.alltrue(deltas == deltas[0])):
+        if not (len(deltas) == 1 or np.all(deltas == deltas[0])):
             return False
 
         # all of these point to 'just do rebin'
@@ -190,6 +190,7 @@ class RebinRagged(PythonAlgorithm):
                         startProgress=(progStart + 2 * progStep),
                         endProgress=(progStart + 3 * progStep),
                         EnableLogging=False,
+                        CheckMatchingBins=False,
                     )
             self.setProperty("OutputWorkspace", mtd[accumulationWS])
             DeleteWorkspace(accumulationWS, EnableLogging=False)

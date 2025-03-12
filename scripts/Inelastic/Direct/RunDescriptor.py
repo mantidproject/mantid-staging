@@ -7,14 +7,37 @@
 # pylint: disable=too-many-lines
 # pylint: disable=invalid-name
 # pylint: disable=attribute-defined-outside-init
-""" File contains Descriptors used describe run for direct inelastic reduction """
+"""File contains Descriptors used describe run for direct inelastic reduction"""
 
-from mantid.simpleapi import *
-from mantid.dataobjects import *
+from mantid.api import mtd, FileFinder, MatrixWorkspace, Workspace
+from mantid.dataobjects import EventWorkspace
 from mantid.kernel import funcinspect
-from Direct.PropertiesDescriptors import *
+from mantid.simpleapi import (
+    AddSampleLog,
+    CloneWorkspace,
+    ConjoinWorkspaces,
+    CopyInstrumentParameters,
+    CreateSingleValuedWorkspace,
+    CreateWorkspace,
+    CropWorkspace,
+    DeleteWorkspace,
+    ExtractMask,
+    ExtractMonitors,
+    ExtractSingleSpectrum,
+    Load,
+    LoadDetectorInfo,
+    Minus,
+    Multiply,
+    NormaliseByCurrent,
+    Plus,
+    Rebin,
+    RebinToWorkspace,
+    RenameWorkspace,
+)
+from Direct.PropertiesDescriptors import prop_helpers, PropDescriptor
+import os
 import re
-import collections
+import collections.abc
 
 
 class RunList(object):
@@ -461,7 +484,7 @@ class RunDescriptor(PropDescriptor):
         if value is None:  # clear current run number
             self._clear_all()
             return
-        if isinstance(value, api.Workspace):
+        if isinstance(value, Workspace):
             if self._ws_name:
                 if self._ws_name != value.name():
                     self._clear_all()
@@ -485,7 +508,7 @@ class RunDescriptor(PropDescriptor):
                     self._set_run_list(instance, run_num, file_path, fext)
                 else:
                     self._set_single_run(instance, run_num, file_path, fext)
-        elif isinstance(value, collections.Iterable):  # xrange provided
+        elif isinstance(value, collections.abc.Iterable):  # xrange provided
             value = list(value)
             self._set_run_list(instance, value, "", None)
         else:
@@ -536,7 +559,6 @@ class RunDescriptor(PropDescriptor):
                         self._fext = fext
 
     def _set_run_list(self, instance, run_list, file_path=None, fext=None):
-
         if self._run_list and self._run_list.check_runs_equal(run_list, file_path, fext):
             return
         else:
@@ -956,7 +978,6 @@ class RunDescriptor(PropDescriptor):
         spec_to_mon = RunDescriptor._holder.spectra_to_monitors_list
         combined_spec_list = prop_helpers.process_prop_list(mon_ws, "CombinedSpectraIDList")
         if monitors_separate and spec_to_mon:
-
             for specID in spec_to_mon:
                 if specID not in combined_spec_list:
                     mon_ws = self.copy_spectrum2monitors(data_ws, mon_ws, specID)
@@ -967,14 +988,14 @@ class RunDescriptor(PropDescriptor):
         if monitors_ID:
 
             def flatten_list(targ_list, source):
-                if isinstance(source, collections.Iterable):
+                if isinstance(source, collections.abc.Iterable):
                     for item in source:
                         targ_list = flatten_list(targ_list, item)
                 else:
                     targ_list.append(source)
                 return targ_list
 
-            if isinstance(monitors_ID, collections.Iterable):
+            if isinstance(monitors_ID, collections.abc.Iterable):
                 mon_list = []
                 mon_list = flatten_list(mon_list, monitors_ID)
             else:
@@ -1110,7 +1131,7 @@ class RunDescriptor(PropDescriptor):
                         RunDescriptor._logger(message, "warning")
                     raise RuntimeError(message)
                 else:
-                    message = "*** Cannot find run-file with extension {0}.\n" "    Found file {1} instead".format(old_ext, file_name)
+                    message = "*** Cannot find run-file with extension {0}.\n    Found file {1} instead".format(old_ext, file_name)
                     RunDescriptor._logger(message, "notice")
                 self._run_file_path = os.path.dirname(fname)
                 self._fext = fex
@@ -1176,7 +1197,7 @@ class RunDescriptor(PropDescriptor):
         use_ws_calibration=True,
         filePath=None,
         fileExt=None,
-        **kwargs
+        **kwargs,
     ):
         """Loads run into workspace with name provided.
 
@@ -1212,7 +1233,7 @@ class RunDescriptor(PropDescriptor):
 
         if not calibration or use_ws_calibration:
             return
-        if not isinstance(loaded_ws, api.Workspace):
+        if not isinstance(loaded_ws, Workspace):
             raise RuntimeError(" Calibration can be applied to a workspace only and got object of type {0}".format(type(loaded_ws)))
 
         if loaded_ws.run().hasProperty("calibrated"):
@@ -1231,8 +1252,9 @@ class RunDescriptor(PropDescriptor):
                     ws_calibration = FileFinder.getFullPath(ws_calibration)
                     if len(ws_calibration) == 0:
                         raise RuntimeError(
-                            "Can not find defined in run {0} calibration file {1}\n"
-                            "Define det_cal_file reduction parameter properly".format(loaded_ws.name(), test_name)
+                            "Can not find defined in run {0} calibration file {1}\nDefine det_cal_file reduction parameter properly".format(
+                                loaded_ws.name(), test_name
+                            )
                         )
                     RunDescriptor._logger(
                         "*** load_data: Calibrating data using workspace defined calibration file: {0}".format(ws_calibration), "notice"
@@ -1248,7 +1270,7 @@ class RunDescriptor(PropDescriptor):
             # Pull in pressures, thicknesses & update from cal file
             LoadDetectorInfo(Workspace=loaded_ws, DataFilename=ws_calibration, RelocateDets=True)
             AddSampleLog(Workspace=loaded_ws, LogName="calibrated", LogText=str(ws_calibration))
-        elif isinstance(ws_calibration, api.Workspace):
+        elif isinstance(ws_calibration, Workspace):
             RunDescriptor._logger("load_data: Copying detectors positions from workspace {0}: ".format(ws_calibration.name()), "debug")
             CopyInstrumentParameters(InputWorkspace=ws_calibration, OutputWorkspace=loaded_ws)
             AddSampleLog(Workspace=loaded_ws, LogName="calibrated", LogText=str(ws_calibration))
@@ -1267,7 +1289,7 @@ class RunDescriptor(PropDescriptor):
         """
         source_ws = self.get_workspace()
 
-        if isinstance(other_workspace, api.MatrixWorkspace):
+        if isinstance(other_workspace, MatrixWorkspace):
             targ_ws = other_workspace
         else:
             targ_ws = mtd[other_workspace]
@@ -1275,9 +1297,7 @@ class RunDescriptor(PropDescriptor):
         if "NormalizationFactor" not in source_ws.getRun():
             raise RuntimeError(
                 """ Can not change normalization of target workspace {0}
-                               as source workspace {1} is not normalized""".format(
-                    source_ws.name(), targ_ws.name()
-                )
+                               as source workspace {1} is not normalized""".format(source_ws.name(), targ_ws.name())
             )
         TargFactor = source_ws.getRun().getLogData("NormalizationFactor").value
         if "NormalizationFactor" in targ_ws.getRun():
@@ -1326,7 +1346,7 @@ class RunDescriptor(PropDescriptor):
         mon_ws_name = mon_ws.name()
         if not homo_binning:
             Rebin(InputWorkspace=mon_ws_name, OutputWorkspace=mon_ws_name, Params=bins, PreserveEvents="0")
-        ConjoinWorkspaces(InputWorkspace1=mon_ws_name, InputWorkspace2="tmp_mon")
+        ConjoinWorkspaces(InputWorkspace1=mon_ws_name, InputWorkspace2="tmp_mon", CheckMatchingBins=False)
         mon_ws = mtd[mon_ws_name]
 
         if "tmp_mon" in mtd:
@@ -1514,7 +1534,6 @@ class RunDescriptor(PropDescriptor):
         # end
 
         for ind, run_num in enumerate(runs_to_sum[load_start:num_to_sum]):
-
             RunDescriptor._logger("*** Adding  #{0}/{1}, run N: {2} ".format(ind + 1 + load_start, num_to_sum, run_num))
 
             term_name = "{0}_ADDITIVE_#{1}/{2}".format(inst_name, ind + 1 + load_start, num_to_sum)  #
@@ -1846,7 +1865,7 @@ class RunDescriptorDependent(RunDescriptor):
         use_ws_calibration=True,
         filePath=None,
         fileExt=None,
-        **kwargs
+        **kwargs,
     ):
         if self._has_own_value:
             return super(RunDescriptorDependent, self).load_run(

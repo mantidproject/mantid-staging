@@ -17,8 +17,8 @@
 #include "MantidGeometry/Instrument.h"
 #include "MantidKernel/ListValidator.h"
 #include "MantidKernel/OptionalBool.h"
+
 #include "MantidKernel/Strings.h"
-#include "MantidKernel/System.h"
 
 #include <Poco/DOM/DOMParser.h>
 #include <Poco/DOM/Element.h>
@@ -113,12 +113,9 @@ void LoadDetectorsGroupingFile::exec() {
     progress.report("Checking detector IDs");
 
     // 2. Check if detector IDs are given
-    if (!m_instrument) {
-      std::map<int, std::vector<detid_t>>::iterator dit;
-      for (dit = m_groupDetectorsMap.begin(); dit != m_groupDetectorsMap.end(); ++dit) {
-        if (!dit->second.empty())
-          throw std::invalid_argument("Grouping file specifies detector ID without instrument name");
-      }
+    if (!m_instrument && std::any_of(m_groupDetectorsMap.cbegin(), m_groupDetectorsMap.cend(),
+                                     [](const auto &pair) { return !pair.second.empty(); })) {
+      throw std::invalid_argument("Grouping file specifies detector ID without instrument name");
     }
 
     m_groupComponentsMap = loader.getGroupComponentsMap();
@@ -193,19 +190,14 @@ void LoadDetectorsGroupingFile::setByComponents() {
 
   // 0. Check
   if (!m_instrument) {
-    std::map<int, std::vector<std::string>>::iterator mapiter;
-    bool norecord = true;
-    for (mapiter = m_groupComponentsMap.begin(); mapiter != m_groupComponentsMap.end(); ++mapiter) {
-      if (!mapiter->second.empty()) {
-        g_log.error() << "Instrument is not specified in XML file.  "
-                      << "But tag 'component' is used in XML file for Group " << mapiter->first
-                      << " It is not allowed\n";
-        norecord = false;
-        break;
-      }
-    }
-    if (!norecord)
+    const auto it = std::find_if(m_groupComponentsMap.cbegin(), m_groupComponentsMap.cend(),
+                                 [](const auto &pair) { return !pair.second.empty(); });
+    if (it != m_groupComponentsMap.cend()) {
+      g_log.error() << "Instrument is not specified in XML file.  "
+                    << "But tag 'component' is used in XML file for Group " << it->first << " It is not allowed"
+                    << std::endl;
       throw std::invalid_argument("XML definition involving component causes error");
+    }
   }
 
   // 1. Prepare
@@ -215,10 +207,10 @@ void LoadDetectorsGroupingFile::setByComponents() {
   for (auto &componentMap : m_groupComponentsMap) {
     g_log.debug() << "Group ID = " << componentMap.first << " With " << componentMap.second.size() << " Components\n";
 
-    for (auto &name : componentMap.second) {
+    for (auto &componentName : componentMap.second) {
 
       // a) get component
-      Geometry::IComponent_const_sptr component = m_instrument->getComponentByName(name);
+      Geometry::IComponent_const_sptr component = m_instrument->getComponentByName(componentName);
 
       // b) component -> component assembly --> children (more than detectors)
       std::shared_ptr<const Geometry::ICompAssembly> asmb =
@@ -226,7 +218,7 @@ void LoadDetectorsGroupingFile::setByComponents() {
       std::vector<Geometry::IComponent_const_sptr> children;
       asmb->getChildren(children, true);
 
-      g_log.debug() << "Component Name = " << name << "  Component ID = " << component->getComponentID()
+      g_log.debug() << "Component Name = " << componentName << "  Component ID = " << component->getComponentID()
                     << "Number of Children = " << children.size() << '\n';
 
       for (const auto &child : children) {
@@ -246,7 +238,7 @@ void LoadDetectorsGroupingFile::setByComponents() {
         } // ENDIF Detector
 
       } // ENDFOR (children of component)
-    }   // ENDFOR (component)
+    } // ENDFOR (component)
 
   } // ENDFOR GroupID
 }
@@ -258,26 +250,21 @@ void LoadDetectorsGroupingFile::setByDetectors() {
 
   // 0. Check
   if (!m_instrument && !m_groupDetectorsMap.empty()) {
-    std::map<int, std::vector<detid_t>>::iterator mapiter;
-    bool norecord = true;
-    for (mapiter = m_groupDetectorsMap.begin(); mapiter != m_groupDetectorsMap.end(); ++mapiter)
-      if (!mapiter->second.empty()) {
-        norecord = false;
-        g_log.error() << "Instrument is not specified in XML file. "
-                      << "But tag 'detid' is used in XML file for Group " << mapiter->first
-                      << ". It is not allowed. \n";
-        break;
-      }
-
-    if (!norecord)
-      throw std::invalid_argument("XML definition involving detectors causes error");
+    const auto it = std::find_if(m_groupDetectorsMap.cbegin(), m_groupDetectorsMap.cend(),
+                                 [](const auto &pair) { return !pair.second.empty(); });
+    if (it != m_groupDetectorsMap.cend()) {
+      g_log.error() << "Instrument is not specified in XML file.  "
+                    << "But tag 'detid' is used in XML file for Group " << it->first << " It is not allowed"
+                    << std::endl;
+      throw std::invalid_argument("XML definition involving component causes error");
+    }
   }
 
   // 1. Prepare
   const detid2index_map indexmap = m_groupWS->getDetectorIDToWorkspaceIndexMap(true);
 
   // 2. Set GroupingWorkspace
-  for (auto &detectorMap : m_groupDetectorsMap) {
+  for (const auto &detectorMap : m_groupDetectorsMap) {
     g_log.debug() << "Group ID = " << detectorMap.first << '\n';
 
     for (auto detid : detectorMap.second) {
@@ -290,7 +277,7 @@ void LoadDetectorsGroupingFile::setByDetectors() {
         g_log.error() << "Pixel w/ ID = " << detid << " Cannot Be Located\n";
       }
     } // ENDFOR detid (in range)
-  }   // ENDFOR each group ID
+  } // ENDFOR each group ID
 }
 
 /*
@@ -321,9 +308,9 @@ void LoadDetectorsGroupingFile::setBySpectrumNos() {
           // Finally set the group workspace
           m_groupWS->mutableY(wsindex)[0] = groupid;
         } // IF-ELSE: ws index out of range
-      }   // IF-ELSE: spectrum No has an entry
-    }     // FOR: each spectrum No
-  }       // FOR: each group ID
+      } // IF-ELSE: spectrum No has an entry
+    } // FOR: each spectrum No
+  } // FOR: each group ID
 }
 
 /* Initialize a GroupingWorkspace
@@ -611,13 +598,12 @@ LoadGroupMapFile::~LoadGroupMapFile() {
  * Creates a group -> [spectra list] map by parsing the input file.
  */
 void LoadGroupMapFile::parseFile() {
-  std::string line;
-
   try {
     // We don't use the total number of groups report at the top of the file but
     // we'll tell them
     // later if there is a problem with it for their diagnostic purposes
     size_t givenNoOfGroups;
+    std::string line;
 
     if (!nextDataLine(line))
       throw std::invalid_argument("The input file doesn't appear to contain any data");

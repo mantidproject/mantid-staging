@@ -92,7 +92,6 @@ ResultType performBinaryOp(const LHSType lhs, const RHSType rhs, const std::stri
   const auto algoName = (lhs_mat || lhs_grp) && (rhs_mat || rhs_grp) ? op : op + "MD";
 
   ResultType result;
-  std::string error;
   try {
     ReleaseGlobalInterpreterLock releaseGIL;
     if (reverse) {
@@ -103,7 +102,7 @@ ResultType performBinaryOp(const LHSType lhs, const RHSType rhs, const std::stri
                                                                                             false, name, true);
     }
   } catch (std::runtime_error &exc) {
-    error = exc.what();
+    std::string error = exc.what();
     if (error == "algorithm") {
       error = "Unknown binary operation requested: " + op;
       throw std::runtime_error(error);
@@ -131,34 +130,13 @@ ResultType performBinaryOp(const LHSType lhs, const RHSType rhs, const std::stri
 template <typename LHSType, typename ResultType>
 ResultType performBinaryOpWithDouble(const LHSType inputWS, const double value, const std::string &op,
                                      const std::string &name, bool inplace, bool reverse) {
-  // RAII struct to add/remove workspace from ADS
-  struct ScopedADSEntry {
-    ScopedADSEntry(const std::string &entryName, const MatrixWorkspace_sptr &value) : name(entryName) {
-      ads.addOrReplace(entryName, value);
-    }
-    ~ScopedADSEntry() { ads.remove(name); }
 
-    const std::string &name;
-    API::AnalysisDataServiceImpl &ads = API::AnalysisDataService::Instance();
-  };
-
-  // In order to recreate a history record of the final binary operation
-  // there must be a record of the creation of the single value workspace used
-  // on the RHS here. This is achieved by running CreateSingleValuedWorkspace
-  // algorithm and adding the output workspace to the ADS. Adding the output
-  // to the ADS is critical so that workspace.name() is updated, by the ADS, to
-  // return the same string. WorkspaceProperty<TYPE>::createHistory() then
-  // records the correct workspace name for input into the final binary
-  // operation rather than creating a temporary name.
   auto alg = API::AlgorithmManager::Instance().createUnmanaged("CreateSingleValuedWorkspace");
   alg->setChild(false);
-  // we manually store the workspace as it's easier to retrieve the correct
-  // type from alg->getProperty rather than calling the ADS again and casting
   alg->setAlwaysStoreInADS(false);
   alg->initialize();
   alg->setProperty<double>("DataValue", value);
-  const std::string tmpName("__python_binary_op_single_value");
-  alg->setPropertyValue("OutputWorkspace", tmpName);
+  alg->setPropertyValue("OutputWorkspace", "python_binary_op_single_value");
   { // instantiate releaseGIL in limited scope to allow for repeat in 'performBinaryOp'
     ReleaseGlobalInterpreterLock releaseGIL;
     alg->execute();
@@ -171,7 +149,6 @@ ResultType performBinaryOpWithDouble(const LHSType inputWS, const double value, 
     throw std::runtime_error("performBinaryOp: Error in execution of "
                              "CreateSingleValuedWorkspace");
   }
-  ScopedADSEntry removeOnExit(tmpName, singleValue);
   ResultType result =
       performBinaryOp<LHSType, MatrixWorkspace_sptr, ResultType>(inputWS, singleValue, op, name, inplace, reverse);
   return result;

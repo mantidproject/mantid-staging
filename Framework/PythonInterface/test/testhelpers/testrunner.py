@@ -11,6 +11,8 @@ once qtpy is universally used.
 It is intended to be used as a launcher script for a given unit test file.
 The reports are output to the current working directory.
 """
+
+import importlib.util
 from importlib.machinery import SourceFileLoader
 import os
 import sys
@@ -33,7 +35,12 @@ def main(argv):
 
     # Load the test and copy over any module variables so that we have
     # the same environment defined here
-    test_module = SourceFileLoader(module_name(pathname), pathname).load_module()
+
+    test_module_name = module_name(pathname)
+    test_loader = SourceFileLoader(test_module_name, pathname)
+    test_spec = importlib.util.spec_from_loader(test_module_name, test_loader)
+    test_module = importlib.util.module_from_spec(test_spec)
+    test_loader.exec_module(test_module)
     test_module_globals = dir(test_module)
     this_globals = globals()
     for key in test_module_globals:
@@ -60,20 +67,6 @@ def module_name(pathname):
     :return: A module name to give to the import mechanism
     """
     return os.path.splitext(os.path.basename(pathname))[0]
-
-
-def result_class(pathname):
-    """
-    Returns a result class that can be passed to XMLTestRunner that
-    customizes the test naming to suite our needs. Note that this
-    is only suitable for running tests from a single file.
-    :return: A sub class of _XMLTestResult
-    """
-    directory_path, _ = os.path.split(pathname)
-    directory_name = os.path.relpath(directory_path, os.path.dirname(directory_path))
-    class_ = GroupedNameTestResult
-    class_.testcase_prefix = "python." + directory_name + "."
-    return class_
 
 
 if __name__ == "__main__":

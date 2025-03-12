@@ -20,6 +20,8 @@ from mantidqt.widgets.sliceviewer.models.model import SliceViewerModel, WS_TYPE
 from mantidqt.widgets.sliceviewer.models.sliceinfo import SliceInfo
 from mantidqt.widgets.sliceviewer.models.workspaceinfo import WorkspaceInfo
 from mantidqt.widgets.sliceviewer.cutviewer.presenter import CutViewerPresenter
+from mantidqt.widgets.sliceviewer.cutviewer.view import CutViewerView
+from mantidqt.widgets.sliceviewer.cutviewer.model import CutViewerModel
 from mantidqt.widgets.sliceviewer.peaksviewer import PeaksViewerPresenter, PeaksViewerCollectionPresenter
 from mantidqt.widgets.sliceviewer.presenters.base_presenter import SliceViewerBasePresenter
 from mantidqt.widgets.sliceviewer.views.toolbar import ToolItemText
@@ -49,7 +51,6 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
             else SliceViewerView(self, Dimensions.get_dimensions_info(ws), model.can_normalize_workspace(), parent, window_flags, conf)
         )
         super().__init__(ws, self.view.data_view, model)
-
         self._logger = Logger("SliceViewer")
         self._peaks_presenter: PeaksViewerCollectionPresenter = None
         self._cutviewer_presenter = None
@@ -187,6 +188,7 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
             range=dimensions.get_slicerange(),
             qflags=dimensions.qflags,
             axes_angles=axes_angles,
+            proj_matrix=self.get_proj_matrix(),
         )
 
     def get_proj_matrix(self):
@@ -225,6 +227,8 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
         else:
             self.new_plot()
         self._call_cutviewer_presenter_if_created("on_dimension_changed")
+        if self.view.data_view.nonorthogonal_mode:
+            self.show_all_data_clicked()
 
     def slicepoint_changed(self):
         """Indicates the slicepoint has been updated"""
@@ -311,6 +315,7 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
         :param state: If true a request is being made to turn them on, else they should be turned off
         """
         data_view = self.view.data_view
+        data_view.image_info_widget.setShowSignal(not state)
         if state:
             data_view.deactivate_and_disable_tool(ToolItemText.REGIONSELECTION)
             data_view.disable_tool_button(ToolItemText.LINEPLOTS)
@@ -351,6 +356,7 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
             return
         if names_to_overlay or names_overlayed:
             self._create_peaks_presenter_if_necessary().overlay_peaksworkspaces(names_to_overlay)
+            self.view.data_view.on_resize()
         else:
             self.view.peaks_view.hide()
 
@@ -358,7 +364,9 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
         data_view = self._data_view
         if state:
             if self._cutviewer_presenter is None:
-                self._cutviewer_presenter = CutViewerPresenter(self, data_view.canvas)
+                cutviewer_view = CutViewerView(data_view.canvas, self.get_frame())
+                cutviewer_model = CutViewerModel(self.get_proj_matrix())
+                self._cutviewer_presenter = CutViewerPresenter(self, cutviewer_model, cutviewer_view)
                 self.view.add_widget_to_splitter(self._cutviewer_presenter.get_view())
             self._cutviewer_presenter.show_view()
             data_view.deactivate_tool(ToolItemText.ZOOM)
@@ -380,9 +388,14 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
         @param workspace_name: the name of the workspace that has changed
         @param workspace: the workspace that has changed
         """
-        if self.model.check_for_removed_original_workspace():
-            self._close_view_with_message("Original workspace has been replaced: Closing Slice Viewer")
-            return
+
+        try:
+            if self.model.check_for_removed_original_workspace():
+                self._close_view_with_message("Original workspace has been replaced: Closing Slice Viewer")
+                return
+        except RuntimeError:
+            # can't check for original workspace if existing models workspace has been replaced
+            pass
 
         if not self.model.workspace_equals(workspace_name):
             # TODO this is a dead branch, since the ADS observer will call this if the
@@ -397,7 +410,7 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
 
             # New model is OK, proceed with updating Slice Viewer
             self.model = candidate_model
-            self.new_plot, self.update_plot_data = self._decide_plot_update_methods()
+            self._new_plot_method, self.update_plot_data = self._decide_plot_update_methods()
             self.view.delayed_refresh()
         except ValueError as err:
             self._close_view_with_message(f"Closing Sliceviewer as the underlying workspace was changed: {str(err)}")
@@ -420,6 +433,9 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
             self.new_plot()
         finally:
             ws.unlock()
+
+    def show_view(self):
+        self.view.show()
 
     def rename_workspace(self, old_name, new_name):
         if self.model.workspace_equals(old_name):
@@ -549,6 +565,9 @@ class SliceViewer(ObservingPresenter, SliceViewerBasePresenter):
             return self.get_sliceinfo().is_xy_q_frame()
 
     def get_extra_image_info_columns(self, xdata, ydata):
+        if self.view is None:
+            return {"H": "0", "K": "0", "L": "0"}
+
         qdims = [i for i, v in enumerate(self.view.data_view.dimensions.qflags) if v]
 
         if len(qdims) != 3 or self.get_frame() != SpecialCoordinateSystem.HKL:

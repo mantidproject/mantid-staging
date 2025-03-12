@@ -222,7 +222,7 @@ class ModelFittingModel(BasicFittingModel):
     @staticmethod
     def _convert_str_column_values_to_int(parameter_values: list) -> list:
         """Converts any str column values to an int so that they can be fitted."""
-        if type(parameter_values[0][0]) == str:
+        if isinstance(parameter_values[0][0], str):
             return range(len(parameter_values[0]))
         else:
             return parameter_values[0]
@@ -240,6 +240,10 @@ class ModelFittingModel(BasicFittingModel):
         """Returns the first good data value from a workspace."""
         x_lower, _ = self.x_limits_of_workspace(workspace_name)
         return x_lower
+
+    def number_of_result_tables(self) -> int:
+        """Returns the number of results tables stored by the fitting context."""
+        return self.fitting_context.number_of_result_tables()
 
     def _reset_current_result_table_index(self) -> None:
         """Resets the current result table index stored by the context."""

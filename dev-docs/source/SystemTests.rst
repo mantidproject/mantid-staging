@@ -77,6 +77,7 @@ standard workpace, then this step can be skipped. Simply omitting the
 .. code-block:: python
 
    def validate(self):
+       pass
 
 method from the system test is sufficient.
 
@@ -155,6 +156,7 @@ Additional assertions can be used as the basis for your own comparison
 tests. The following assertions are already implemented in the base
 class.
 
+.. rstcheck: ignore-next-code-block
 .. code-block:: python
 
    def assertTrue(self, value, msg=""):
@@ -215,7 +217,7 @@ fixed when running CMake, e.g.
 Selecting Tests to Run From IDE
 -------------------------------
 
-System tests can be ran from the MSVC IDE using the ``SystemTests`` target,
+System tests can be run from the MSVC IDE using the ``SystemTests`` target,
 which behaves in a similar way to unit test targets. One key advantage is
 that it allows you to start Mantid in a debug environment rather than attach
 to one midway through.

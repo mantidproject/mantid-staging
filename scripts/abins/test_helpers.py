@@ -5,30 +5,43 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 import os
-from typing import Any, Dict, Mapping
+from pathlib import Path
+from typing import Any, Dict, List, Mapping
 from unittest import TestCase
 
 import numpy as np
 from numpy.testing import assert_allclose
+from pydantic import validate_call
 
 from abins.atomsdata import _AtomData
 from abins.kpointsdata import KpointData
+import abins.io
 
 
 # Module with helper functions used to create tests.
-def find_file(filename=None):
+def find_file(filename: str, try_upcase_suffix: bool = True) -> str:
     """
     Calculates path of filename with the testing data. Path is determined in the platform independent way.
 
     :param filename: name of file to find
+    :param try_upcase_suffix: if file not found, try with upper-case extension
+        (e.g. if filename.jpg not found, try filename.JPG)
     :returns: full path for the file with the testing data
     """
     from mantid.api import FileFinder
 
-    return FileFinder.Instance().getFullPath(filename)
+    result = FileFinder.Instance().getFullPath(filename)
+    if result:
+        return result
+    elif try_upcase_suffix:
+        path = Path(filename)
+        return find_file(str(path.with_suffix(path.suffix.upper())), try_upcase_suffix=False)
+    else:
+        raise ValueError(f"Could not find file '{filename}'")
 
 
-def remove_output_files(list_of_names=None):
+@validate_call
+def remove_output_files(list_of_names: List[str]) -> None:
     """Removes output files created during a test."""
 
     # import ConfigService here to avoid:
@@ -36,11 +49,6 @@ def remove_output_files(list_of_names=None):
     # instances is not enabled (http://www.boost.org/libs/python/doc/v2/pickle.html)
 
     from mantid.kernel import ConfigService
-
-    if not isinstance(list_of_names, list):
-        raise ValueError("List of names is expected.")
-    if not all(isinstance(i, str) for i in list_of_names):
-        raise ValueError("Each name should be a string.")
 
     save_dir_path = ConfigService.getString("defaultsave.directory")
     if save_dir_path != "":  # default save directory set
@@ -51,7 +59,7 @@ def remove_output_files(list_of_names=None):
     for filename in all_files:
         for name in list_of_names:
             if name in filename:
-                full_path = os.path.join(save_dir_path, filename)
+                full_path = os.path.join(abins.io.IO.get_save_dir_path(), filename)
                 if os.path.isfile(full_path):
                     os.remove(full_path)
                 break

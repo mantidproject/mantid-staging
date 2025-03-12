@@ -137,13 +137,13 @@ QMap<QString, QVariant> Encoder::encodeRangeInQ(const RangeInQ &rangeInQ) {
   auto step = rangeInQ.step();
   qRangeMap.insert(QString("minPresent"), QVariant(static_cast<bool>(min)));
   if (min)
-    qRangeMap.insert(QString("min"), QVariant(min.get()));
+    qRangeMap.insert(QString("min"), QVariant(min.value()));
   qRangeMap.insert(QString("maxPresent"), QVariant(static_cast<bool>(max)));
   if (max)
-    qRangeMap.insert(QString("max"), QVariant(max.get()));
+    qRangeMap.insert(QString("max"), QVariant(max.value()));
   qRangeMap.insert(QString("stepPresent"), QVariant(static_cast<bool>(step)));
   if (step)
-    qRangeMap.insert(QString("step"), QVariant(step.get()));
+    qRangeMap.insert(QString("step"), QVariant(step.value()));
   return qRangeMap;
 }
 
@@ -326,6 +326,8 @@ QMap<QString, QVariant> Encoder::encodeSave(const QtSaveView *gui) {
   saveMap.insert(QString("prefixEdit"), QVariant(gui->m_ui.prefixEdit->text()));
   saveMap.insert(QString("headerCheckBox"), QVariant(gui->m_ui.headerCheckBox->isChecked()));
   saveMap.insert(QString("qResolutionCheckBox"), QVariant(gui->m_ui.qResolutionCheckBox->isChecked()));
+  saveMap.insert(QString("extraColumnsCheckBox"), QVariant(gui->m_ui.extraColumnsCheckBox->isChecked()));
+  saveMap.insert(QString("multipleDatasetsCheckBox"), QVariant(gui->m_ui.multipleDatasetsCheckBox->isChecked()));
   saveMap.insert(QString("commaRadioButton"), QVariant(gui->m_ui.commaRadioButton->isChecked()));
   saveMap.insert(QString("spaceRadioButton"), QVariant(gui->m_ui.spaceRadioButton->isChecked()));
   saveMap.insert(QString("tabRadioButton"), QVariant(gui->m_ui.tabRadioButton->isChecked()));

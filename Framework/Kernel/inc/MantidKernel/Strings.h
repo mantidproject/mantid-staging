@@ -250,6 +250,9 @@ MANTID_KERNEL_DLL std::string toLower(const std::string &input);
 /// Converts string to all uppercase
 MANTID_KERNEL_DLL std::string toUpper(const std::string &input);
 
+/// Checks if string ends with a suffix
+MANTID_KERNEL_DLL bool endsWith(std::string const &str, std::string const &suffix);
+
 /// determine if a character group exists in a string
 MANTID_KERNEL_DLL int confirmStr(const std::string &S, const std::string &fullPhrase);
 /// Get a word from a string
@@ -425,6 +428,13 @@ template <typename Integer> std::vector<std::vector<Integer>> parseGroups(const 
 
   return groups;
 }
+
+/**
+ * Generates random alpha-numeric string.
+ * @param len :: Length of the string
+ * @return Random string of the given length
+ */
+MANTID_KERNEL_DLL std::string randomString(const size_t len);
 
 /// Extract a line from input stream, discarding any EOL characters encountered
 MANTID_KERNEL_DLL std::istream &extractToEOL(std::istream &is, std::string &str);

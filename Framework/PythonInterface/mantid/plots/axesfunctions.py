@@ -7,7 +7,7 @@
 #  This file is part of the mantid package
 #
 #
-import collections
+import collections.abc
 import matplotlib
 import matplotlib.collections as mcoll
 import matplotlib.colors
@@ -41,6 +41,7 @@ from mantid.plots.datafunctions import (
 )
 from mantid.plots.utility import MantidAxType
 from mantid.plots.quad_mesh_wrapper import QuadMeshWrapper
+from mantid import logger
 
 # Used for initializing searches of max, min values
 _LARGEST, _SMALLEST = float(sys.maxsize), -sys.maxsize
@@ -111,6 +112,11 @@ def _get_data_for_plot(axes, workspace, kwargs, with_dy=False, with_dx=False):
         (normalization, kwargs) = get_normalization(workspace, **kwargs)
         indices, kwargs = get_indices(workspace, **kwargs)
         (x, y, dy) = get_md_data1d(workspace, normalization, indices)
+        # Protect against unused arguments for MDHisto workspaces
+        if "wkspIndex" in kwargs:
+            kwargs.pop("wkspIndex")
+        if "specNum" in kwargs:
+            kwargs.pop("specNum")
         dx = None
         axis = None
     else:
@@ -120,7 +126,7 @@ def _get_data_for_plot(axes, workspace, kwargs, with_dy=False, with_dx=False):
         workspace_index, distribution, kwargs = get_wksp_index_dist_and_label(workspace, axis, **kwargs)
         if axis == MantidAxType.BIN:
             # get_bin returns the bin *without the monitor data*
-            x, y, dy, dx = get_bins(workspace, workspace_index, with_dy)
+            x, y, dy, dx = get_bins(workspace, workspace_index, with_dy, with_dx)
             vertical_axis = workspace.getAxis(1)
             if isinstance(vertical_axis, mantid.api.NumericAxis):
                 axes.set_xlabel(vertical_axis.getUnit().unitID())
@@ -275,11 +281,33 @@ def errorbar(axes, workspace, *args, **kwargs):
     keyword for MDHistoWorkspaces. These type of workspaces have to have exactly one non integrated
     dimension
     """
+    withDy = True
+    withDx = False
+    if isinstance(workspace, mantid.api.MatrixWorkspace) and workspace.run().hasProperty("plot_type"):
+        plot_type = workspace.run().getProperty("plot_type").value
+        if plot_type == "errorbar_x":
+            withDy = False
+            withDx = True
+        if plot_type == "errorbar_y":
+            withDy = True
+            withDx = False
+        if plot_type == "errorbar_xy":
+            withDy = True
+            withDx = True
+
     normalize_by_bin_width, kwargs = get_normalize_by_bin_width(workspace, axes, **kwargs)
-    x, y, dy, dx, indices, axis, kwargs = _get_data_for_plot(axes, workspace, kwargs, with_dy=True, with_dx=False)
+    x, y, dy, dx, indices, axis, kwargs = _get_data_for_plot(axes, workspace, kwargs, with_dy=withDy, with_dx=withDx)
     if kwargs.pop("update_axes_labels", True):
         _setLabels1D(axes, workspace, indices, normalize_by_bin_width=normalize_by_bin_width, axis=axis)
     kwargs.pop("normalize_by_bin_width", None)
+
+    if dy is not None and min(dy) < 0:
+        dy = None
+        logger.warning("Negative values found in y error when plotting error bars. Continuing without y error bars.")
+
+    if dx is not None and min(dx) < 0:
+        dx = None
+        logger.warning("Negative values found in x error when plotting error bars. Continuing without x error bars.")
 
     return axes.errorbar(x, y, dy, dx, *args, **kwargs)
 
@@ -795,7 +823,7 @@ def update_colorplot_datalimits(axes, mappables, axis="both"):
     # ax.relim in matplotlib < 2.2 doesn't take into account of images
     # and it doesn't support collections at all as of verison 3 so we'll take
     # over
-    if not isinstance(mappables, collections.Iterable):
+    if not isinstance(mappables, collections.abc.Iterable):
         mappables = [mappables]
     xmin_all, xmax_all, ymin_all, ymax_all = _LARGEST, _SMALLEST, _LARGEST, _SMALLEST
     for mappable in mappables:

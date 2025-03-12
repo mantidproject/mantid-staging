@@ -32,10 +32,19 @@ Set up
 
 Automatic Save Selection
 ########################
-#. Switch between 1D and 2D at the bottom of the screen, it should automatically switch
-   between CanSAS and NXcanSAS
-#. Change any of the tick boxes (e.g. tick RKH), and switch between 1D and 2D. It should
-   not change.
+
+#. Select ``File`` or ``Both`` from the ``Save Options`` at the bottom right of the screen.
+#. In the ``Reduction`` section to the left of the ``Save Options``, switch between the ``1D`` and ``2D`` radio buttons..
+
+   * When 1D is selected, ``CanSAS (1D)`` and ``NxCanSAS (1D/2D)`` should be checked.
+   * When 2D is selected, only ``NxCanSAS (1D/2D)`` should be checked.
+
+#. Check ``RKH (1D/2D)``.
+#. Change the selected ``Reduction`` radio button.
+#. The options should revert to the defaults above (with ``RKH (1D/2D)`` unchecked).
+#. Select ``Memory``. The ``CanSAS (1D)``, ``NxCanSAS (1D/2D)``, and ``RKH (1D/2D)`` checkboxes should be disabled.
+#. Swap between ``Memory`` and ``File`` with a ``2D`` reduction mode. ``CanSAS (1D)`` should always stay disabled.
+#. Set the ``Save Option`` back to ``Memory`` to continue with the rest of the tests.
 
 Runs table editing
 ##################
@@ -49,9 +58,8 @@ In the ``Runs`` tab:
    an output name, one row without.
 #. Try changing a random setting in the settings tab and remember what you set
    it to.
-#. Make some more edits to the table. Due to a known issue, the setting will change
-   back to its original value (once fixed, we expect the setting to keep showing
-   the value you changed it to).
+#. Make some more edits to the table. The settings will be reverted to the defaults
+   set in the User File.
 #. Click the ``Export Table`` button and save the table as a csv file. Check
    the file in an editor or Excel and ensure it looks like a sensible
    representation of the table in the format ``key,value,key,value,...``. All
@@ -64,8 +72,6 @@ In the ``Runs`` tab:
 #. Try deleting and/or reordering some of the columns in the saved file and
    re-load it. All of the values in the file should be populated in the correct
    columns.
-#. Check again that the setting you changed is still showing the value you
-   changed it to, rather than the original.
 #. Re-load the original batch file.
 
 User files
@@ -75,10 +81,13 @@ User files
 #. Re-load the user file and check the values you changed - they should have
    reverted to their original values.
 #. Change some values on the ``Beam Centre`` tab. Re-load the user file. The inputs in the ``Centre Position``
-   section should revert to their original values, apart from the ``Detector`` combobox.
-   The inputs in the ``Options`` section (such as the radius limits) should not revert.
-#. Ensure that you can load the old style ``MaskFile.txt`` user file from the
-   sample data.
+   section should revert to their original values. The inputs in the ``Options`` section (such as the radius limits)
+   should not revert.
+#. Ensure that you can load the old style ``MaskFile.txt`` user file from the sample data.
+
+   - **Note:** In order to see this file, you may need to change the settings in the file browser window to look for
+     ``.txt`` files instead of ``.TOML`` files.
+
 #. In the table on the ``Runs`` tab, under the ``User File`` column, enter
    ``MaskFile.toml`` in one row and ``MaskFile.txt`` in the other row. Click
    ``Process All``. After some seconds, the rows should turn green to indicate
@@ -106,16 +115,21 @@ Processing
 
 *1D reduction*
 
+#. Clear all workspaces in your workspaces list if they are not empty.
 #. In ``General, Scale, Event Slice, Sample`` sub-tab, ensure the ``Reduction
    Mode`` is ``All``.
 #. In the ``Runs`` tab, under ``Save Options``, select ``Both``, and tick
    ``CanSAS (1D)`` and ``NXcanSAS (1D/2D)``.
+#. Select ``Save Can``.
 #. Click ``Process All``.
 #. After some seconds the rows should turn green.
 #. In the workspaces list, there should be a series of new workspaces; four
    group workspaces and four 1D workspaces.
 #. Check your default save directory. For each reduction two banks (HAB/main) should
-   be saved. In total there should be 8 workspaces (4 .xml and 4 .nxs) saved.
+   be saved. In total, there should be 20 workspaces saved. For each row, file type, and bank, there should be a
+   reduced file (with no suffix) and a ``sample`` file. The ``first_time`` line should also produce a ``can`` workspace
+   for each file type and bank. This is because both workspaces have the same ``can`` input run numbers and so the
+   reduction only calculates it once.
 #. Double-click the 1D workspaces and you should get a single line plot.
 #. Clear the newly created files and workspaces to make the next test easier
 #. Change the contents of the first cell in the first row to ``74045`` and click
@@ -126,11 +140,11 @@ Processing
 
 *2D reduction*
 
-#. Switch to 2D and manually untick CanSAS (since we have manually
-   changed the save options at this point)
-#. Tick the ``Plot Results`` box.
+#. Clear all workspaces in your workspaces list if they are not empty.
+#. In ``General, Scale, Event Slice, Sample`` sub-tab, ensure the ``Reduction
+   Mode`` is ``All``.
+#. Switch to the 2D ``Reduction Mode``.
 #. Click ``Process All``.
-#. A plot window will open; initially empty, then with a line.
 #. You should get four 2D workspaces instead of the previous 1D workspaces
    (they will have 100 spectra instead of 1). Double-click them and check you
    can do a colourfill plot.
@@ -139,8 +153,7 @@ Processing
 #. Clear the newly created files and workspaces to make future tests easier
 #. Change ``Reduction`` back to 1D.
 #. Click ``Process All``.
-#. A new plot window should open and you should end up with multiple lines plotted.
-#. Check the ``Multi-period`` box - six additional columns should appear in the table.
+#. When it completes, Check the ``Multi-period`` box - six additional columns should appear in the table.
 #. Delete all rows and re-load the batch file.
 
 *Merged reduction*
@@ -148,10 +161,9 @@ Processing
 #. In the ``Settings`` tab, ``General, Scale, Event Slice, Sample`` sub-tab,
    set ``Reduction Mode`` to ``Merged``.
 #. Return to the ``Runs`` tab.
-#. Ensure ``Plot results`` is ticked and that save outputs ``CanSAS (1D)`` and
+#. Ensure save outputs ``CanSAS (1D)`` and
    ``NXcanSAS (1D/2D)`` are ticked.
 #. Click ``Process All``.
-#. This should result in a plot with six lines.
 #. The workspaces list should now contain a group named
    ``LAB_and_HAB_workspaces_from_merged_reduction`` that contains the ``main``
    and ``HAB`` workspaces, which were previously ungrouped for a non-merged
@@ -164,31 +176,58 @@ Processing
 
 *Scaled Background Subtracted Reduction*
 
-#. In the ``Settings`` tab, ``General, Scale, Event Slice, Sample`` sub-tab, set ``Reduction Mode`` to ``Merged``.
-#. Return to the ``Runs`` tab.
+#. Create a new copy of the User File in your file browser.
+#. Open this new copy in a text editor and find the ``[detector.configuration]`` section.
+#. Under this section, make sure setting ``selected_detector`` is set to ``Merged``.
+#. Back in the ISIS SANS interface, change the user file to this new file.
+#. Click over to the ``Runs`` tab.
 #. Set the ``Save Options`` to ``Memory``.
 #. Select one of the rows and click ``Process Selected``
 #. Take note of the name of the reduced workspace with ``merged`` in the title.
 #. Make a copy of the row you just processed using the ``Copy`` and ``Paste`` buttons above the runs table.
 #. Change the ``Output Name`` of the new row to something like ``bgsub_test``.
-#. In the ``Options`` column, enter ``BackgroundWorkspace=<WS_NAME>, ScaleFactor=0.9`` (replacing <WS_NAME> with the
-   name of the merged workspace you took note of before).
+#. Check the ``Scaled Background Subtraction`` checkbox.
+#. In the ``BackgroundWorkspace`` column, enter the name of the merged workspace you took note of before.
+#. In the ``ScaleFactor`` column, enter ``0.9``.
+#. Set the ``Save Options`` to ``Both`` and ensure that save outputs ``CanSAS (1D)`` and ``NXcanSAS (1D/2D)`` are ticked.
 #. Select this new row and click ``Process Selected``.
 #. When it completes, two output files should have been created with ``bgsub_test`` in the name. One, which is the
    normal output data. Another with the scaled subtraction, which should have ``_bgsub`` appended to the name.
 #. Right click on each of these and select ``Show Data``. The subtracted workspace's values should be 10% of the of the
    unsubtracted workspace's values.
+#. Check that your save location contains files for both the background subtracted workspace and the normal reduction
+   output.
+
+Save Other
+##########
+
+*Single Workspace*
+
+#. Navigate to the ``Runs`` tab, making sure there are some reduced workspaces present in the ADS. Follow one of the
+   "Processing" instruction sets above if you need to create some.
+#. Click the ``Save Other`` button.
+#. Select one of the workspaces from the list.
+#. Provide a path to a new save directory, and provide a file name.
+#. Click ``Save``.
+#. Check the file was saved to the correct location on your system.
+
+*Multiple Workspaces*
+
+#. Select multiple workspaces with Shift or Ctrl/Cmd.
+#. Provide a suffix for the files.
+#. Click ``Save``.
+#. Check that the files were saved with their workspace's names, but with the provided suffix appended.
 
 Beam centre finder
 ##################
 
 In the ``Beam centre`` tab:
 
-#. Make a note of the four values representing the front/main detector centre positions.
-#. Check that detector is set to ``main-detector`` and click run.
+#. Make a note of the four values representing the rear/front detector centre positions.
+#. Check that the ``Find Rear Centre`` radio button is selected and click run.
 #. A plot should appear - make sure to show it if it is behind another window. It should be updated with four lines, which gradually get closer together. This might take a while to run.
 #. Check the values in the first two text boxes at the top (Centre Position - Rear) have changed when it has finished running.
-#. Change the detector to ``Hab`` and re-run the test.
+#. Select the ``Find Front Centre`` radio button and re-run the test.
 #. Four more lines should appear on the same plot. This time, in the values at the top, only the values for the front should have changed.
 
 Sum runs
@@ -224,7 +263,8 @@ Display
 
 #. In the ``Runs`` tab, check that all table, process, and load buttons have
    clear tooltips by hovering over them.
-#. Check that ``Zero Error Free``, ``Use Optimizations``, and ``Plot Results``
-   have clear tooltips.
+#. Check that ``Zero Error Free`` and ``Use Optimizations`` have clear tooltips.
 #. In the settings, hover over a random selection of buttons and text boxes to check tooltips are still there.
    Users rely on the tooltips a lot and really do notice each missing one.
+   *Note: The* ``Wavelength`` *section of the settings is missing its tooltips. We and the users are aware of this so an
+   issue should not be made when it is discovered.*

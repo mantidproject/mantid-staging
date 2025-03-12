@@ -11,7 +11,6 @@
 #include "MantidKernel/FreeBlock.h"
 #include "MantidKernel/ISaveable.h"
 #include "MantidKernel/MultiThreaded.h"
-#include "MantidKernel/System.h"
 #include "MantidKernel/Timer.h"
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
@@ -663,7 +662,7 @@ public:
   }
 
   /// Method to flush the data to disk and ensure it is written.
-  void flushData() const override{};
+  void flushData() const override {};
   /** @return the amount of memory that the object takes as a whole.
       For filebased objects it should be the amount the object occupies in
      memory plus the size it occupies in file if the object has not been fully

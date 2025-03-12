@@ -6,12 +6,24 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 
 from mantid.kernel import funcinspect
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    AbsorptionCorrection,
+    ConvertUnits,
+    CreateSampleWorkspace,
+    CreateSampleShape,
+    DeleteWorkspace,
+    FlatPlateAbsorption,
+    MonteCarloAbsorption,
+    RenameWorkspace,
+    SetSample,
+    SetSampleMaterial,
+    SphericalAbsorption,
+)
 
 import random
 import types
 import ast
-import collections
+import collections.abc
 
 
 class anAbsorptionShape(object):
@@ -255,7 +267,7 @@ class anAbsorptionShape(object):
 
         if not isinstance(str_val, str):
             raise ValueError(
-                'The input of the "from_str" function should be a string representing a diary.' " Actually it is: {0}".format(type(str_val))
+                'The input of the "from_str" function should be a string representing a diary. Actually it is: {0}'.format(type(str_val))
             )
         str_list = str_val.split("!")
         shape_par = ast.literal_eval(str_list[0])
@@ -264,8 +276,9 @@ class anAbsorptionShape(object):
         the_shape_id = shape_par.pop("Shape", None)
         if the_shape_id is None:
             raise ValueError(
-                'The input of the "from_str" function = {0} but does not contain the '
-                "Shape description e.g. the Key Shape:ShapeName".format(str_val)
+                'The input of the "from_str" function = {0} but does not contain the Shape description e.g. the Key Shape:ShapeName'.format(
+                    str_val
+                )
             )
         theShape = anAbsorptionShape._Defined_Shapes[the_shape_id]
         theShape.material = mater_par
@@ -281,7 +294,7 @@ class anAbsorptionShape(object):
         if value is None or not value:
             self._axis_is_default = True
             return {}
-        if not isinstance(value, collections.Iterable):
+        if not isinstance(value, collections.abc.Iterable):
             value = [value]
         n_elements = len(value)
         if n_elements < len(mandatory_prop_list):

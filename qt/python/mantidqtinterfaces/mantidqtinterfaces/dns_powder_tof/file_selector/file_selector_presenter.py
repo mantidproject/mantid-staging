@@ -20,6 +20,7 @@ class DNSFileSelectorPresenter(DNSObserver):
         self.view = view
         self._old_data_set = set()
         self._standard_data_counter = 0
+        self._sample_data_path = ""
 
         # connect signals
         self._attach_signal_slots()
@@ -32,12 +33,16 @@ class DNSFileSelectorPresenter(DNSObserver):
         """
         if self.param_dict:
             data_path = self.param_dict["paths"]["data_dir"]
+            if "polarisation_table" in self.param_dict["paths"]:
+                pol_table = self.param_dict["paths"]["polarisation_table"]
+            else:
+                pol_table = []
             file_number_range = [start, end]
             number_of_files, loaded, datafiles, file_number_range_filtered = self.model.set_datafiles_to_load(
                 data_path, file_number_range, filtered, watcher
             )
             self.view.open_progress_dialog(number_of_files)
-            self.model.read_all(datafiles, data_path, loaded, watcher)
+            self.model.read_all(datafiles, data_path, loaded, pol_table, watcher)
 
     def _read_standard(self, self_call=False):
         """
@@ -46,7 +51,11 @@ class DNSFileSelectorPresenter(DNSObserver):
         data_path = self.param_dict["paths"]["data_dir"]
         standard_path = self.param_dict["paths"]["standards_dir"]
         if standard_path:
-            standard_found = self.model.read_standard(standard_path)
+            if "polarisation_table" in self.param_dict["paths"]:
+                pol_table = self.param_dict["paths"]["polarisation_table"]
+            else:
+                pol_table = []
+            standard_found = self.model.read_standard(standard_path, pol_table)
             self._filter_standard()
             if not standard_found and not self_call:
                 if self.model.try_unzip(data_path, standard_path):
@@ -156,9 +165,8 @@ class DNSFileSelectorPresenter(DNSObserver):
 
     # model can access this function
     # have no idea how to do this otherwise
-    def update_progress(self, i, end):
-        if i % 100 == 0 or i >= end - 1:
-            self.view.set_progress(i + 1)
+    def update_progress(self, iteration, iteration_max):
+        self.view.set_progress(iteration, iteration_max)
 
     def _right_click(self, index):
         """
@@ -192,9 +200,19 @@ class DNSFileSelectorPresenter(DNSObserver):
             self.view.set_state(self.param_dict.get(self.name, {}))
             not_found = self.model.check_by_file_numbers(file_numbers)
             if not_found:
-                print(f"Of {len(file_numbers)} loaded checked " f"file numbers {not_found} were not found " "in list of datafiles")
+                print(f"Of {len(file_numbers)} loaded checked file numbers {not_found} were not found in list of datafiles")
+
+    def _clear_data_trees(self):
+        self.model.sample_data_tree_model.clear_scans()
+        self.model.standard_data_tree_model.clear_scans()
 
     def tab_got_focus(self):
+        sample_data_dir = self.param_dict["paths"]["data_dir"]
+        if self._sample_data_path != sample_data_dir:
+            self._clear_data_trees()
+            self._standard_data_counter = 0
+            self._sample_data_path = sample_data_dir
+
         standard_path = self.param_dict["paths"]["standards_dir"]
         # The first time that the standard data path is provided
         # and the user clicks on the file selector tab, then the

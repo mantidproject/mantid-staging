@@ -7,9 +7,9 @@
 
 import os
 import systemtesting
-from mantid.simpleapi import *
-from PelicanCrystalProcessing import PelicanCrystalProcessing
-from mantid import config
+from mantid.api import mtd
+from mantid.kernel import config
+from mantid.simpleapi import PelicanCrystalProcessing
 
 
 class PelicanCrystalProcessingSingleTest(systemtesting.MantidSystemTest):

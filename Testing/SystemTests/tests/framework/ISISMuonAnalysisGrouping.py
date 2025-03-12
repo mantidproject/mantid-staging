@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,attribute-defined-outside-init,too-many-instance-attributes,too-few-public-methods
 import systemtesting
-from mantid.simpleapi import *
+from mantid.simpleapi import CloneWorkspace, CropWorkspace, GroupDetectors, GroupWorkspaces, Load, Logarithm, RemoveExpDecay
 
 from abc import ABCMeta, abstractmethod
 
@@ -33,7 +33,7 @@ class ISISMuonAnalysisGrouping(systemtesting.MantidSystemTest, metaclass=ABCMeta
     @abstractmethod
     def get_reference_file(self):
         """Returns the name of the reference file to compare against"""
-        raise NotImplementedError("Implmenent get_reference_file to return " "the name of the file to compare against.")
+        raise NotImplementedError("Implmenent get_reference_file to return the name of the file to compare against.")
 
     def get_result_workspace(self):
         """Returns the result workspace to be checked"""
@@ -47,7 +47,7 @@ class ISISMuonAnalysisGrouping(systemtesting.MantidSystemTest, metaclass=ABCMeta
         outputWS = self.instr_name + str(self.sample_run)
 
         # Load
-        LoadMuonNexus(Filename=self.file_name, OutputWorkspace="MuonAnalysis")
+        Load(Filename=self.file_name, OutputWorkspace="MuonAnalysis")
 
         # Group, Crop, Clone
         if self.period_data:

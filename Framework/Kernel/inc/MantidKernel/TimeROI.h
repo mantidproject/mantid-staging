@@ -20,10 +20,12 @@ public:
   /// the underlying property needs a name
   static const std::string NAME;
   static const TimeROI USE_NONE;
+  static const TimeROI USE_ALL;
 
   TimeROI();
   TimeROI(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime);
   TimeROI(const Kernel::TimeSeriesProperty<bool> *filter);
+
   double durationInSeconds() const;
   double durationInSeconds(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime) const;
   std::size_t numBoundaries() const;
@@ -36,6 +38,7 @@ public:
   void addROI(const std::string &startTime, const std::string &stopTime);
   void addROI(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime);
   void addROI(const std::time_t &startTime, const std::time_t &stopTime);
+  void appendROIFast(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime);
   void addMask(const std::string &startTime, const std::string &stopTime);
   void addMask(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime);
   void addMask(const std::time_t &startTime, const std::time_t &stopTime);
@@ -43,9 +46,12 @@ public:
   Types::Core::DateAndTime getEffectiveTime(const Types::Core::DateAndTime &time) const;
   Types::Core::DateAndTime firstTime() const;
   Types::Core::DateAndTime lastTime() const;
+  const std::vector<Types::Core::DateAndTime> &getAllTimes() const { return m_roi; }
 
   void replaceROI(const TimeSeriesProperty<bool> *roi);
   void replaceROI(const TimeROI &other);
+  void replaceROI(const std::vector<Types::Core::DateAndTime> &roi);
+
   void update_union(const TimeROI &other);
   void update_intersection(const TimeROI &other);
   void update_or_replace_intersection(const TimeROI &other);
@@ -69,6 +75,16 @@ private:
   bool isCompletelyInMask(const Types::Core::DateAndTime &startTime, const Types::Core::DateAndTime &stopTime) const;
   std::vector<Types::Core::DateAndTime> m_roi;
 };
+
+namespace ROI {
+/**
+ * This calculates the intersection of two sorted vectors that represent regions of interest (ROI).
+ * The ROI are pairs of [[include, exclude), [include,exclude), ...] where an empty vector is interpreted to mean "use
+ * all".
+ */
+template <typename TYPE>
+std::vector<TYPE> calculate_intersection(const std::vector<TYPE> &left, const std::vector<TYPE> &right);
+} // namespace ROI
 
 } // namespace Kernel
 } // namespace Mantid

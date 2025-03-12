@@ -6,11 +6,14 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 
-""" SANSSave algorithm performs saving of SANS reduction data."""
+"""SANSSave algorithm performs saving of SANS reduction data."""
 
 from mantid.api import DataProcessorAlgorithm, MatrixWorkspaceProperty, AlgorithmFactory, PropertyMode, FileProperty, FileAction, Progress
 from mantid.kernel import Direction, logger
 from sans.algorithm_detail.save_workspace import save_to_file, get_zero_error_free_workspace, file_format_with_append
+from sans.common.file_information import convert_to_shape
+from sans.common.general_functions import get_detector_names_from_instrument
+from sans.common.constant_containers import SANSInstrument_string_as_key_NoInstrument
 from sans.common.enums import SaveType
 
 
@@ -31,7 +34,7 @@ class SANSSave(DataProcessorAlgorithm):
 
         self.declareProperty(
             FileProperty("Filename", "", action=FileAction.Save, extensions=[]),
-            doc="The name of the file which needs to be stored. Note that " "the actual file type is selected below.",
+            doc="The name of the file which needs to be stored. Note that the actual file type is selected below.",
         )
 
         self.declareProperty(
@@ -107,13 +110,13 @@ class SANSSave(DataProcessorAlgorithm):
             "SampleTransmissionRunNumber",
             "",
             direction=Direction.Input,
-            doc="The run number for the Sample Transmission workspace used in " "the reduction. Can be blank.",
+            doc="The run number for the Sample Transmission workspace used in the reduction. Can be blank.",
         )
         self.declareProperty(
             "SampleDirectRunNumber",
             "",
             direction=Direction.Input,
-            doc="The run number for the Sample Direct workspace used in " "the reduction. Can be blank.",
+            doc="The run number for the Sample Direct workspace used in the reduction. Can be blank.",
         )
         self.declareProperty(
             "CanScatterRunNumber",
@@ -127,12 +130,34 @@ class SANSSave(DataProcessorAlgorithm):
             direction=Direction.Input,
             doc="The run number for the Can Direct workspace used in the reduction. Can be blank.",
         )
+        self.declareProperty(
+            "BackgroundSubtractionWorkspace",
+            "",
+            direction=Direction.Input,
+            doc="The workspace used to perform a scaled background subtraction on the reduced workspace. Can be blank.",
+        )
+        self.declareProperty(
+            "BackgroundSubtractionScaleFactor",
+            0.0,
+            direction=Direction.Input,
+            doc="The scale factor the BackgroundSubtractionWorkspace is multiplied by before subtraction. Can be blank.",
+        )
 
     def PyExec(self):
         use_zero_error_free = self.getProperty("UseZeroErrorFree").value
         file_formats = self._get_file_formats()
         file_name = self.getProperty("Filename").value
         workspace = self.getProperty("InputWorkspace").value
+
+        sample = workspace.sample()
+        maybe_geometry = convert_to_shape(sample.getGeometryFlag())
+        height = sample.getHeight()
+        width = sample.getWidth()
+        thickness = sample.getThickness()
+
+        instrument = SANSInstrument_string_as_key_NoInstrument[workspace.getInstrument().getName()]
+
+        detectors = ",".join(get_detector_names_from_instrument(instrument))
 
         transmission = self.getProperty("Transmission").value
         transmission_can = self.getProperty("TransmissionCan").value
@@ -143,7 +168,18 @@ class SANSSave(DataProcessorAlgorithm):
                 transmission = get_zero_error_free_workspace(transmission)
             if transmission_can:
                 transmission_can = get_zero_error_free_workspace(transmission_can)
-        transmission_workspaces = {"Transmission": transmission, "TransmissionCan": transmission_can}
+        additional_properties = {
+            "Transmission": transmission,
+            "TransmissionCan": transmission_can,
+            "DetectorNames": detectors,
+            "SampleHeight": height,
+            "SampleWidth": width,
+            "SampleThickness": thickness,
+            "BackgroundSubtractionWorkspace": self.getProperty("BackgroundSubtractionWorkspace").value,
+            "BackgroundSubtractionScaleFactor": self.getProperty("BackgroundSubtractionScaleFactor").value,
+        }
+        if maybe_geometry is not None:
+            additional_properties["Geometry"] = maybe_geometry.value
 
         additional_run_numbers = {
             "SampleTransmissionRunNumber": self.getProperty("SampleTransmissionRunNumber").value,
@@ -158,7 +194,7 @@ class SANSSave(DataProcessorAlgorithm):
             progress.report(progress_message)
             progress.report(progress_message)
             try:
-                save_to_file(workspace, file_format, file_name, transmission_workspaces, additional_run_numbers)
+                save_to_file(workspace, file_format, file_name, additional_properties, additional_run_numbers)
             except (RuntimeError, ValueError) as e:
                 logger.warning(
                     "Cannot save workspace using SANSSave. "
@@ -176,7 +212,7 @@ class SANSSave(DataProcessorAlgorithm):
         axis1 = workspace.getAxis(1)
         is_first_axis_numeric = axis1.isNumeric()
         if not is_first_axis_numeric and number_of_histograms > 1:
-            errors.update({"InputWorkspace": "The input data seems to be 2D. In this case all " "axes need to be numeric."})
+            errors.update({"InputWorkspace": "The input data seems to be 2D. In this case all axes need to be numeric."})
 
         # Make sure that at least one file format is selected
         file_formats = self._get_file_formats()

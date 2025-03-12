@@ -22,6 +22,7 @@
 #include "MantidGeometry/MDGeometry/MDFrame.h"
 #include "MantidIndexing/GlobalSpectrumIndex.h"
 #include "MantidIndexing/IndexInfo.h"
+#include "MantidKernel/ListValidator.h"
 #include "MantidKernel/MDUnit.h"
 #include "MantidKernel/MultiThreaded.h"
 #include "MantidKernel/Strings.h"
@@ -38,6 +39,7 @@
 #include <numeric>
 #include <utility>
 
+using Mantid::Kernel::StringListValidator;
 using Mantid::Kernel::TimeSeriesProperty;
 using Mantid::Types::Core::DateAndTime;
 
@@ -109,15 +111,17 @@ const std::string MatrixWorkspace::yDimensionId = "yDimension";
 
 /// Default constructor
 MatrixWorkspace::MatrixWorkspace()
-    : IMDWorkspace(), ExperimentInfo(), m_axes(), m_isInitialized(false), m_YUnit(), m_YUnitLabel(), m_masks() {}
+    : IMDWorkspace(), ExperimentInfo(), m_axes(), m_isInitialized(false), m_YUnit(), m_YUnitLabel(), m_masks(),
+      m_marker_size(6.) {}
 
 MatrixWorkspace::MatrixWorkspace(const MatrixWorkspace &other)
     : IMDWorkspace(other), ExperimentInfo(other), m_indexInfo(std::make_unique<Indexing::IndexInfo>(other.indexInfo())),
       m_isInitialized(other.m_isInitialized), m_YUnit(other.m_YUnit), m_YUnitLabel(other.m_YUnitLabel),
-      m_isCommonBinsFlag(other.m_isCommonBinsFlag), m_masks(other.m_masks), m_indexInfoNeedsUpdate(false) {
+      m_masks(other.m_masks), m_indexInfoNeedsUpdate(false), m_marker_size(6.) {
   m_axes.resize(other.m_axes.size());
   for (size_t i = 0; i < m_axes.size(); ++i)
     m_axes[i] = std::unique_ptr<Axis>(other.m_axes[i]->clone(this));
+  m_isCommonBinsFlag.store(other.m_isCommonBinsFlag.load());
   m_isCommonBinsFlagValid.store(other.m_isCommonBinsFlagValid.load());
   // TODO: Do we need to init m_monitorWorkspace?
 }
@@ -320,6 +324,71 @@ const std::string MatrixWorkspace::getTitle() const {
     return Workspace::getTitle();
 }
 
+/** Set the plot type of the workspace
+ *
+ * @param t :: The plot type. Must be one of: ["plot", "marker", "histogram", "errorbar_x", "errorbar_y", "errorbar_xy"]
+ */
+void MatrixWorkspace::setPlotType(const std::string &t) {
+  Run &run = mutableRun();
+  StringListValidator v(validPlotTypes);
+
+  if (v.isValid(t) == "") {
+    if (run.hasProperty("plot_type"))
+      run.addProperty("plot_type", t, true);
+    else
+      run.addProperty("plot_type", t, false);
+  }
+}
+
+/** Get the plot type
+ *
+ * @return The plot type
+ */
+std::string MatrixWorkspace::getPlotType() const {
+  std::string plotType;
+  if (run().hasProperty("plot_type")) {
+    plotType = run().getProperty("plot_type")->value();
+  } else {
+    plotType = "plot";
+  }
+  return plotType;
+}
+
+/**
+ * set marker type
+ *
+ * @param markerType :: The Marker Type
+ */
+void MatrixWorkspace::setMarkerStyle(const std::string &markerType) { m_marker = markerType; }
+
+/**
+ * get the marker type
+ *
+ * @return std::string :: the marker type
+ */
+std::string MatrixWorkspace::getMarkerStyle() const {
+  if (m_marker.empty())
+    return Kernel::ConfigService::Instance().getString("markerworkspace.marker.Style");
+  else
+    return m_marker;
+}
+
+/**
+ * Set the marker size for plotting
+ *
+ * @param size :: size of the marker
+ */
+void MatrixWorkspace::setMarkerSize(const float size) {
+  if (size > 0)
+    m_marker_size = size;
+}
+/**
+ * Get the marker size for plotting
+ *
+ * @return int :: marker size
+ */
+float MatrixWorkspace::getMarkerSize() const { return m_marker_size; }
+
 void MatrixWorkspace::updateSpectraUsing(const SpectrumDetectorMapping &map) {
   for (size_t j = 0; j < getNumberHistograms(); ++j) {
     auto &spec = getSpectrum(j);
@@ -328,10 +397,10 @@ void MatrixWorkspace::updateSpectraUsing(const SpectrumDetectorMapping &map) {
         spec.setDetectorIDs(map.getDetectorIDsForSpectrumNo(spec.getSpectrumNo()));
       else
         spec.setDetectorIDs(map.getDetectorIDsForSpectrumIndex(j));
-    } catch (std::out_of_range &e) {
+    } catch (std::out_of_range &exception) {
       // Get here if the spectrum number is not in the map.
       spec.clearDetectorIDs();
-      g_log.debug(e.what());
+      g_log.debug(exception.what());
       g_log.debug() << "Spectrum number " << spec.getSpectrumNo() << " not in map.\n";
     }
   }
@@ -380,7 +449,7 @@ void MatrixWorkspace::rebuildSpectraMapping(const bool includeMonitors, const sp
  *    VALUE is the Workspace Index
  */
 spec2index_map MatrixWorkspace::getSpectrumToWorkspaceIndexMap() const {
-  auto *ax = dynamic_cast<SpectraAxis *>(this->m_axes[1].get());
+  auto const *ax = dynamic_cast<SpectraAxis *>(this->m_axes[1].get());
   if (!ax)
     throw std::runtime_error("MatrixWorkspace::getSpectrumToWorkspaceIndexMap: "
                              "axis[1] is not a SpectraAxis, so I cannot "
@@ -402,7 +471,7 @@ spec2index_map MatrixWorkspace::getSpectrumToWorkspaceIndexMap() const {
  *vector.
  */
 std::vector<size_t> MatrixWorkspace::getSpectrumToWorkspaceIndexVector(specnum_t &offset) const {
-  auto *ax = dynamic_cast<SpectraAxis *>(this->m_axes[1].get());
+  auto const *ax = dynamic_cast<SpectraAxis *>(this->m_axes[1].get());
   if (!ax)
     throw std::runtime_error("MatrixWorkspace::getSpectrumToWorkspaceIndexMap: "
                              "axis[1] is not a SpectraAxis, so I cannot "
@@ -689,9 +758,9 @@ void MatrixWorkspace::getXMinMax(double &xmin, double &xmax) const {
 
   // determine the data range
   for (size_t workspaceIndex = 0; workspaceIndex < numberOfSpectra; workspaceIndex++) {
-    const auto &dataX = this->x(workspaceIndex);
-    const double xfront = dataX.front();
-    const double xback = dataX.back();
+    const auto &xData = this->x(workspaceIndex);
+    const double xfront = xData.front();
+    const double xback = xData.back();
     if (std::isfinite(xfront) && std::isfinite(xback)) {
       if (xfront < xmin)
         xmin = xfront;
@@ -725,34 +794,34 @@ void MatrixWorkspace::getIntegratedSpectra(std::vector<double> &out, const doubl
   PARALLEL_FOR_IF(this->threadSafe())
   for (int wksp_index = 0; wksp_index < static_cast<int>(this->getNumberHistograms()); wksp_index++) {
     // Get Handle to data
-    const Mantid::MantidVec &x = this->readX(wksp_index);
-    const auto &y = this->y(wksp_index);
+    const Mantid::MantidVec &xData = this->readX(wksp_index);
+    const auto &yData = this->y(wksp_index);
     // If it is a 1D workspace, no need to integrate
-    if ((x.size() <= 1 + histogramOffset) && (!y.empty())) {
-      out[wksp_index] = y[0];
+    if ((xData.size() <= 1 + histogramOffset) && (!yData.empty())) {
+      out[wksp_index] = yData[0];
     } else {
       // Iterators for limits - whole range by default
       Mantid::MantidVec::const_iterator lowit, highit;
-      lowit = x.begin();
-      highit = x.end() - histogramOffset;
+      lowit = xData.begin();
+      highit = xData.end() - histogramOffset;
 
       // But maybe we don't want the entire range?
       if (!entireRange) {
         // If the first element is lower that the xmin then search for new lowit
         if ((*lowit) < minX)
-          lowit = std::lower_bound(x.begin(), x.end(), minX);
+          lowit = std::lower_bound(xData.begin(), xData.end(), minX);
         // If the last element is higher that the xmax then search for new highit
         if (*(highit - 1 + histogramOffset) > maxX)
-          highit = std::upper_bound(lowit, x.end(), maxX);
+          highit = std::upper_bound(lowit, xData.end(), maxX);
       }
 
       // Get the range for the y vector
-      Mantid::MantidVec::difference_type distmin = std::distance(x.begin(), lowit);
-      Mantid::MantidVec::difference_type distmax = std::distance(x.begin(), highit);
+      Mantid::MantidVec::difference_type distmin = std::distance(xData.begin(), lowit);
+      Mantid::MantidVec::difference_type distmax = std::distance(xData.begin(), highit);
       double sum(0.0);
       if (distmin <= distmax) {
         // Integrate
-        sum = std::accumulate(y.begin() + distmin, y.begin() + distmax, 0.0, accumulate_if_finite);
+        sum = std::accumulate(yData.begin() + distmin, yData.begin() + distmax, 0.0, accumulate_if_finite);
       }
       // Save it in the vector
       out[wksp_index] = sum;
@@ -1055,19 +1124,20 @@ bool MatrixWorkspace::isCommonBins() const {
   for (size_t i = 1; i < numHist; ++i) {
     if (x(i).size() != numBins) {
       m_isCommonBinsFlag = false;
-      break;
+      return m_isCommonBinsFlag;
     }
   }
 
+  const auto &x0 = x(0);
   // Check that the values of each histogram are identical.
-  if (m_isCommonBinsFlag) {
-    const size_t lastSpec = numHist - 1;
-    for (size_t i = 0; i < lastSpec; ++i) {
-      const auto &xi = x(i);
-      const auto &xip1 = x(i + 1);
+  PARALLEL_FOR_IF(this->threadSafe())
+  for (int i = 1; i < static_cast<int>(numHist); ++i) {
+    if (m_isCommonBinsFlag) {
+      const auto specIndex = static_cast<std::size_t>(i);
+      const auto &xi = x(specIndex);
       for (size_t j = 0; j < numBins; ++j) {
-        const double a = xi[j];
-        const double b = xip1[j];
+        const double a = x0[j];
+        const double b = xi[j];
         // Check for NaN and infinity before comparing for equality
         if (std::isfinite(a) && std::isfinite(b)) {
           if (std::abs(a - b) > EPSILON) {
@@ -1136,10 +1206,10 @@ void MatrixWorkspace::maskBin(const size_t &workspaceIndex, const size_t &binInd
   // If the weight is not 0, NaN and Inf values are set to 0,
   // whereas other values are scaled by (1 - weight)
   if (weight != 0.) {
-    double &y = this->mutableY(workspaceIndex)[binIndex];
-    (std::isnan(y) || std::isinf(y)) ? y = 0. : y *= (1 - weight);
-    double &e = this->mutableE(workspaceIndex)[binIndex];
-    (std::isnan(e) || std::isinf(e)) ? e = 0. : e *= (1 - weight);
+    double &yData = this->mutableY(workspaceIndex)[binIndex];
+    (std::isnan(yData) || std::isinf(yData)) ? yData = 0. : yData *= (1 - weight);
+    double &eData = this->mutableE(workspaceIndex)[binIndex];
+    (std::isnan(eData) || std::isinf(eData)) ? eData = 0. : eData *= (1 - weight);
   }
 }
 
@@ -1203,11 +1273,11 @@ std::vector<size_t> MatrixWorkspace::maskedBinsIndices(const size_t &workspaceIn
     throw Kernel::Exception::IndexError(workspaceIndex, 0, "MatrixWorkspace::maskedBins");
   }
 
-  auto maskedBins = it->second;
+  auto maskedBinsList = it->second;
   std::vector<size_t> maskedIds;
-  maskedIds.reserve(maskedBins.size());
+  maskedIds.reserve(maskedBinsList.size());
 
-  std::transform(maskedBins.begin(), maskedBins.end(), std::back_inserter(maskedIds),
+  std::transform(maskedBinsList.begin(), maskedBinsList.end(), std::back_inserter(maskedIds),
                  [](const auto &mb) { return mb.first; });
   return maskedIds;
 }
@@ -1632,13 +1702,11 @@ signal_t MatrixWorkspace::getSignalAtCoord(const coord_t *coords,
                                 "Workspace can only have 2 axes, found " +
                                 std::to_string(this->axes()));
 
-  coord_t xCoord = coords[0];
-  coord_t yCoord = coords[1];
   // First, find the workspace index
-  Axis *ax1 = this->getAxis(1);
+  Axis const *ax1 = this->getAxis(1);
   size_t wi(-1);
   try {
-    wi = ax1->indexOfValue(yCoord);
+    wi = ax1->indexOfValue(coords[1]);
   } catch (std::out_of_range &) {
     return std::numeric_limits<double>::quiet_NaN();
   }
@@ -1661,6 +1729,7 @@ signal_t MatrixWorkspace::getSignalAtCoord(const coord_t *coords,
     const auto &xVals = x(wi);
     size_t i;
     try {
+      coord_t xCoord = coords[0];
       if (isHistogramData())
         i = Kernel::VectorHelper::indexOfValueFromEdges(xVals.rawData(), xCoord);
       else
@@ -1669,25 +1738,25 @@ signal_t MatrixWorkspace::getSignalAtCoord(const coord_t *coords,
       return std::numeric_limits<double>::quiet_NaN();
     }
 
-    double y = yVals[i];
+    double yVal = yVals[i];
     // What is our normalization factor?
     switch (normalization) {
     case NoNormalization:
-      return y;
+      return yVal;
     case VolumeNormalization: {
       // Divide the signal by the area
       auto volume = yBinSize * (xVals[i + 1] - xVals[i]);
       if (volume == 0.0) {
         return std::numeric_limits<double>::quiet_NaN();
       }
-      return y / volume;
+      return yVal / volume;
     }
     case NumEventsNormalization:
       // Not yet implemented, may not make sense
-      return y;
+      return yVal;
     }
     // This won't happen
-    return y;
+    return yVal;
   } else {
     return std::numeric_limits<double>::quiet_NaN();
   }
@@ -1950,7 +2019,7 @@ std::pair<size_t, double> MatrixWorkspace::getXIndex(size_t i, double x, bool is
       auto index = static_cast<size_t>(std::distance(X.begin(), ix));
       if (isLeft)
         --index;
-      return std::make_pair(index, fabs((X[index] - x) / (*ix - *(ix - 1))));
+      return std::make_pair(index, std::abs((X[index] - x) / (*ix - *(ix - 1))));
     }
   }
   // I don't think we can ever get here
@@ -2066,11 +2135,11 @@ void MatrixWorkspace::rebuildDetectorIDGroupings() {
   const auto &detInfo = detectorInfo();
   const auto &allDetIDs = detInfo.detectorIDs();
   const auto &specDefs = m_indexInfo->spectrumDefinitions();
-  const auto size = static_cast<int64_t>(m_indexInfo->size());
+  const auto indexInfoSize = static_cast<int64_t>(m_indexInfo->size());
   enum class ErrorCode { None, InvalidDetIndex, InvalidTimeIndex };
   std::atomic<ErrorCode> errorValue(ErrorCode::None);
 #pragma omp parallel for
-  for (int64_t i = 0; i < size; ++i) {
+  for (int64_t i = 0; i < indexInfoSize; ++i) {
     auto &spec = getSpectrum(i);
     // Prevent setting flags that require spectrum definition updates
     spec.setMatrixWorkspace(nullptr, i);
@@ -2123,7 +2192,7 @@ IPropertyManager::getValue<Mantid::API::MatrixWorkspace_sptr>(const std::string 
 template <>
 MANTID_API_DLL Mantid::API::MatrixWorkspace_const_sptr
 IPropertyManager::getValue<Mantid::API::MatrixWorkspace_const_sptr>(const std::string &name) const {
-  auto *prop = dynamic_cast<PropertyWithValue<Mantid::API::MatrixWorkspace_sptr> *>(getPointerToProperty(name));
+  auto const *prop = dynamic_cast<PropertyWithValue<Mantid::API::MatrixWorkspace_sptr> *>(getPointerToProperty(name));
   if (prop) {
     return prop->operator()();
   } else {

@@ -8,6 +8,7 @@
 
 #include "MantidAPI/Column.h"
 #include "MantidDataObjects/DllConfig.h"
+#include "MantidKernel/FloatingPointComparison.h"
 #include "MantidKernel/StringTokenizer.h"
 
 #include <boost/algorithm/string/join.hpp>
@@ -15,6 +16,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <cmath>
+#include <numeric>
 namespace Mantid {
 namespace DataObjects {
 
@@ -86,13 +88,9 @@ public:
 
   /// Overall memory size taken by the column (bytes)
   long int sizeOfData() const override {
-    long int dataSize(0);
-
-    for (auto elemIt = m_data.begin(); elemIt != m_data.end(); ++elemIt) {
-      dataSize += static_cast<long int>(elemIt->size() * sizeof(Type));
-    }
-
-    return dataSize;
+    return std::accumulate(m_data.cbegin(), m_data.cend(), 0, [](long int dataSize, const auto &elem) {
+      return dataSize + static_cast<long int>(elem.size() * sizeof(Type));
+    });
   }
 
   /// Create another copy of the column
@@ -120,7 +118,7 @@ public:
   /// Reference to the data.
   const std::vector<std::vector<Type>> &data() const { return m_data; }
 
-  bool equals(const Column &otherColumn, double tolerance) const override {
+  bool equals(const Column &otherColumn, double tolerance, bool const nanEqual = false) const override {
     if (!possibleToCompare(otherColumn)) {
       return false;
     }
@@ -131,7 +129,11 @@ public:
         return false;
       }
       for (size_t j = 0; j < m_data[i].size(); j++) {
-        if (fabs((double)m_data[i][j] - (double)otherData[i][j]) > tolerance) {
+        double const left = static_cast<double>(m_data[i][j]);
+        double const right = static_cast<double>(otherData[i][j]);
+        if (nanEqual && std::isnan(left) && isnan(right)) {
+          continue;
+        } else if (!Kernel::withinAbsoluteDifference(left, right, tolerance)) {
           return false;
         }
       }
@@ -139,7 +141,7 @@ public:
     return true;
   }
 
-  bool equalsRelErr(const Column &otherColumn, double tolerance) const override {
+  bool equalsRelErr(const Column &otherColumn, double tolerance, bool const nanEqual = false) const override {
     if (!possibleToCompare(otherColumn)) {
       return false;
     }
@@ -150,11 +152,11 @@ public:
         return false;
       }
       for (size_t j = 0; j < m_data[i].size(); j++) {
-        double num = fabs((double)m_data[i][j] - (double)otherData[i][j]);
-        double den = (fabs((double)m_data[i][j]) + fabs((double)otherData[i][j])) / 2;
-        if (den < tolerance && num > tolerance) {
-          return false;
-        } else if (num / den > tolerance) {
+        double const left = static_cast<double>(m_data[i][j]);
+        double const right = static_cast<double>(otherData[i][j]);
+        if (nanEqual && std::isnan(left) && isnan(right)) {
+          continue;
+        } else if (!Kernel::withinRelativeDifference(left, right, tolerance)) {
           return false;
         }
       }

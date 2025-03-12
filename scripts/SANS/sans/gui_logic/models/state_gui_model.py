@@ -4,11 +4,12 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The state gui model contains all the reduction information which is not explicitly available in the data table.
+"""The state gui model contains all the reduction information which is not explicitly available in the data table.
 
 This is one of the two models which is used for the data reduction. It contains generally all the settings which
 are not available in the model associated with the data table.
 """
+
 from typing import Union
 
 from sans.common.enums import ReductionDimensionality, ReductionMode, RangeStepType, SaveType, DetectorType, FitModeForMerge
@@ -177,7 +178,7 @@ class StateGuiModel(ModelCommon):
     @undo_selective_view_scaling
     def front_pos_2(self, value):
         if DetectorType.HAB.value in self._all_states.move.detectors:
-            self._all_states.move.detectors[DetectorType.HAB.value].sample_centre_pos1 = value
+            self._all_states.move.detectors[DetectorType.HAB.value].sample_centre_pos2 = value
 
     # ==================================================================================================================
     # ==================================================================================================================

@@ -9,21 +9,16 @@
 #include "MantidAPI/InstrumentValidator.h"
 #include "MantidAPI/MatrixWorkspace.h"
 #include "MantidAPI/SpectrumInfo.h"
-#include "MantidDataHandling/SaveDetectorsGrouping.h"
-#include "MantidDataHandling/SavePAR.h"
 #include "MantidDataObjects/GroupingWorkspace.h"
 #include "MantidGeometry/Crystal/AngleUnits.h"
-#include "MantidGeometry/Instrument.h"
 #include "MantidGeometry/Instrument/DetectorGroup.h"
 #include "MantidGeometry/Instrument/DetectorInfo.h"
 #include "MantidKernel/BoundedValidator.h"
 #include "MantidKernel/ListValidator.h"
-#include "MantidKernel/System.h"
 
 #include <Poco/DOM/AutoPtr.h>
 #include <Poco/DOM/DOMWriter.h>
 #include <Poco/DOM/Document.h>
-#include <Poco/DOM/Element.h>
 #include <Poco/DOM/Text.h>
 #include <Poco/XML/XMLWriter.h>
 
@@ -45,8 +40,8 @@ protected:
 public:
   Labelor(double t_step, double a_step = 0.0, double a_start = 0.0)
       : tt_step(t_step * Mantid::Geometry::deg2rad), aa_step(a_step * Mantid::Geometry::deg2rad),
-        aa_start(a_start * Mantid::Geometry::deg2rad){};
-  virtual ~Labelor(){};
+        aa_start(a_start * Mantid::Geometry::deg2rad) {};
+  virtual ~Labelor() {};
   virtual size_t operator()(SpectrumInfo const &spectrumInfo, size_t i) = 0;
 };
 
@@ -61,7 +56,7 @@ class CircularSectorLabelor : public Labelor {
   const double inv_tt_step;
 
 public:
-  CircularSectorLabelor(double t_step) : Labelor(t_step), inv_tt_step(1.0 / tt_step){};
+  CircularSectorLabelor(double t_step) : Labelor(t_step), inv_tt_step(1.0 / tt_step) {};
   size_t operator()(SpectrumInfo const &spectrumInfo, size_t i) override {
     return static_cast<size_t>(spectrumInfo.twoTheta(i) * inv_tt_step) + 1;
   };
@@ -82,7 +77,7 @@ class SphericalSectorLabelor : public Labelor {
 public:
   SphericalSectorLabelor(double t_step, double a_step, double a_start)
       : Labelor(t_step, a_step, a_start), inv_tt_step(1.0 / tt_step), inv_aa_step(1.0 / aa_step),
-        num_aa_step(int(std::ceil(360.0 / a_step))){};
+        num_aa_step(int(std::ceil(360.0 / a_step))) {};
   size_t operator()(SpectrumInfo const &spectrumInfo, size_t i) override {
     return static_cast<size_t>(spectrumInfo.twoTheta(i) * inv_tt_step) * num_aa_step +
            static_cast<size_t>(std::floor((spectrumInfo.azimuthal(i) - aa_start) * inv_aa_step)) % num_aa_step + 1;
@@ -214,7 +209,8 @@ void GenerateGroupingPowder::init() {
   declareProperty(std::make_unique<WorkspaceProperty<>>("InputWorkspace", "", Direction::Input,
                                                         std::make_shared<InstrumentValidator>()),
                   "A workspace from which to generate the grouping.");
-  declareProperty(std::make_unique<WorkspaceProperty<GroupingWorkspace>>("GroupingWorkspace", "", Direction::Output),
+  declareProperty(std::make_unique<WorkspaceProperty<GroupingWorkspace>>("GroupingWorkspace", "", Direction::Output,
+                                                                         PropertyMode::Optional),
                   "The grouping workspace created");
 
   auto positiveDouble = std::make_shared<BoundedValidator<double>>();
@@ -244,12 +240,12 @@ void GenerateGroupingPowder::init() {
   fileExtensionXMLorHDF5->addAllowedValue(std::string("nx5"));
   declareProperty("FileFormat", std::string("xml"), fileExtensionXMLorHDF5,
                   "File extension/format for saving output: either xml (default) or nxs/nx5.");
-  declareProperty(std::make_unique<FileProperty>("GroupingFilename", "", FileProperty::Save,
+  declareProperty(std::make_unique<FileProperty>("GroupingFilename", "", FileProperty::OptionalSave,
                                                  std::vector<std::string>{"xml", "nxs", "nx5"}),
                   "A grouping file that will be created.");
   declareProperty("GenerateParFile", true,
                   "If true, a par file with a corresponding name to the "
-                  "grouping file will be generated.");
+                  "grouping file will be generated. Ignored if grouping file is not specified.");
 }
 
 //----------------------------------------------------------------------------------------------
@@ -260,6 +256,7 @@ void GenerateGroupingPowder::init() {
  */
 std::map<std::string, std::string> GenerateGroupingPowder::validateInputs() {
   std::map<std::string, std::string> issues;
+
   const bool useAzimuthal = (double(getProperty("AzimuthalStep")) < 360.0);
   const bool generateParFile = getProperty("GenerateParFile");
   if (useAzimuthal && generateParFile) {
@@ -267,16 +264,29 @@ std::map<std::string, std::string> GenerateGroupingPowder::validateInputs() {
     issues["AzimuthalStep"] = noAzimuthInPar;
     issues["GenerateParFile"] = noAzimuthInPar;
   }
+
+  if (isDefault("GroupingWorkspace") && isDefault("GroupingFilename")) {
+    std::string err = "At least one of {'GroupingWorkspace', 'GroupingFilename'} must be passed.";
+    issues["GroupingWorkspace"] = err;
+    issues["GroupingFilename"] = err;
+  }
+
   return issues;
 }
 
 /** Execute the algorithm.
  */
 void GenerateGroupingPowder::exec() {
+  createGroups();
+  saveGroups();
+}
+
+void GenerateGroupingPowder::createGroups() {
   MatrixWorkspace_const_sptr input_ws = getProperty("InputWorkspace");
   const auto &spectrumInfo = input_ws->spectrumInfo();
   const auto &detectorInfo = input_ws->detectorInfo();
   const auto &detectorIDs = detectorInfo.detectorIDs();
+
   if (detectorIDs.empty())
     throw std::invalid_argument("Workspace contains no detectors.");
 
@@ -285,8 +295,10 @@ void GenerateGroupingPowder::exec() {
     throw std::invalid_argument("Input Workspace has invalid Instrument\n");
   }
 
-  auto groupWS = std::make_shared<GroupingWorkspace>(inst);
-  this->setProperty("GroupingWorkspace", groupWS);
+  this->m_groupWS = std::make_shared<GroupingWorkspace>(inst);
+  if (!isDefault("GroupingWorkspace")) {
+    this->setProperty("GroupingWorkspace", this->m_groupWS);
+  }
 
   const double step = getProperty("AngleStep");
 
@@ -315,44 +327,50 @@ void GenerateGroupingPowder::exec() {
     const double groupId = (double)(*label)(spectrumInfo, i);
 
     if (spectrumInfo.hasUniqueDetector(i)) {
-      groupWS->setValue(det.getID(), groupId);
+      this->m_groupWS->setValue(det.getID(), groupId);
     } else {
       const auto &group = dynamic_cast<const DetectorGroup &>(det);
       const auto idv = group.getDetectorIDs();
       const auto ids = std::set<detid_t>(idv.begin(), idv.end());
-      groupWS->setValue(ids, groupId);
+      this->m_groupWS->setValue(ids, groupId);
     }
   }
+}
 
-  std::string ext = this->getProperty("FileFormat");
-  if (ext == "xml") {
-    this->saveAsXML();
-  } else if (ext == "nxs" || ext == "nx5") {
-    this->saveAsNexus();
-  } else {
-    throw std::invalid_argument("that file format doesn't exist: must be xml, nxs, nx5\n");
-  }
+void GenerateGroupingPowder::saveGroups() {
 
-  if (getProperty("GenerateParFile")) {
-    this->saveAsPAR();
+  // save if a filename was specified
+  if (!isDefault("GroupingFilename")) {
+
+    std::string ext = this->getProperty("FileFormat");
+    if (ext == "xml") {
+      this->saveAsXML();
+    } else if (ext == "nxs" || ext == "nx5") {
+      this->saveAsNexus();
+    } else {
+      throw std::invalid_argument("that file format doesn't exist: must be xml, nxs, nx5\n");
+    }
+
+    if (getProperty("GenerateParFile")) {
+      this->saveAsPAR();
+    }
   }
 }
 
 // XML file
 void GenerateGroupingPowder::saveAsXML() {
-  GroupingWorkspace_sptr groupWS = this->getProperty("GroupingWorkspace");
   const std::string XMLfilename = this->getProperty("GroupingFilename");
   // XML
   AutoPtr<Document> pDoc = new Document;
   AutoPtr<Element> pRoot = pDoc->createElement("detector-grouping");
   pDoc->appendChild(pRoot);
-  pRoot->setAttribute("instrument", groupWS->getInstrument()->getName());
+  pRoot->setAttribute("instrument", this->m_groupWS->getInstrument()->getName());
 
   const double step = getProperty("AngleStep");
   const auto numSteps = int(180. / step + 1);
 
   for (int i = 0; i < numSteps; ++i) {
-    std::vector<detid_t> group = groupWS->getDetectorIDsOfGroup(i);
+    std::vector<detid_t> group = this->m_groupWS->getDetectorIDsOfGroup(i);
     size_t gSize = group.size();
     if (gSize > 0) {
       std::stringstream spID, textvalue;
@@ -398,10 +416,9 @@ void GenerateGroupingPowder::saveAsXML() {
 
 // HDF5 file
 void GenerateGroupingPowder::saveAsNexus() {
-  GroupingWorkspace_sptr groupWS = this->getProperty("GroupingWorkspace");
   const std::string filename = this->getProperty("GroupingFilename");
   auto saveNexus = createChildAlgorithm("SaveNexusProcessed");
-  saveNexus->setProperty("InputWorkspace", groupWS);
+  saveNexus->setProperty("InputWorkspace", this->m_groupWS);
   saveNexus->setProperty("Filename", filename);
   saveNexus->executeAsChildAlg();
 }

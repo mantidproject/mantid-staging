@@ -10,7 +10,7 @@ from typing import List, Sequence, Tuple, Optional
 
 from mantid.api import MatrixWorkspace, MultipleExperimentInfos
 from mantid.kernel import SpecialCoordinateSystem
-from mantid.plots.datafunctions import get_indices
+from mantid.plots.datafunctions import get_indices, get_normalization, get_md_data2d_bin_bounds
 from mantid.simpleapi import BinMD, IntegrateMDHistoWorkspace, TransposeMD
 
 from .base_model import SliceViewerBaseModel
@@ -181,10 +181,9 @@ class SliceViewerModel(SliceViewerBaseModel):
 
     def get_data_MDH(self, slicepoint, transpose=False):
         indices, _ = get_indices(self.get_ws(), slicepoint=slicepoint)
-        if transpose:
-            return np.ma.masked_invalid(self.get_ws().getSignalArray()[indices]).T
-        else:
-            return np.ma.masked_invalid(self.get_ws().getSignalArray()[indices])
+        mdh_normalization, _ = get_normalization(self.get_ws())
+        _, _, z = get_md_data2d_bin_bounds(self.get_ws(), mdh_normalization, indices, not (transpose))
+        return z
 
     def get_data_MDE(self, slicepoint, bin_params, dimension_indices, limits=None, transpose=False):
         """
@@ -196,10 +195,10 @@ class SliceViewerModel(SliceViewerBaseModel):
                        should be provided in the order of the workspace not the display
         :param transpose: If true then transpose the data before returning
         """
-        if transpose:
-            return np.ma.masked_invalid(self.get_ws_MDE(slicepoint, bin_params, limits, dimension_indices).getSignalArray().squeeze()).T
-        else:
-            return np.ma.masked_invalid(self.get_ws_MDE(slicepoint, bin_params, limits, dimension_indices).getSignalArray().squeeze())
+        mdh = self.get_ws_MDE(slicepoint, bin_params, limits, dimension_indices)
+        mdh_normalization, _ = get_normalization(mdh)
+        _, _, z = get_md_data2d_bin_bounds(mdh, mdh_normalization, transpose=not (transpose))
+        return z
 
     def get_properties(self):
         """
@@ -310,7 +309,7 @@ class SliceViewerModel(SliceViewerBaseModel):
             cen_vec = cen_vec + cens[ivec] * vectors[ivec]
         proj_str = (
             "("
-            + " ".join([f"{np.round(c,2)}+{np.round(x,2)}x" if abs(x) > 0 else f"{np.round(c,2)}" for c, x in zip(cen_vec, vectors[ix])])
+            + " ".join([f"{np.round(c, 2)}+{np.round(x, 2)}x" if abs(x) > 0 else f"{np.round(c, 2)}" for c, x in zip(cen_vec, vectors[ix])])
             + ")"
         )
         proj_str = proj_str.replace("+-", "-")
@@ -325,8 +324,8 @@ class SliceViewerModel(SliceViewerBaseModel):
                     pass
             else:
                 length = np.sqrt(np.sum(vec**2))
-            unit_str = f"in {np.round(length,2)} Ang^-1" if length is not None else "r.l.u."
-            xlab = proj_str if ivec == ix else f"u{ivec+1}"
+            unit_str = f"in {np.round(length, 2)} Ang^-1" if length is not None else "r.l.u."
+            xlab = proj_str if ivec == ix else f"u{ivec + 1}"
             vec_str = ",".join(str(v) for v in vec)
             projection_params[f"BasisVector{ivec}"] = ", ".join([xlab, unit_str, vec_str])
 
@@ -529,20 +528,24 @@ class SliceViewerModel(SliceViewerBaseModel):
         return proj_matrix
 
     def projection_matrix_from_basis(self, ws):
-        proj_matrix = np.zeros((3, 3))
         ndims = ws.getNumDims()
         basis_matrix = np.zeros((ndims, ndims))
         if len(list(ws.getBasisVector(0))) == ndims:  # basis vectors valid
+            proj_matrix = np.eye(3)
             for idim in range(ndims):
                 basis_matrix[:, idim] = list(ws.getBasisVector(idim))
-            # exclude non-Q dim elements from basis vectors
-            qflags = np.array([ws.getDimension(idim).getMDFrame().isQ() for idim in range(ndims)])
-            i_nonq = np.flatnonzero(np.invert(qflags))
-            qmask = np.invert(basis_matrix[:, i_nonq] == 1).ravel()
+            # find columns of basis_matrix to keep (corresponding axes that are momentum transfer)
+            q_axes = np.array([ws.getDimension(idim).getMDFrame().isQ() for idim in range(ndims)])
+            # find rows of basis matrix to exclude (corresponding to non-momentum components of basis vectors)
+            # note this depends on the order of the axes in the original workspace
+            i_nonq_axes = np.flatnonzero(np.invert(q_axes))
+            q_comps = np.invert(basis_matrix[:, i_nonq_axes].any(axis=1))
             # extract proj matrix from basis vectors of q dimension
             # note for 2D the last col/row of proj_matrix is 0,0,1 - i.e. L
-            proj_matrix[: qmask.sum(), : qflags.sum()] = basis_matrix[qmask, :][:, qflags]
-        return proj_matrix
+            proj_matrix[: q_comps.sum(), : q_comps.sum()] = basis_matrix[q_comps, :][:, q_axes]
+            return proj_matrix
+        else:
+            return np.zeros((3, 3))  # singular matrix should be ignored
 
     def get_proj_matrix(self):
         ws = self._get_ws()
@@ -672,12 +675,16 @@ def _dimension_limits(
     :param limits: An optional Sequence of length 2 containing limits for plotting dimensions. If
                     not provided the full extent of each dimension is used.
     """
-    dim_limits = [(dim.getMinimum(), dim.getMaximum()) for dim in [workspace.getDimension(i) for i in range(workspace.getNumDims())]]
-    for idim, (dim_min, dim_max) in enumerate(dim_limits):
+    dim_limits = []
+
+    for idim in range(workspace.getNumDims()):
+        dim = workspace.getDimension(idim)
+        dim_min = dim.getMinimum()
+        dim_max = dim.getMaximum()
         slice_pt = slicepoint[idim]
         if slice_pt is not None:
             # replace extents with integration limits (calc from bin width in bin_params)
-            half_bin_width = bin_params[idim] / 2
+            half_bin_width = bin_params[idim] / 2 if bin_params is not None else dim.getBinWidth() / 2
             dim_min, dim_max = (slice_pt - half_bin_width, slice_pt + half_bin_width)
         elif limits is not None and dimension_indices[idim] is not None:
             # replace min/max of non-integrated dims with limits from ROI if specified
@@ -686,7 +693,8 @@ def _dimension_limits(
         # check all limits are over minimum width
         if dim_max - dim_min < MIN_WIDTH:
             dim_max = dim_min + MIN_WIDTH
-        dim_limits[idim] = (dim_min, dim_max)
+        dim_limits.append((dim_min, dim_max))
+
     return dim_limits
 
 

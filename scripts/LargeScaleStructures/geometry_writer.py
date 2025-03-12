@@ -71,7 +71,6 @@ class MantidGeom(object):
         self._root.appendChild(child)
 
     def _append_child(self, element_name, element_parent, **kwargs):
-
         element = self._document.createElement(element_name)
         for item in kwargs:
             element.setAttribute(item, str(kwargs[item]))
@@ -168,10 +167,10 @@ class MantidGeom(object):
             comp = self._append_child("component", root, type=type_name, idlist=idlist)
         else:
             comp = self._append_child("component", root, type=type_name)
-        l = comp
+        location = comp
         if blank_location:
-            l = self._append_child("location", comp)
-        return l
+            location = self._append_child("location", comp)
+        return location
 
     def makeTypeElement(self, name):
         """

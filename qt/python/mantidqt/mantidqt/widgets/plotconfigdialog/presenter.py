@@ -14,7 +14,7 @@ from mantidqt.widgets.plotconfigdialog.curvestabwidget.presenter import CurvesTa
 from mantidqt.widgets.plotconfigdialog.imagestabwidget.presenter import ImagesTabWidgetPresenter
 from mantidqt.widgets.plotconfigdialog.legendtabwidget.presenter import LegendTabWidgetPresenter
 
-HELP_URL = "qthelp://org.mantidproject/doc/tutorials/mantid_basic_course/loading_and_displaying_data/" "06_formatting_plots.html"
+HELP_URL = "qthelp://org.mantidproject/doc/tutorials/mantid_basic_course/loading_and_displaying_data/06_formatting_plots.html"
 
 
 class PlotConfigDialogPresenter:
@@ -24,7 +24,6 @@ class PlotConfigDialogPresenter:
             self.view = view
         else:
             self.view = PlotConfigDialogView(parent)
-        self.view.show()
 
         self.tab_widget_presenters = [None, None, None, None]
         self.tab_widget_views = [None, None, None, None]
@@ -53,6 +52,7 @@ class PlotConfigDialogPresenter:
             self.tab_widget_views[2] = (images_tab.view, "Images")
 
         self._add_tab_widget_views()
+        self.view.show()
 
         # Signals
         self.view.ok_button.clicked.connect(self.apply_properties_and_exit)

@@ -6,19 +6,21 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=too-many-lines, invalid-name, redefined-builtin, protected-access, too-many-arguments
 """
-    Enables the SANS commands (listed at http://www.mantidproject.org/SANS) to
-    be run
+Enables the SANS commands (listed at http://www.mantidproject.org/SANS) to
+be run
 """
+
 import isis_instrument
 from reducer_singleton import ReductionSingleton
-from mantid.kernel import Logger
 import isis_reduction_steps
 import isis_reducer
-from centre_finder import *
-from mantid.simpleapi import *
-from mantid.api import WorkspaceGroup, ExperimentInfo
+from centre_finder import is_workspace_which_requires_angle, BeamCenterLogger, CentreFinder, CentrePositioner, FindDirectionEnum
+from mantid.api import mtd, AnalysisDataService, ExperimentInfo, WorkspaceGroup
+from mantid.kernel import config, Logger
+from mantid.simpleapi import AddSampleLog, CloneWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Scale
 import copy
-from SANSadd2 import *
+import os
+from SANSadd2 import add_runs
 import SANSUtility as su
 from SANSUtility import deprecated
 import SANSUserFileParser as UserFileParser
@@ -702,12 +704,12 @@ def _merge_workspaces(retWSname_front, retWSname_rear, rAnds):
 
 
 def _common_substring(val1, val2):
-    l = []
+    substrings = []
     for i in range(len(val1)):
         if val1[i] == val2[i]:
-            l.append(val1[i])
+            substrings.append(val1[i])
         else:
-            return "".join(l)
+            return "".join(substrings)
 
 
 def _group_workspaces(list_of_values, outputname):
@@ -2086,7 +2088,7 @@ def ViewCurrentMask():
     detectors in the bank in a different colour
     """
     raise NotImplementedError(
-        "This is no longer implemented as it required MantidPlot, please switch" "to sans.command_interface.ISISCommandInterface instead"
+        "This is no longer implemented as it required MantidPlot, please switch to sans.command_interface.ISISCommandInterface instead"
     )
 
 

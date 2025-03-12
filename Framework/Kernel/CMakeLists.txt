@@ -128,17 +128,6 @@ set(SRC_FILES
     src/WriteLock.cpp
 )
 
-set(SRC_UNITY_IGNORE_FILES
-    src/Atom.cpp
-    src/NeutronAtom.cpp
-    src/FacilityInfo.cpp
-    src/FileValidator.cpp
-    src/DirectoryValidator.cpp
-    src/PropertyManager.cpp
-    src/Unit.cpp
-    src/System.cpp
-)
-
 set(INC_FILES
     inc/MantidKernel/ANN/ANN.h
     inc/MantidKernel/ANN/ANNperf.h
@@ -177,10 +166,12 @@ set(INC_FILES
     inc/MantidKernel/DllOpen.h
     inc/MantidKernel/DocumentationHeader.h
     inc/MantidKernel/DynamicFactory.h
+    inc/MantidKernel/DynamicPointerCastHelper.h
     inc/MantidKernel/EigenConversionHelpers.h
     inc/MantidKernel/EmptyValues.h
     inc/MantidKernel/EnabledWhenProperty.h
     inc/MantidKernel/EnumeratedString.h
+    inc/MantidKernel/EnumeratedStringProperty.h
     inc/MantidKernel/EnvironmentHistory.h
     inc/MantidKernel/EqualBinsChecker.h
     inc/MantidKernel/ErrorReporter.h
@@ -347,8 +338,10 @@ set(TEST_FILES
     DiskBufferTest.h
     DllOpenTest.h
     DynamicFactoryTest.h
+    DynamicPointerCastHelperTest.h
     EigenConversionHelpersTest.h
     EnabledWhenPropertyTest.h
+    EnumeratedStringPropertyTest.h
     EnumeratedStringTest.h
     EnvironmentHistoryTest.h
     EqualBinsCheckerTest.h
@@ -361,8 +354,6 @@ set(TEST_FILES
     FreeBlockTest.h
     FunctionTaskTest.h
     GlobTest.h
-    IPropertySettingsTest.h
-    ISaveableTest.h
     IValidatorTest.h
     IndexSetTest.h
     InstrumentInfoTest.h
@@ -471,11 +462,6 @@ else()
   list(APPEND SRC_FILES src/NetworkProxyLinux.cpp)
 endif()
 
-if(UNITY_BUILD)
-  include(UnityBuild)
-  enable_unity_build(Kernel SRC_FILES SRC_UNITY_IGNORE_FILES 10)
-endif(UNITY_BUILD)
-
 # Enable precompiled headers where supported (must be done before target is added)
 enable_precompiled_headers(inc/MantidKernel/PrecompiledHeader.h SRC_FILES)
 # Add the target for this directory
@@ -502,7 +488,7 @@ target_link_libraries(
   Kernel
   PUBLIC Mantid::Types
          Mantid::Json
-         Nexus::nexuscpp
+         Mantid::NexusCpp
          Eigen3::Eigen
          TBB::tbb
          Poco::Foundation
@@ -513,8 +499,7 @@ target_link_libraries(
          GSL::gsl
          OpenSSL::SSL
          ${HDF5_LIBRARIES}
-         ${HDF5_HL_LIBRARIES}
-  PRIVATE ${NETWORK_LIBRARIES} span
+  PRIVATE ${NETWORK_LIBRARIES}
 )
 if(WIN32)
   target_link_libraries(Kernel PRIVATE Psapi.lib) # For memory usage queries

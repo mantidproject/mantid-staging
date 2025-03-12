@@ -106,7 +106,7 @@ class SpectraSelectionDialog(SpectraSelectionDialogUIBase):
 
     def on_plot_all_clicked(self):
         selection = SpectraSelection(self._workspaces)
-        selection.wksp_indices = range(self.wi_min, self.wi_max + 1)
+        selection.spectra = self._plottable_spectra
         selection.plot_type = self._ui.plotType.currentIndex()
 
         if self._advanced:
@@ -145,7 +145,7 @@ class SpectraSelectionDialog(SpectraSelectionDialogUIBase):
             response = QMessageBox.warning(
                 self,
                 "Mantid Workbench",
-                "You selected {} spectra to plot. Are you sure " "you want to plot this many?".format(number_of_lines_to_plot),
+                "You selected {} spectra to plot. Are you sure you want to plot this many?".format(number_of_lines_to_plot),
                 QMessageBox.Ok | QMessageBox.Cancel,
             )
             return response == QMessageBox.Ok

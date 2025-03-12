@@ -5,9 +5,11 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,too-many-instance-attributes
-from mantid.simpleapi import *
-from mantid.api import PythonAlgorithm, AlgorithmFactory, MatrixWorkspaceProperty, ITableWorkspaceProperty, PropertyMode, Progress
+from mantid.api import mtd, AlgorithmFactory, ITableWorkspaceProperty, MatrixWorkspaceProperty, PropertyMode, Progress, PythonAlgorithm
 from mantid.kernel import Direction, logger, IntBoundedValidator
+from mantid.simpleapi import CreateEmptyTableWorkspace, CropWorkspace
+
+from IndirectCommon import check_analysers_or_e_fixed, check_dimensions_equal, check_hist_zero, get_efixed, get_workspace_name_prefix
 
 DEFAULT_ITERATIONS = 50
 DEFAULT_SEED = 89631139
@@ -24,6 +26,7 @@ class TransformToIqt(PythonAlgorithm):
     _output_workspace = None
     _dry_run = None
     _calculate_errors = None
+    _enforce_normalization = None
     _number_of_iterations = None
     _seed = None
 
@@ -49,7 +52,7 @@ class TransformToIqt(PythonAlgorithm):
         self.declareProperty(
             name="BinReductionFactor",
             defaultValue=10.0,
-            doc="Decrease total number of spectrum points by this ratio through merging of " "intensities from neighbouring bins.",
+            doc="Decrease total number of spectrum points by this ratio through merging of intensities from neighbouring bins.",
         )
 
         self.declareProperty(
@@ -78,6 +81,7 @@ class TransformToIqt(PythonAlgorithm):
 
         self.declareProperty(name="DryRun", defaultValue=False, doc="Only calculate and output the parameters")
         self.declareProperty("CalculateErrors", defaultValue=True, doc="Calculate monte-carlo errors.")
+        self.declareProperty("EnforceNormalization", defaultValue=True, doc="Normalization to enforce I(t=0)")
 
     def PyExec(self):
         self._setup()
@@ -104,9 +108,6 @@ class TransformToIqt(PythonAlgorithm):
         """
         Gets algorithm properties.
         """
-
-        from IndirectCommon import getWSprefix
-
         self._sample = self.getPropertyValue("SampleWorkspace")
         self._resolution = self.getPropertyValue("ResolutionWorkspace")
 
@@ -116,15 +117,16 @@ class TransformToIqt(PythonAlgorithm):
 
         self._parameter_table = self.getPropertyValue("ParameterWorkspace")
         if self._parameter_table == "":
-            self._parameter_table = getWSprefix(self._sample) + "TransformToIqtParameters"
+            self._parameter_table = get_workspace_name_prefix(self._sample) + "TransformToIqtParameters"
 
         self._calculate_errors = self.getProperty("CalculateErrors").value
+        self._enforce_normalization = self.getProperty("EnforceNormalization").value
         self._number_of_iterations = self.getProperty("NumberOfIterations").value
         self._seed = self.getProperty("SeedValue").value
 
         self._output_workspace = self.getPropertyValue("OutputWorkspace")
         if self._output_workspace == "":
-            self._output_workspace = getWSprefix(self._sample) + "iqt"
+            self._output_workspace = get_workspace_name_prefix(self._sample) + "iqt"
 
         self._dry_run = self.getProperty("DryRun").value
 
@@ -149,15 +151,12 @@ class TransformToIqt(PythonAlgorithm):
         """
         Calculates the TransformToIqt parameters and saves in a table workspace.
         """
-        from IndirectCommon import getEfixed
-
         end_prog = 0.3 if self._calculate_errors else 0.9
         workflow_prog = Progress(self, start=0.0, end=end_prog, nreports=8)
         workflow_prog.report("Cropping Workspace")
-        CropWorkspace(InputWorkspace=self._sample, OutputWorkspace="__TransformToIqt_sample_cropped", Xmin=self._e_min, Xmax=self._e_max)
+        cropped_workspace = CropWorkspace(InputWorkspace=self._sample, Xmin=self._e_min, Xmax=self._e_max, StoreInADS=False)
         workflow_prog.report("Calculating table properties")
-        x_data = mtd["__TransformToIqt_sample_cropped"].readX(0)
-        number_input_points = len(x_data) - 1
+        number_input_points = cropped_workspace.blocksize()
         num_bins = int(number_input_points / self._number_points_per_bin)
         self._e_width = (abs(self._e_min) + abs(self._e_max)) / num_bins
 
@@ -182,9 +181,9 @@ class TransformToIqt(PythonAlgorithm):
             workflow_prog.report("IPF resolution obtained")
         except (AttributeError, IndexError):
             workflow_prog.report("Resorting to Default")
-            resolution = getEfixed(self._sample) * 0.01
+            resolution = get_efixed(self._sample) * 0.01
             logger.warning(
-                "Could not get the resolution from the IPF, using 1% of the E Fixed value for the " "resolution: {0}".format(resolution)
+                "Could not get the resolution from the IPF, using 1% of the E Fixed value for the resolution: {0}".format(resolution)
             )
 
         resolution_bins = int(round((2 * resolution) / self._e_width))
@@ -218,10 +217,6 @@ class TransformToIqt(PythonAlgorithm):
             ]
         )
 
-        workflow_prog.report("Deleting temp Workspace")
-        if mtd.doesExist("__TransformToIqt_sample_cropped"):
-            DeleteWorkspace("__TransformToIqt_sample_cropped")
-
         self.setProperty("ParameterWorkspace", param_table)
 
     def _add_logs(self):
@@ -241,13 +236,11 @@ class TransformToIqt(PythonAlgorithm):
         """
         Run TransformToIqt.
         """
-        from IndirectCommon import CheckHistZero, CheckHistSame
-
         # Process resolution data
-        res_number_of_histograms = CheckHistZero(self._resolution)[0]
-        sample_number_of_histograms = CheckHistZero(self._sample)[0]
+        res_number_of_histograms = check_hist_zero(self._resolution)[0]
+        sample_number_of_histograms = check_hist_zero(self._sample)[0]
         if res_number_of_histograms > 1 and sample_number_of_histograms is not res_number_of_histograms:
-            CheckHistSame(self._sample, "Sample", self._resolution, "Resolution")
+            check_dimensions_equal(self._sample, "Sample", self._resolution, "Resolution")
 
         calculateiqt_alg = self.createChildAlgorithm(name="CalculateIqt", startProgress=0.3, endProgress=1.0, enableLogging=True)
         calculateiqt_alg.setAlwaysStoreInADS(False)
@@ -259,6 +252,7 @@ class TransformToIqt(PythonAlgorithm):
             "EnergyMax": self._e_max,
             "EnergyWidth": self._e_width,
             "CalculateErrors": self._calculate_errors,
+            "EnforceNormalization": self._enforce_normalization,
             "NumberOfIterations": self._number_of_iterations,
             "SeedValue": self._seed,
         }
@@ -274,10 +268,8 @@ class TransformToIqt(PythonAlgorithm):
         return iqt
 
     def _check_analysers_and_reflection(self):
-        from IndirectCommon import CheckAnalysersOrEFixed
-
         try:
-            CheckAnalysersOrEFixed(self._sample, self._resolution)
+            check_analysers_or_e_fixed(self._sample, self._resolution)
         except ValueError:
             # A genuine error the shows that the two runs are incompatible
             raise

@@ -32,8 +32,8 @@ Interface Usage and Description
 -------------------------------
 
 * :ref:`DNS Powder TOF <dns_powder_tof-ref>`
-* DNS Powder Elastic
-* DNS Single Crystal Elastic
+* :ref:`DNS Powder Elastic <dns_powder_elastic-ref>`
+* :ref:`DNS Single Crystal Elastic <dns_single_crystal_elastic-ref>`
 * DNS Simulation
 
 Feedback & Comments

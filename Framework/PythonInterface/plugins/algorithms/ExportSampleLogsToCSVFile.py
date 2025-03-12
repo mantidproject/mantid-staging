@@ -5,9 +5,8 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name,too-many-instance-attributes
-from mantid.api import *
-from mantid.kernel import *
-from distutils.version import LooseVersion
+from mantid.api import AlgorithmFactory, FileAction, FileProperty, MatrixWorkspaceProperty, PythonAlgorithm
+from mantid.kernel import DateAndTime, Direction, StringArrayProperty, StringListValidator
 import numpy as np
 import os
 
@@ -80,14 +79,13 @@ class ExportSampleLogsToCSVFile(PythonAlgorithm):
         self.declareProperty(
             "DateTitleInHeader",
             True,
-            "If true, then the first 2 lines of header will be experiment date and title."
-            "Otherwise, there will be only 1 line in header.",
+            "If true, then the first 2 lines of header will be experiment date and title.Otherwise, there will be only 1 line in header.",
         )
 
         self.declareProperty(
             "SeparateHeaderFile",
             True,
-            "If true, then the header is written to another file." "Otherwise, header will be in the same output file.",
+            "If true, then the header is written to another file. Otherwise, header will be in the same output file.",
         )
 
         # Time zone
@@ -202,9 +200,6 @@ class ExportSampleLogsToCSVFile(PythonAlgorithm):
             localtimediff = np.timedelta64(0, "s")
 
         epoch = "1990-01-01T00:00"
-        # older numpy assumes local timezone
-        if LooseVersion(np.__version__) < LooseVersion("1.9"):
-            epoch = epoch + "Z"
         return np.datetime64(epoch) + localtimediff
 
     def _getLogsInfo(self, logtimeslist):

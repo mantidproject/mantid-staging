@@ -17,7 +17,6 @@ DIFF_PLACES = 12
 
 
 class VesuvioTests(unittest.TestCase):
-
     ws_name = "evs_raw"
 
     def tearDown(self):
@@ -200,6 +199,18 @@ class VesuvioTests(unittest.TestCase):
         self.assertAlmostEqual(0.0013599866184859088, evs_raw.readY(63)[1188], places=DIFF_PLACES)
         self.assertAlmostEqual(0.16935354944452052, evs_raw.readE(0)[1], places=DIFF_PLACES)
 
+    def test_consecutive_and_non_consecutive_runs_with_forward_scattering_spectra_gives_expected_numbers(self):
+        # Skips runs 14190, 91
+        self._run_load("14188, 14189-14190", "135-198", "SingleDifference")
+
+        # Check some data
+        evs_raw = mtd[self.ws_name]
+
+        self.assertAlmostEqual(-0.3302367568682385, evs_raw.readY(0)[1], places=DIFF_PLACES)
+        self.assertAlmostEqual(0.1383918129898758, evs_raw.readE(0)[1], places=DIFF_PLACES)
+        self.assertAlmostEqual(-0.0005762703884557574, evs_raw.readY(63)[1188], places=DIFF_PLACES)
+        self.assertAlmostEqual(0.1383918129898758, evs_raw.readE(0)[1], places=DIFF_PLACES)
+
     def test_foilout_mode_gives_expected_numbers(self):
         self._run_load("14188", "3", "FoilOut")
 
@@ -379,10 +390,10 @@ class VesuvioTests(unittest.TestCase):
     # ================== Failure cases ================================
 
     def test_run_range_bad_order_raises_error(self):
-        self.assertRaises(RuntimeError, ms.LoadVesuvio, Filename="14188-14187", OutputWorkspace=self.ws_name)
+        self.assertRaises(TypeError, ms.LoadVesuvio, Filename="14188-14187", OutputWorkspace=self.ws_name)
 
     def test_missing_spectra_property_raises_error(self):
-        self.assertRaises(RuntimeError, ms.LoadVesuvio, Filename="14188", OutputWorkspace=self.ws_name)
+        self.assertRaises(TypeError, ms.LoadVesuvio, Filename="14188", OutputWorkspace=self.ws_name)
 
     def test_load_with_invalid_spectra_raises_error(self):
         self.assertRaises(RuntimeError, ms.LoadVesuvio, Filename="14188", OutputWorkspace=self.ws_name, SpectrumList="200")
@@ -444,7 +455,6 @@ class VesuvioTests(unittest.TestCase):
 
 
 class LoadVesuvioTest(systemtesting.MantidSystemTest):
-
     _success = False
 
     def runTest(self):

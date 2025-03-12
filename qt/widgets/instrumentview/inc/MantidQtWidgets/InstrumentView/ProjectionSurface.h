@@ -82,7 +82,7 @@ public:
   ProjectionSurface()
       : m_viewImage(nullptr), m_pickImage(nullptr), m_isLightingOn(false), m_peakLabelPrecision(2),
         m_showPeakRows(false), m_showPeakLabels(false), m_showPeakRelativeIntensity(false), m_peakShapesStyle(0),
-        m_viewChanged(true), m_redrawPicking(true){};
+        m_viewChanged(true), m_redrawPicking(true) {};
   /// Destructor
   ~ProjectionSurface() override;
   /// Resets the instrument actor.
@@ -254,6 +254,7 @@ public:
   void clearAlignmentPlane();
   void clearComparisonPeaks();
   bool hasPeakOverlays() const { return !m_peakShapes.isEmpty(); }
+  int getPeakOverlayCount() const { return m_peakShapes.count(); }
   void setPeakLabelPrecision(int n);
   int getPeakLabelPrecision() const { return m_peakLabelPrecision; }
   void setShowPeakRowsFlag(bool on);

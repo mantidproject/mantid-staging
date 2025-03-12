@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name
 
-""" SANSReductionCorePreprocess algorithm runs the sequence of reduction steps which are necessary to reduce a data set,
+"""SANSReductionCorePreprocess algorithm runs the sequence of reduction steps which are necessary to reduce a data set,
 which can be performed before event slicing."""
 
 from SANSReductionCoreBase import SANSReductionCoreBase
@@ -22,7 +22,7 @@ class SANSReductionCorePreprocess(SANSReductionCoreBase):
         return "SANS\\Reduction"
 
     def summary(self):
-        return "Runs the initial core reduction elements. These are the steps which " "can be carried out before event slicing."
+        return "Runs the initial core reduction elements. These are the steps which can be carried out before event slicing."
 
     def PyInit(self):
         # ----------

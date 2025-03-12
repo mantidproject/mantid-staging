@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The settings diagnostic tab view.
+"""The settings diagnostic tab view.
 
 The settings diagnostic tab allows to display the state information in a tree view. The user can select the data
 from the individual rows in the data table. This view is useful for checking the overall settings of a reduction
@@ -125,7 +125,7 @@ class SettingsDiagnosticTab(QtWidgets.QWidget, Ui_SettingsDiagnosticTab):
 
     def fill_tree_widget(self, item, value):
         item.setExpanded(True)
-        if type(value) is dict:
+        if isinstance(value, dict):
             for key, val in sorted(value.items()):
                 if key in self.excluded:
                     continue
@@ -133,7 +133,7 @@ class SettingsDiagnosticTab(QtWidgets.QWidget, Ui_SettingsDiagnosticTab):
                 child.setText(0, unicode(key))
                 item.addChild(child)
                 self.fill_tree_widget(child, val)
-        elif type(value) is list:
+        elif isinstance(value, list):
             for val in value:
                 child = QtWidgets.QTreeWidgetItem()
                 child.setText(1, unicode(val))

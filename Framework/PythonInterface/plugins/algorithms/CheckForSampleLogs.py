@@ -6,7 +6,7 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name, no-init
 from mantid.api import PythonAlgorithm, AlgorithmFactory, WorkspaceProperty
-from mantid.kernel import Direction, logger
+from mantid.kernel import Direction
 
 
 class CheckForSampleLogs(PythonAlgorithm):
@@ -31,7 +31,7 @@ class CheckForSampleLogs(PythonAlgorithm):
         self.declareProperty(WorkspaceProperty("Workspace", "", Direction.Input), "The workspace to check.")
         self.declareProperty("LogNames", "", "Names of the logs to look for")
         self.declareProperty(
-            "Result", "A string that will be empty if all the logs are found, " "otherwise will contain an error message", Direction.Output
+            "Result", "A string that will be empty if all the logs are found, otherwise will contain an error message", Direction.Output
         )
         return
 
@@ -48,10 +48,8 @@ class CheckForSampleLogs(PythonAlgorithm):
                 if not w.run().hasProperty(value):
                     resultString += "Property " + value + " not found\n"
 
-        # return the result
-        logger.notice(resultString)
+        self.getLogger().notice(resultString)
         self.setProperty("Result", resultString)
-        return
 
 
 AlgorithmFactory.subscribe(CheckForSampleLogs)

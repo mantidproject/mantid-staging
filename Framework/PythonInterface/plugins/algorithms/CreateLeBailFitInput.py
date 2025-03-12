@@ -5,25 +5,30 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
+# ruff: noqa: E741  # Ambiguous variable name
 import mantid.simpleapi as api
-from mantid.api import *
-from mantid.kernel import *
-
-_OUTPUTLEVEL = "NOOUTPUT"
+from mantid.api import (
+    AlgorithmFactory,
+    AnalysisDataService,
+    FileAction,
+    FileProperty,
+    ITableWorkspaceProperty,
+    PythonAlgorithm,
+    WorkspaceFactory,
+)
+from mantid.kernel import Direction, FloatBoundedValidator, IntArrayBoundedValidator, IntArrayProperty
 
 
 class CreateLeBailFitInput(PythonAlgorithm):
     """Create the input TableWorkspaces for LeBail Fitting"""
 
     def category(self):
-        """ """
         return "Diffraction\\Fitting;Utility\\Workspaces"
 
     def seeAlso(self):
         return ["LeBailFit"]
 
     def name(self):
-        """ """
         return "CreateLeBailFitInput"
 
     def summary(self):

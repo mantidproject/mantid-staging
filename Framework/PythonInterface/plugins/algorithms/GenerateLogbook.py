@@ -6,9 +6,16 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 
 from mantid import config
-from mantid.api import AlgorithmFactory, FileAction, FileProperty, ITableWorkspaceProperty, Progress, PythonAlgorithm
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, ITableWorkspaceProperty, Progress, PythonAlgorithm
 from mantid.kernel import Direction, IntArrayBoundedValidator, StringListValidator, StringMandatoryValidator
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    CreateEmptyTableWorkspace,
+    CreateSingleValuedWorkspace,
+    DeleteWorkspace,
+    LoadEmptyInstrument,
+    LoadParameterFile,
+    SaveAscii,
+)
 
 import fnmatch
 import h5py
@@ -18,7 +25,6 @@ import re
 
 
 class GenerateLogbook(PythonAlgorithm):
-
     _data_directory = None
     _facility = None
     _instrument = None
@@ -66,7 +72,6 @@ class GenerateLogbook(PythonAlgorithm):
         return issues
 
     def PyInit(self):
-
         self.declareProperty(
             FileProperty("Directory", "", action=FileAction.Directory), doc="Path to directory containing data files for logging."
         )
@@ -101,7 +106,7 @@ class GenerateLogbook(PythonAlgorithm):
         self.declareProperty(
             "OptionalHeaders",
             "",
-            doc="Names of optional metadata to be included in the logbook. Entries need to be specified" "in the instrument IPF.",
+            doc="Names of optional metadata to be included in the logbook. Entries need to be specified in the instrument IPF.",
         )
 
         self.declareProperty("CustomEntries", "", doc="Custom NeXus paths for additional metadata to be included in the logbook.")
@@ -265,7 +270,7 @@ class GenerateLogbook(PythonAlgorithm):
                 continue
             if op == "+":
                 padding = 0
-                if type(values[ind1]) == str:
+                if isinstance(values[ind1], str):
                     padding = " "
                 new_val = values[ind1] + padding + values[ind2]
             elif op == "-":
@@ -280,7 +285,7 @@ class GenerateLogbook(PythonAlgorithm):
                     new_val = "N/A"
             else:
                 raise RuntimeError("Unknown operation: {}".format(operation))
-            if type(new_val) == str():
+            if type(new_val) is str:
                 new_val = new_val.strip()
             values[ind1] = new_val
             values.pop(ind2)

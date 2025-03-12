@@ -7,7 +7,8 @@
 #    This file is part of the mantid workbench.
 #
 #
-from matplotlib.collections import LineCollection
+from matplotlib.collections import LineCollection, PathCollection
+from matplotlib.contour import ContourSet
 from qtpy import QtCore, QtGui, QtPrintSupport, QtWidgets
 
 from mantid.plots import MantidAxes
@@ -34,6 +35,7 @@ def _create_script_action(self, text, tooltip_text, mdi_icon, *args):
 class WorkbenchNavigationToolbar(MantidNavigationToolbar):
     sig_home_clicked = QtCore.Signal()
     sig_grid_toggle_triggered = QtCore.Signal(bool)
+    sig_crosshair_toggle_triggered = QtCore.Signal(bool)
     sig_active_triggered = QtCore.Signal()
     sig_hold_triggered = QtCore.Signal()
     sig_toggle_fit_triggered = QtCore.Signal()
@@ -83,6 +85,7 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
         MantidNavigationTool("Fill Area", "Fill area under curves", "mdi.format-color-fill", "waterfall_fill_area", None),
         MantidStandardNavigationTools.SEPARATOR,
         MantidNavigationTool("Help", "Open plotting help documentation", "mdi.help", "launch_plot_help", None),
+        MantidNavigationTool("Crosshair", "Toggle crosshair", "mdi.plus", "toggle_crosshair", False),
         MantidNavigationTool("Hide", "Hide the plot", "mdi.eye", "hide_plot", None),
     )
 
@@ -92,6 +95,13 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
         # Adjust icon size or they are too small in PyQt5 by default
         dpi_ratio = QtWidgets.QApplication.instance().desktop().physicalDpiX() / 100
         self.setIconSize(QtCore.QSize(int(24 * dpi_ratio), int(24 * dpi_ratio)))
+
+    def toggle_crosshair(self, enable=None):
+        if enable is None:
+            enable = self._actions["toggle_crosshair"].isChecked()
+        else:
+            self._actions["toggle_crosshair"].setChecked(enable)
+        self.sig_crosshair_toggle_triggered.emit(enable)
 
     def hide_plot(self):
         self.sig_hide_plot_triggered.emit()
@@ -145,6 +155,7 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
 
     def on_home_clicked(self):
         self.sig_home_clicked.emit()
+        self.home()
         self.push_current()
 
     def waterfall_conversion(self, is_waterfall):
@@ -211,11 +222,10 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
                 break
 
     def set_buttons_visibility(self, fig):
+        #  check if fitting and superplot should be enabled
         if figure_type(fig) not in [FigureType.Line, FigureType.Errorbar] or len(fig.get_axes()) > 1:
             self.set_fit_enabled(False)
             self.set_superplot_enabled(False)
-
-        # if any of the lines are a sample log plot disable fitting
         for ax in fig.get_axes():
             for artist in ax.get_lines():
                 try:
@@ -225,11 +235,18 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
                 except Exception:
                     # The artist is not tracked - ignore this one and check the rest
                     continue
+            if isinstance(ax, MantidAxes):
+                for artists in ax.tracked_workspaces.values():
+                    if any([artist.workspace_index is None for artist in artists]):
+                        self.set_fit_enabled(False)
+                        self.set_superplot_enabled(False)
 
-        # For plot-to-script button to show, every axis must be a MantidAxes with lines in it
         # Plot-to-script currently doesn't work with waterfall plots so the button is hidden for that plot type.
-        if not all((isinstance(ax, MantidAxes) and curve_in_ax(ax)) for ax in fig.get_axes()) or fig.get_axes()[0].is_waterfall():
+        # There must be at least one MantidAxis plot with data for to generate a script, others will be skipped
+        if not any((isinstance(ax, MantidAxes) and curve_in_ax(ax)) for ax in fig.get_axes()) or fig.get_axes()[0].is_waterfall():
             self.set_generate_plot_script_enabled(False)
+            self.set_fit_enabled(False)
+            self.set_superplot_enabled(False)
 
         # reenable script generation for colormaps
         if self.is_colormap(fig):
@@ -241,8 +258,7 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
 
         # For contour and wireframe plots, add a toolbar option to change the colour of the lines.
         if figure_type(fig) in [FigureType.Wireframe, FigureType.Contour]:
-            if any(isinstance(col, LineCollection) for col in fig.get_axes()[0].collections):
-                self.set_up_color_selector_toolbar_button(fig)
+            self.set_up_color_selector_toolbar_button(fig)
 
         if figure_type(fig) in [FigureType.Surface, FigureType.Wireframe, FigureType.Mesh]:
             self.adjust_for_3d_plots()
@@ -277,9 +293,11 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
     @classmethod
     def _is_colorbar(cls, ax):
         """Determine whether an axes object is a colorbar"""
-        return not hasattr(ax, "get_subplotspec") or hasattr(ax, "_colorbar")
+        return hasattr(ax, "_colorbar")
 
     def set_up_color_selector_toolbar_button(self, fig):
+        current_ax_colour = None
+
         # check if the action is already in the toolbar
         if self._actions.get("line_colour"):
             return
@@ -292,10 +310,21 @@ class WorkbenchNavigationToolbar(MantidNavigationToolbar):
         else:
             a.setToolTip("Set the colour of the contour lines.")
 
-        line_collection = next(col for col in fig.get_axes()[0].collections if isinstance(col, LineCollection))
-        initial_colour = convert_color_to_hex(line_collection.get_color()[0])
+        for col in fig.get_axes()[0].collections:
+            if isinstance(col, LineCollection):
+                current_ax_colour = col.get_color()
+                break
+            elif isinstance(col, PathCollection):
+                current_ax_colour = col.get_edgecolor()
+                break
+            elif isinstance(col, ContourSet):
+                current_ax_colour = col.get_edgecolor()[0]
+                break
 
-        colour_dialog = QtWidgets.QColorDialog(QtGui.QColor(initial_colour))
+        # Current_ax_colour remains None and breaks the code
+
+        # initial QColorDialog colour
+        colour_dialog = QtWidgets.QColorDialog(QtGui.QColor(convert_color_to_hex(current_ax_colour)))
         colour_dialog.setOption(QtWidgets.QColorDialog.NoButtons)
         colour_dialog.setOption(QtWidgets.QColorDialog.DontUseNativeDialog)
         colour_dialog.currentColorChanged.connect(self.change_line_collection_colour)

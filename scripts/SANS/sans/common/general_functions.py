@@ -4,7 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-""" The elements of this module contain various general-purpose functions for the SANS reduction framework."""
+"""The elements of this module contain various general-purpose functions for the SANS reduction framework."""
 
 # pylint: disable=invalid-name
 import copy
@@ -28,6 +28,7 @@ from sans.common.enums import (
     DataType,
     TransmissionType,
     SANSInstrument,
+    SANSDetector,
 )
 
 # -------------------------------------------
@@ -187,9 +188,7 @@ def get_input_workspace_as_copy_if_not_same_as_output_workspace(alg):
         return clone_alg.getProperty("OutputWorkspace").value
 
     if "InputWorkspace" not in alg or "OutputWorkspace" not in alg:
-        raise RuntimeError(
-            "The algorithm {} does not seem to have an InputWorkspace and" " an OutputWorkspace property.".format(alg.name())
-        )
+        raise RuntimeError("The algorithm {} does not seem to have an InputWorkspace and an OutputWorkspace property.".format(alg.name()))
 
     ws_in = alg.getProperty("InputWorkspace").value
     if ws_in is None:
@@ -271,6 +270,28 @@ def get_ads_workspace_references():
         yield AnalysisDataService.retrieve(workspace_name)
 
 
+def get_detector_types_from_instrument(instrument: SANSInstrument = None) -> list:
+    """
+    :param instrument Instrument to get the detector types for.
+    :return list of detector types on the given instrument
+    """
+    if instrument is SANSInstrument.SANS2D or instrument is SANSInstrument.LOQ:
+        return [DetectorType.HAB, DetectorType.LAB]
+    # Larmor and Zoom only need LAB
+    elif instrument is SANSInstrument.LARMOR or instrument is SANSInstrument.ZOOM:
+        return [DetectorType.LAB]
+
+    else:
+        return []
+
+
+def get_detector_names_from_instrument(instrument: SANSInstrument = None) -> list:
+    return [
+        convert_instrument_and_detector_type_to_bank_name(instrument, detector_type)
+        for detector_type in get_detector_types_from_instrument(instrument)
+    ]
+
+
 def convert_bank_name_to_detector_type_isis(detector_name):
     """
     Converts a detector name of an isis detector to a detector type.
@@ -301,19 +322,19 @@ def convert_bank_name_to_detector_type_isis(detector_name):
     elif detector_name == "FRONT-DETECTOR" or detector_name == "HAB" or detector_name == "FRONT":
         detector_type = DetectorType.HAB
     else:
-        raise RuntimeError("There is not detector type conversion for a detector with the " "name {0}".format(detector_name))
+        raise RuntimeError("There is not detector type conversion for a detector with the name {0}".format(detector_name))
     return detector_type
 
 
 def convert_instrument_and_detector_type_to_bank_name(instrument, detector_type):
     if instrument is SANSInstrument.SANS2D:
-        bank_name = "front-detector" if detector_type is DetectorType.HAB else "rear-detector"
+        bank_name = SANSDetector.SANS2D_HAB.value if detector_type is DetectorType.HAB else SANSDetector.SANS2D_LAB.value
     elif instrument is SANSInstrument.LOQ:
-        bank_name = "HAB" if detector_type is DetectorType.HAB else "main-detector-bank"
+        bank_name = SANSDetector.LOQ_HAB.value if detector_type is DetectorType.HAB else SANSDetector.LOQ_LAB.value
     elif instrument is SANSInstrument.LARMOR:
-        bank_name = "DetectorBench"
+        bank_name = SANSDetector.LARMOR_LAB.value
     elif instrument is SANSInstrument.ZOOM:
-        bank_name = "rear-detector"
+        bank_name = SANSDetector.ZOOM_LAB.value
     else:
         raise RuntimeError("Cropping Component: The instrument {0} is currently not supported.".format(instrument))
     return bank_name
@@ -438,7 +459,7 @@ def parse_diagnostic_settings(string_to_parse):
                 integral += _extract_number(slice_setting)
             else:
                 raise ValueError(
-                    "The provided event slice configuration {0} cannot be parsed because " "of {1}".format(slice_settings, slice_setting)
+                    "The provided event slice configuration {0} cannot be parsed because of {1}".format(slice_settings, slice_setting)
                 )
             all_ranges.append(integral)
     return all_ranges
@@ -504,7 +525,7 @@ class EventSliceParser(object):
                 all_ranges.append(self._extract_full_range(slice_setting, self.range_marker))
             else:
                 raise ValueError(
-                    "The provided event slice configuration {0} cannot be parsed because " "of {1}".format(slice_settings, slice_setting)
+                    "The provided event slice configuration {0} cannot be parsed because of {1}".format(slice_settings, slice_setting)
                 )
         return all_ranges
 
@@ -722,7 +743,7 @@ def get_standard_output_workspace_name(state, reduction_data_type, wav_range, in
         detector_name_short = det_name if det_name is not None else "lab"
     else:
         raise RuntimeError(
-            "SANSStateFunctions: Unknown reduction data type {0} cannot be used to " "create an output name".format(reduction_data_type)
+            "SANSStateFunctions: Unknown reduction data type {0} cannot be used to create an output name".format(reduction_data_type)
         )
 
     # 4. Dimensionality
@@ -869,7 +890,7 @@ def get_base_name_from_multi_period_name(workspace_name):
     if re.search(multi_period_workspace_form, workspace_name) is not None:
         return re.sub(multi_period_workspace_form, "", workspace_name)
     else:
-        raise RuntimeError("The workspace name {0} seems to not be part of a " "multi-period workspace.".format(workspace_name))
+        raise RuntimeError("The workspace name {0} seems to not be part of a multi-period workspace.".format(workspace_name))
 
 
 def sanitise_instrument_name(instrument_name):
@@ -958,7 +979,7 @@ def get_state_hash_for_can_reduction(state, reduction_mode, wav_range: Optional[
     elif reduction_mode is ReductionMode.HAB:
         state_string += "HAB"
     else:
-        raise RuntimeError("Only LAB and HAB reduction modes are allowed at this point." " {} was provided".format(reduction_mode))
+        raise RuntimeError("Only LAB and HAB reduction modes are allowed at this point. {} was provided".format(reduction_mode))
 
     # If we are dealing with a partial output workspace, then mark it as such
     if partial_type is OutputParts.COUNT:

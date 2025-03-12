@@ -11,6 +11,7 @@
 #include "MantidAPI/MatrixWorkspace.h"
 #include "MantidAPI/Progress.h"
 #include "MantidAPI/RegisterFileLoader.h"
+#include "MantidAPI/Sample.h"
 #include "MantidAPI/WorkspaceFactory.h"
 #include "MantidDataHandling/LoadHelper.h"
 #include "MantidGeometry/Instrument.h"
@@ -121,7 +122,7 @@ void LoadSINQFocus::setInstrumentName(const NeXus::NXEntry &entry) {
   m_instrumentName = m_instrumentName.substr(0, pos);
 }
 
-void LoadSINQFocus::initWorkSpace(NeXus::NXEntry &entry) {
+void LoadSINQFocus::initWorkSpace(const NeXus::NXEntry &entry) {
 
   // read in the data
   NXData dataGroup = entry.openNXData("merged");
@@ -220,8 +221,8 @@ void LoadSINQFocus::loadRunDetails(const NXEntry &entry) {
  */
 void LoadSINQFocus::loadExperimentDetails(const NXEntry &entry) {
 
-  std::string name = boost::lexical_cast<std::string>(entry.getFloat("sample/name"));
-  m_localWorkspace->mutableSample().setName(name);
+  std::string sampleName = boost::lexical_cast<std::string>(entry.getFloat("sample/name"));
+  m_localWorkspace->mutableSample().setName(sampleName);
 }
 
 /**

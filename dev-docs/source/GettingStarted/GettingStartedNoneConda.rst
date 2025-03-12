@@ -1,8 +1,8 @@
 .. _GettingStartedNoneConda:
 
-=============================
-Getting Started without Conda
-=============================
+=====================
+Develop without Conda
+=====================
 
 Environment
 ###########
@@ -32,7 +32,7 @@ Install the following:
   * open up Git Bash and run ``git config --global lfs.storage C:/GitLFSStorage``
   * run ``git lfs install`` to initialize Git LFS. (Note that if you miss this step you may get errors due to the third party libraries not checking out properly. This can be fixed later by running ``git lfs fetch`` and ``git lfs checkout`` in the ``external\src\ThirdParty`` directory.)
 
-* `CMake <https://cmake.org/download/>`_ >= 3.15
+* `CMake <https://cmake.org/download/>`_ >= 3.21
 * `MiKTeX <https://miktex.org/download>`_. Installation instructions are  `available here <https://miktex.org/howto/install-miktex>`_. Once installed:
 
   * open the MikTeX console from the start menu
@@ -158,7 +158,7 @@ Docker
 ------
 
 On Docker supported systems you may use the `mantid-development
-<https://github.com/mantidproject/dockerfiles/tree/master/development>`_
+<https://github.com/mantidproject/dockerfiles/tree/main/development>`_
 images to develop Mantid without having to configure your system as a suitable
 build environment. This will give you an out of the box working build
 environment, Python 3 (where available) and ccache.
@@ -183,4 +183,3 @@ This requires one to supply an authentication token when pushing or re-type thei
 .. code-block:: sh
 
     git clone https://github.com/mantidproject/mantid.git
-

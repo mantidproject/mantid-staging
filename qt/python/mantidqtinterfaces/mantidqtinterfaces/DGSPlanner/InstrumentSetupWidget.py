@@ -13,7 +13,7 @@ import numpy
 
 sys.path.append("..")
 # the following matplotlib imports cannot be placed before the setting of the backend, so we ignore flake8 warnings
-from mantidqt.MPLwidgets import *
+from mantidqt.MPLwidgets import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot  # noqa
@@ -136,7 +136,7 @@ class GonioTableModel(QtCore.QAbstractTableModel):
     def validDir(self, dirstring):
         d = numpy.fromstring(dirstring, dtype=float, sep=",")
         if len(d) == 3:
-            return numpy.alltrue(numpy.isfinite(d))
+            return numpy.all(numpy.isfinite(d))
         return False
 
     def validateGon(self):
@@ -187,7 +187,7 @@ class InstrumentSetupWidget(QtWidgets.QWidget):
             "MARI",
             "MERLIN",
             "SEQUOIA",
-            "WAND\u00B2",
+            "WAND\u00b2",
         ]
         self.combo = QtWidgets.QComboBox(self)
         for inst in self.instrumentList:
@@ -309,7 +309,6 @@ class InstrumentSetupWidget(QtWidgets.QWidget):
             self.gonfig.clear()
         self.gonfig = Axes3D(self.figure, auto_add_to_figure=False)
         self.figure.add_axes(self.gonfig)
-        self.gonfig.set_frame_on(False)
         self.gonfig.set_xlim3d(-0.6, 0.6)
         self.gonfig.set_ylim3d(-0.6, 0.6)
         self.gonfig.set_zlim3d(-1, 5)
@@ -368,14 +367,14 @@ class InstrumentSetupWidget(QtWidgets.QWidget):
         d = dict()
         self.instrument = text
         d["instrument"] = str(self.instrument)
-        if self.instrument in ["HYSPEC", "EXED", "DEMAND", "WAND\u00B2"]:
+        if self.instrument in ["HYSPEC", "EXED", "DEMAND", "WAND\u00b2"]:
             self.labelS2.show()
             self.editS2.show()
         else:
             self.labelS2.hide()
             self.editS2.hide()
 
-        if self.instrument in ["DEMAND", "WAND\u00B2"]:
+        if self.instrument in ["DEMAND", "WAND\u00b2"]:
             self.labelDetZ.show()
             self.editDetZ.show()
             self.setLabelEi("Wavelength")

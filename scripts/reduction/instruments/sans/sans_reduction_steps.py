@@ -6,8 +6,9 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name, arguments-differ, unused-variable
 """
-    Implementation of reduction steps for SANS
+Implementation of reduction steps for SANS
 """
+
 import math
 import pickle
 from reduction import ReductionStep
@@ -15,12 +16,25 @@ from reduction import validate_step
 
 # Mantid imports
 import mantid
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    ApplyTransmissionCorrection,
+    CorrectToFile,
+    CreateSingleValuedWorkspace,
+    CropWorkspace,
+    Divide,
+    ExtractMask,
+    MaskDetectors,
+    ReplaceSpecialValues,
+    SANSBeamFinder,
+    Scale,
+    Q1D,
+    Qxy,
+)
 
 # Define a SANS specific logger
 from mantid.kernel import Logger
 import mantid.simpleapi as api
-from mantid.api import AnalysisDataService
+from mantid.api import AnalysisDataService, mtd
 
 sanslog = Logger("SANS")
 
@@ -159,11 +173,8 @@ class Normalize(ReductionStep):
             Scale(InputWorkspace=workspace, OutputWorkspace=workspace, Factor=1.0 / norm_count, Operation="Multiply")
             return "Normalization by time: %6.2g sec" % norm_count
         else:
-            logger.notice("Normalization step did not get a valid normalization option: skipping")
+            sanslog.notice("Normalization step did not get a valid normalization option: skipping")
             return "Normalization step did not get a valid normalization option: skipping"
-
-    def clean(self):
-        DeleteWorkspace(Workspace=norm_ws)
 
 
 class Mask(ReductionStep):
@@ -352,7 +363,6 @@ class Mask(ReductionStep):
         self._ignore_run_properties = ignore
 
     def execute(self, reducer, workspace):
-
         # Check whether the workspace has mask information
         run = mtd[workspace].run()
         if not self._ignore_run_properties and run.hasProperty("rectangular_masks"):
@@ -664,11 +674,9 @@ class ConvertToQ(ReductionStep):
             else:
                 raise NotImplementedError("The type of Q reduction has not been set, e.g. 1D or 2D")
         except:
-            # when we are all up to Python 2.5 replace the duplicated code below with one finally:
-            self._deleteWorkspaces([wave_adj, pixel_adj])
             raise
-
-        self._deleteWorkspaces([wave_adj, pixel_adj])
+        finally:
+            self._deleteWorkspaces([wave_adj, pixel_adj])
 
     def _deleteWorkspaces(self, workspaces):
         """
@@ -937,16 +945,6 @@ class StripEndNans(ReductionStep):
     def __init__(self):
         super(StripEndNans, self).__init__()
 
-    def _isNan(self, val):
-        """
-        Can replaced by isNaN in Python 2.6
-        @param val: float to check
-        """
-        if val != val:
-            return True
-        else:
-            return False
-
     def execute(self, reducer, workspace):
         """
         Trips leading and trailing Nan values from workspace
@@ -963,14 +961,14 @@ class StripEndNans(ReductionStep):
         # Find the first non-zero value
         start = 0
         for i in range(0, length):
-            if not self._isNan(y_vals[i]):
+            if not math.isnan(y_vals[i]):
                 start = i
                 break
         # Now find the last non-zero value
         stop = 0
         length -= 1
         for j in range(length, 0, -1):
-            if not self._isNan(y_vals[j]):
+            if not math.isnan(y_vals[j]):
                 stop = j
                 break
         # Find the appropriate X values and call CropWorkspace
@@ -978,4 +976,4 @@ class StripEndNans(ReductionStep):
         startX = x_vals[start]
         # Make sure we're inside the bin that we want to crop
         endX = 1.001 * x_vals[stop + 1]
-        api.CropWorkspace(InputWorkspace=workspace, OutputWorkspace=workspace, XMin=startX, XMax=endX)
+        CropWorkspace(InputWorkspace=workspace, OutputWorkspace=workspace, XMin=startX, XMax=endX)

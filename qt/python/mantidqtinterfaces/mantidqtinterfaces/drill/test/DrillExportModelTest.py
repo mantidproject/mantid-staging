@@ -12,7 +12,6 @@ from mantidqtinterfaces.drill.model.DrillExportModel import DrillExportModel
 
 
 class DrillExportModelTest(unittest.TestCase):
-
     EXPORT_ALGORITHMS = {"a1": {("ea1", ".txt"): True, ("ea2", ".xml"): False}, "a2": {("ea2", ".xml"): True}}
 
     EXPORT_ALGO_CRITERIA = {"ea1": "%param% == 'test'", "ea2": "%param% != 'test'"}
@@ -31,23 +30,23 @@ class DrillExportModelTest(unittest.TestCase):
         self.addCleanup(patch.stop)
 
         patch = mock.patch.dict(
-            "mantidqtinterfaces.drill.model.DrillExportModel" ".RundexSettings.EXPORT_ALGORITHMS", self.EXPORT_ALGORITHMS, clear=True
+            "mantidqtinterfaces.drill.model.DrillExportModel.RundexSettings.EXPORT_ALGORITHMS", self.EXPORT_ALGORITHMS, clear=True
         )
         self.mAlgo = patch.start()
         self.addCleanup(patch.stop)
 
         patch = mock.patch.dict(
-            "mantidqtinterfaces.drill.model.DrillExportModel" ".RundexSettings.EXPORT_ALGO_CRITERIA", self.EXPORT_ALGO_CRITERIA, clear=True
+            "mantidqtinterfaces.drill.model.DrillExportModel.RundexSettings.EXPORT_ALGO_CRITERIA", self.EXPORT_ALGO_CRITERIA, clear=True
         )
         self.mAlgoCriteria = patch.start()
         self.addCleanup(patch.stop)
 
-        patch = mock.patch("mantidqtinterfaces.drill.model.DrillExportModel" ".DrillAlgorithmPool")
+        patch = mock.patch("mantidqtinterfaces.drill.model.DrillExportModel.DrillAlgorithmPool")
         self.mTasksPool = patch.start()
         self.mTasksPool = self.mTasksPool.return_value
         self.addCleanup(patch.stop)
 
-        patch = mock.patch("mantidqtinterfaces.drill.model.DrillExportModel" ".DrillTask")
+        patch = mock.patch("mantidqtinterfaces.drill.model.DrillExportModel.DrillTask")
         self.mTask = patch.start()
         self.addCleanup(patch.stop)
 

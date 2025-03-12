@@ -47,15 +47,16 @@ set(SRC_FILES
     src/SplittersWorkspace.cpp
     src/TableColumn.cpp
     src/TableWorkspace.cpp
+    src/TableWorkspaceNotEmptyValidator.cpp
     src/TimeSplitter.cpp
     src/VectorColumn.cpp
     src/Workspace2D.cpp
     src/WorkspaceCreation.cpp
     src/WorkspaceProperty.cpp
     src/WorkspaceSingleValue.cpp
+    src/PeakShapeDetectorBin.cpp
+    src/PeakShapeDetectorBinFactory.cpp
 )
-
-set(SRC_UNITY_IGNORE_FILES src/Workspace2D.cpp src/WorkspaceSingleValue.cpp src/EventWorkspace.cpp)
 
 set(INC_FILES
     inc/MantidDataObjects/AffineMatrixParameter.h
@@ -130,6 +131,8 @@ set(INC_FILES
     inc/MantidDataObjects/SplittersWorkspace.h
     inc/MantidDataObjects/TableColumn.h
     inc/MantidDataObjects/TableWorkspace.h
+    inc/MantidDataObjects/TableWorkspaceValidator.h
+    inc/MantidDataObjects/TableWorkspaceNotEmptyValidator.h
     inc/MantidDataObjects/TableWorkspace_fwd.h
     inc/MantidDataObjects/TimeSplitter.h
     inc/MantidDataObjects/VectorColumn.h
@@ -137,6 +140,8 @@ set(INC_FILES
     inc/MantidDataObjects/Workspace2D_fwd.h
     inc/MantidDataObjects/WorkspaceCreation.h
     inc/MantidDataObjects/WorkspaceSingleValue.h
+    inc/MantidDataObjects/PeakShapeDetectorBin.h
+    inc/MantidDataObjects/PeakShapeDetectorBinFactory.h
 )
 
 set(TEST_FILES
@@ -204,12 +209,9 @@ set(TEST_FILES
     WorkspaceSingleValueTest.h
     WorkspaceValidatorsTest.h
     MortonIndex/BitInterleavingTest.h
+    PeakShapeDetectorBinTest.h
+    PeakShapeDetectorBinFactoryTest.h
 )
-
-if(UNITY_BUILD)
-  include(UnityBuild)
-  enable_unity_build(DataObjects SRC_FILES SRC_UNITY_IGNORE_FILES 10)
-endif(UNITY_BUILD)
 
 if(COVERAGE)
   foreach(loop_var ${SRC_FILES} ${INC_FILES})

@@ -4,14 +4,13 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm
+from mantid.kernel import FloatArrayProperty, IntArrayProperty, StringArrayProperty, StringListValidator
 import h5py
 import numpy
 
 
 class EnggSaveGSASIIFitResultsToHDF5(PythonAlgorithm):
-
     PROP_BANKIDS = "BankIDs"
     PROP_LATTICE_PARAMS = "LatticeParamWorkspaces"
     PROP_SIGMA = "Sigma"
@@ -79,7 +78,7 @@ class EnggSaveGSASIIFitResultsToHDF5(PythonAlgorithm):
 
         self.declareProperty(
             IntArrayProperty(name=self.PROP_BANKIDS),
-            doc="Bank IDs of the workspaces a fit was run on " "(1 for each workspace, in order. 1 for North, 2 for South)",
+            doc="Bank IDs of the workspaces a fit was run on (1 for each workspace, in order. 1 for North, 2 for South)",
         )
 
         self.declareProperty(
@@ -105,16 +104,16 @@ class EnggSaveGSASIIFitResultsToHDF5(PythonAlgorithm):
 
         self.declareProperty(
             FloatArrayProperty(name=self.PROP_SIGMA),
-            doc="GSAS-II profile coefficient sigma, " "one for each run (or none if sigma wasn't refined)",
+            doc="GSAS-II profile coefficient sigma, one for each run (or none if sigma wasn't refined)",
         )
 
         self.declareProperty(
             FloatArrayProperty(name=self.PROP_GAMMA),
-            doc="GSAS-II profile coefficient gamma, " "one for each run (or none if gamma wasn't refined)",
+            doc="GSAS-II profile coefficient gamma, one for each run (or none if gamma wasn't refined)",
         )
 
         self.declareProperty(
-            FloatArrayProperty(name=self.PROP_RWP), doc="Weighted profile R-factor, 'goodness-of-fit' measure. " "One for each run"
+            FloatArrayProperty(name=self.PROP_RWP), doc="Weighted profile R-factor, 'goodness-of-fit' measure. One for each run"
         )
 
         self.declareProperty(

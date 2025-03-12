@@ -26,14 +26,13 @@ class FakePeaksModelFactory(MagicMock):
 
 def create_mock_peaks_workspace(name="peaks"):
     """Create a mock object that looks like a PeaksWorkspace"""
-    mock = create_autospec(PeaksWorkspace)
+    mock = create_autospec(PeaksWorkspace, instance=True)
     mock.name.return_value = name
     return mock
 
 
 @patch("mantidqt.widgets.sliceviewer.peaksviewer.presenter.create_peaksviewermodel", new_callable=FakePeaksModelFactory)
 class PeaksViewerCollectionPresenterTest(unittest.TestCase):
-
     # -------------------- success tests -----------------------------
 
     def test_append_constructs_PeaksViewerPresenter_for_call(self, mock_create_model):
@@ -224,6 +223,19 @@ class PeaksViewerCollectionPresenterTest(unittest.TestCase):
         view.deactivate_zoom_pan.assert_not_called()
         presenter.deactivate_zoom_pan(True)
         view.deactivate_zoom_pan.assert_called_once()
+
+    def test_deleting_peaks_workspace_disables_add_remove_peak(self, _):
+        presenter = PeaksViewerCollectionPresenter(MagicMock())
+        self.assertEqual(0, len(presenter._child_presenters))
+        name_peaks_ws = "peaks"
+        presenter.append_peaksworkspace(name_peaks_ws)
+        self.assertEqual(1, len(presenter._child_presenters))
+        presenter.remove_peaksworkspace(name_peaks_ws)
+        self.assertEqual(0, len(presenter._child_presenters))
+        # With no child presenters, any attempt to add or delete a peak
+        # will throw an exception since those operations act on the child
+        # presenter. Hence if nothing happens here it's working as expected.
+        presenter.add_delete_peak([1, 2, 3])
 
 
 if __name__ == "__main__":

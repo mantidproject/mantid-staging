@@ -4,6 +4,7 @@
 #   NScD Oak Ridge National Laboratory, European Spallation Source,
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
+from typing import Dict, Any
 from copy import deepcopy
 
 from mantid.api import AnalysisDataService, WorkspaceGroup
@@ -32,6 +33,7 @@ from sans.common.constants import (
     REDUCED_HAB_AND_LAB_WORKSPACE_FOR_MERGED_REDUCTION,
     CAN_COUNT_AND_NORM_FOR_OPTIMIZATION,
     CAN_AND_SAMPLE_WORKSPACE,
+    SCALED_BGSUB_SUFFIX,
 )
 from sans.common.file_information import get_extension_for_file_type, SANSFileInformationFactory
 from sans.gui_logic.plotting import get_plotting_module
@@ -100,8 +102,6 @@ def single_reduction_for_batch(state, use_optimizations, output_mode, plot_resul
         SANSDataType.CAN_SCATTER: "CanScatterMonitorWorkspace",
     }
 
-    scaled_background_ws = create_scaled_background_workspace(state)
-
     workspaces, monitors = provide_loaded_data(state, use_optimizations, workspace_to_name, workspace_to_monitor)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -118,6 +118,7 @@ def single_reduction_for_batch(state, use_optimizations, output_mode, plot_resul
         reduction_packages,
     )
 
+    scaled_background_ws = None
     # ------------------------------------------------------------------------------------------------------------------
     # Run reductions (one at a time)
     # ------------------------------------------------------------------------------------------------------------------
@@ -151,10 +152,12 @@ def single_reduction_for_batch(state, use_optimizations, output_mode, plot_resul
         reduction_package.out_scale_factor = out_scale_factor
         reduction_package.out_shift_factor = out_shift_factor
 
-        # -----------------------------------
+        # ---------------------------------------
         # Subtract the background from the slice.
-        # -----------------------------------
-        if scaled_background_ws:
+        # ---------------------------------------
+        if state.background_subtraction.workspace or state.background_subtraction.scale_factor:
+            if not scaled_background_ws:
+                scaled_background_ws = create_scaled_background_workspace(state, reduction_package)
             reduction_package.reduced_bgsub, reduction_package.reduced_bgsub_name = subtract_scaled_background(
                 reduction_package, scaled_background_ws
             )
@@ -175,6 +178,8 @@ def single_reduction_for_batch(state, use_optimizations, output_mode, plot_resul
         "CanScatterRunNumber": "" if data.can_scatter is None else str(data.can_scatter),
         "CanDirectRunNumber": "" if data.can_direct is None else str(data.can_direct),
     }
+    additional_metadata = {}
+
     # --------------------------------
     # Perform output of all workspaces
     # --------------------------------
@@ -188,10 +193,14 @@ def single_reduction_for_batch(state, use_optimizations, output_mode, plot_resul
     #    * This means that we need to save out the reduced data
     #    * The data is already on the ADS, so do nothing
     if output_mode is OutputMode.SAVE_TO_FILE:
-        save_to_file(reduction_packages, save_can, additional_run_numbers, event_slice_optimisation=event_slice_optimisation)
+        save_to_file(
+            reduction_packages, save_can, additional_run_numbers, additional_metadata, event_slice_optimisation=event_slice_optimisation
+        )
         delete_reduced_workspaces(reduction_packages)
     elif output_mode is OutputMode.BOTH:
-        save_to_file(reduction_packages, save_can, additional_run_numbers, event_slice_optimisation=event_slice_optimisation)
+        save_to_file(
+            reduction_packages, save_can, additional_run_numbers, additional_metadata, event_slice_optimisation=event_slice_optimisation
+        )
 
     # -----------------------------------------------------------------------
     # Clean up other workspaces if the optimizations have not been turned on.
@@ -547,11 +556,43 @@ def get_multi_period_workspaces(load_alg, workspace_name, number_of_workspaces):
     return workspaces
 
 
-def create_scaled_background_workspace(state) -> str:
-    state.background_subtraction.validate()
+def check_for_background_workspace_in_ads(state, reduction_package):
     background_ws_name = state.background_subtraction.workspace
-    if not background_ws_name:
-        return None
+    if AnalysisDataService.doesExist(background_ws_name):
+        return background_ws_name
+    # Look for a workspace that has a reduction suffix appended (such as _merged_1D_2.2_10.0)
+    reduced_name = ""
+    if reduction_package.reduction_mode == ReductionMode.MERGED:
+        reduced_name = reduction_package.reduced_merged_name[0]
+    elif reduction_package.reduction_mode == ReductionMode.HAB:
+        reduced_name = reduction_package.reduced_hab_name[0]
+    elif reduction_package.reduction_mode == ReductionMode.LAB:
+        reduced_name = reduction_package.reduced_lab_name[0]
+    full_name = (
+        background_ws_name
+        + reduced_name.split(
+            state.save.user_specified_output_name if state.save.user_specified_output_name else str(state.data.sample_scatter_run_number),
+            1,
+        )[-1]
+    )
+
+    if AnalysisDataService.doesExist(full_name):
+        reduction_package.state.background_subtraction.workspace = full_name
+        return full_name
+    else:
+        raise ValueError(f"BackgroundWorkspace: The workspace '{background_ws_name}' or '{full_name}' could not be found in the ADS.")
+
+
+def create_scaled_background_workspace(state, reduction_package) -> str:
+    state.background_subtraction.validate()
+    if reduction_package.reduction_mode == ReductionMode.ALL:
+        raise ValueError(
+            f"Reduction Mode '{ReductionMode.ALL}' is incompatible with scaled background reduction. The "
+            f"ReductionMode must be set to '{ReductionMode.MERGED}', '{ReductionMode.HAB}', or '{ReductionMode.LAB}'."
+        )
+
+    background_ws_name = check_for_background_workspace_in_ads(state, reduction_package)
+
     scaled_bg_ws_name = "__" + state.background_subtraction.workspace + "_scaled"  # __ makes the ws invisible
 
     scale_name = "Scale"
@@ -1147,6 +1188,9 @@ def group_workspaces_if_required(reduction_package, output_mode, save_can, event
             add_to_group(reduced_lab, reduction_package.reduced_lab_base_name)
             add_to_group(reduced_hab, reduction_package.reduced_hab_base_name)
 
+    if requires_grouping:
+        group_bgsub_if_required(reduction_package)
+
     # Can group workspace depends on if save_can is checked and output_mode
     # Logic table for which group to save CAN into
     # CAN | FILE | In OPTIMIZATION group
@@ -1177,6 +1221,22 @@ def group_workspaces_if_required(reduction_package, output_mode, save_can, event
     add_to_group(reduction_package.calculated_transmission_can, reduction_package.calculated_transmission_can_base_name)
     add_to_group(reduction_package.unfitted_transmission, reduction_package.unfitted_transmission_base_name)
     add_to_group(reduction_package.unfitted_transmission_can, reduction_package.unfitted_transmission_can_base_name)
+
+
+def group_bgsub_if_required(reduction_package):
+    reduced_bgsub = reduction_package.reduced_bgsub
+    is_bgsub_reduction = reduced_bgsub is not None
+
+    if is_bgsub_reduction:
+        base_names = []
+        if reduction_package.reduction_mode == ReductionMode.HAB:
+            base_names = reduction_package.reduced_lab_base_name
+        if reduction_package.reduction_mode == ReductionMode.LAB:
+            base_names = reduction_package.reduced_lab_base_name
+        if reduction_package.reduction_mode == ReductionMode.MERGED:
+            base_names = reduction_package.reduced_merged_base_name
+        for ws, base_name in zip(reduced_bgsub, base_names):
+            add_to_group(ws, base_name)
 
 
 def add_to_group(workspace, name_of_group_workspace):
@@ -1254,18 +1314,21 @@ def rename_group_workspace(name_of_workspace, name_of_group_workspace):
     rename_alg.execute()
 
 
-def save_to_file(reduction_packages, save_can, additional_run_numbers, event_slice_optimisation=False):
+def save_to_file(
+    reduction_packages: list,
+    save_can: bool,
+    additional_run_numbers: Dict[str, str],
+    additional_metadata: Dict[str, Any],
+    event_slice_optimisation: bool = False,
+):
     """
     Extracts all workspace names which need to be saved and saves them into a file.
 
     :param reduction_packages: a list of reduction packages which contain all the relevant information for saving
-    :type reduction_packages: list
     :param save_can: When true save the unsubtracted can and sample workspaces
-    :type save_can: bool
     :param additional_run_numbers: Workspace type to run number
-    :type additional_run_numbers: dict
+    :param additional_metadata: Dict of reduction metadata to be included in saved output.
     :param event_slice_optimisation: optional. If true then reduction packages contain event slice data
-    :type event_slice_optimisation: bool
     """
     if not event_slice_optimisation:
         workspaces_names_to_save = get_all_names_to_save(reduction_packages, save_can=save_can)
@@ -1274,17 +1337,33 @@ def save_to_file(reduction_packages, save_can, additional_run_numbers, event_sli
 
     state = reduction_packages[0].state
     save_info = state.save
+    scaled_bg_info = state.background_subtraction
     file_formats = save_info.file_format
     for to_save in workspaces_names_to_save:
         if isinstance(to_save, tuple):
             for i, ws_name_to_save in enumerate(to_save[0]):
                 transmission = to_save[1][i] if to_save[1] else ""
                 transmission_can = to_save[2][i] if to_save[2] else ""
+                _add_scaled_background_metadata_if_relevant(scaled_bg_info, ws_name_to_save, additional_metadata)
                 save_workspace_to_file(
-                    ws_name_to_save, file_formats, ws_name_to_save, additional_run_numbers, transmission, transmission_can
+                    ws_name_to_save,
+                    file_formats,
+                    ws_name_to_save,
+                    additional_run_numbers,
+                    additional_metadata,
+                    transmission,
+                    transmission_can,
                 )
         else:
-            save_workspace_to_file(to_save, file_formats, to_save, additional_run_numbers)
+            _add_scaled_background_metadata_if_relevant(scaled_bg_info, str(to_save), additional_metadata)
+            save_workspace_to_file(to_save, file_formats, to_save, additional_run_numbers, additional_metadata)
+
+
+def _add_scaled_background_metadata_if_relevant(bg_state, ws_name: str, metadata: dict[str, Any]):
+    if not ws_name.endswith(SCALED_BGSUB_SUFFIX):
+        return
+    metadata["BackgroundSubtractionWorkspace"] = str(bg_state.workspace)
+    metadata["BackgroundSubtractionScaleFactor"] = float(bg_state.scale_factor)
 
 
 def delete_reduced_workspaces(reduction_packages, include_non_transmission=True):
@@ -1326,7 +1405,9 @@ def delete_reduced_workspaces(reduction_packages, include_non_transmission=True)
             reduced_lab_sample = reduction_package.reduced_lab_sample
             reduced_hab_sample = reduction_package.reduced_hab_sample
 
-            workspaces_to_delete.extend([reduced_lab, reduced_hab, reduced_merged, reduced_bgsub, reduced_lab_sample, reduced_hab_sample])
+            workspaces_to_delete.extend([reduced_lab, reduced_hab, reduced_merged, reduced_lab_sample, reduced_hab_sample])
+            if reduced_bgsub is not None:
+                workspaces_to_delete.extend(reduced_bgsub)
 
         _delete_workspaces(delete_alg, workspaces_to_delete)
 
@@ -1534,7 +1615,15 @@ def get_event_slice_names_to_save(reduction_packages, save_can):
     return set(names_to_save)
 
 
-def save_workspace_to_file(workspace_name, file_formats, file_name, additional_run_numbers, transmission_name="", transmission_can_name=""):
+def save_workspace_to_file(
+    workspace_name,
+    file_formats: list,
+    file_name,
+    additional_run_numbers: Dict[str, str],
+    additional_metadata: Dict[str, str],
+    transmission_name: str = "",
+    transmission_can_name: str = "",
+):
     """
     Saves the workspace to the different file formats specified in the state object.
 
@@ -1542,6 +1631,7 @@ def save_workspace_to_file(workspace_name, file_formats, file_name, additional_r
     :param file_formats: a list of file formats to save
     :param file_name: name of file to save
     :param additional_run_numbers: a dict of workspace type to run number
+    :param additional_metadata: metadata names and values to include in saved output files.
     :param transmission_name: name of sample transmission workspace to save to file
             for CanSAS algorithm. Only some workspaces have a corresponding transmission workspace.
     :param transmission_can_name: name of can transmission workspace. As above.
@@ -1550,6 +1640,7 @@ def save_workspace_to_file(workspace_name, file_formats, file_name, additional_r
     save_options = {"InputWorkspace": workspace_name}
     save_options.update({"Filename": file_name, "Transmission": transmission_name, "TransmissionCan": transmission_can_name})
     save_options.update(additional_run_numbers)
+    save_options.update(additional_metadata)
 
     if SaveType.NEXUS in file_formats:
         save_options.update({"Nexus": True})
@@ -1570,7 +1661,7 @@ def save_workspace_to_file(workspace_name, file_formats, file_name, additional_r
 
 def subtract_scaled_background(reduction_package, scaled_ws_name: str):
     def run_minus_alg():
-        output_name = ws_name + "_bgsub"
+        output_name = ws_name + SCALED_BGSUB_SUFFIX
         minus_options["LHSWorkspace"] = ws_name
         minus_options["OutputWorkspace"] = output_name
         minus_alg = create_unmanaged_algorithm(minus_name, **minus_options)
@@ -1579,11 +1670,6 @@ def subtract_scaled_background(reduction_package, scaled_ws_name: str):
         output_workspaces_names.append(output_name)
         output_workspaces.append(get_workspace_from_algorithm(minus_alg, "OutputWorkspace"))
 
-    if reduction_package.reduction_mode == ReductionMode.ALL:
-        raise ValueError(
-            f"Reduction Mode '{ReductionMode.ALL}' is incompatible with scaled background reduction. The "
-            f"ReductionMode must be set to '{ReductionMode.MERGED}', '{ReductionMode.HAB}', or '{ReductionMode.LAB}'."
-        )
     minus_name = "Minus"
     minus_options = {"RHSWorkspace": scaled_ws_name}
     output_workspaces_names = []

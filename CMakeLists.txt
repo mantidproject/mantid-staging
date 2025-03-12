@@ -1,5 +1,5 @@
 # CMake version check.
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.21)
 
 # Define the project name.
 project(Mantid)
@@ -11,6 +11,10 @@ endif()
 # find_package() uses <PackageName>_ROOT variables: https://cmake.org/cmake/help/latest/policy/CMP0074.html
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
+endif()
+# install() DESTINATION paths are normalized. https://cmake.org/cmake/help/latest/policy/CMP0177.html
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
 endif()
 
 # Add the path to our custom 'find' modules
@@ -130,6 +134,8 @@ if(ENABLE_WORKBENCH OR BUILD_MANTIDQT)
   find_package(PyQt5 REQUIRED)
   find_package(SIP REQUIRED)
   separate_arguments(PYQT5_SIP_FLAGS)
+  # Disable use of C++ API deprecated in Qt 5.15
+  add_compile_definitions(QT_DISABLE_DEPRECATED_UP_TO=0x050F00)
 endif()
 
 # Now add in all the components
@@ -162,11 +168,6 @@ set(CORE_MANTIDLIBS
     Mantid::API
     Mantid::Types
 )
-
-if(UNIX)
-  # Experimental feature. Unix only at this point.
-  option(UNITY_BUILD "Switch for utilising unity builds. Faster builds for selected components.")
-endif(UNIX)
 
 add_custom_target(AllTests)
 

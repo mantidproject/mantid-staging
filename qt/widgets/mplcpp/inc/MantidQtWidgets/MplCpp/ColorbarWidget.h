@@ -9,9 +9,11 @@
 #include "MantidQtWidgets/MplCpp/Colors.h"
 #include "MantidQtWidgets/MplCpp/DllConfig.h"
 #include "MantidQtWidgets/MplCpp/Figure.h"
+#include "MantidQtWidgets/MplCpp/FigureEventFilter.h"
 #include "MantidQtWidgets/MplCpp/ScalarMappable.h"
 #include "ui_Colorbar.h"
 
+#include <memory>
 #include <tuple>
 
 namespace MantidQt {
@@ -33,7 +35,7 @@ public:
   ColorbarWidget(QWidget *parent = nullptr);
 
   void setNorm(const NormalizeBase &norm);
-  void setClim(boost::optional<double> vmin, boost::optional<double> vmax);
+  void setClim(std::optional<double> vmin, std::optional<double> vmax);
   std::tuple<double, double> clim() const;
 
   ///@name Legacy API to match DraggableColorBarWidget for instrument view
@@ -44,8 +46,7 @@ public:
   QString getMinValue() const;
   QString getMaxValue() const;
   QString getNthPower() const;
-  void setMinPositiveValue(double /*unused*/) { /*Unused in this implementation*/
-  }
+  void setMinPositiveValue(double /*unused*/) { /*Unused in this implementation*/ }
   int getScaleType() const;
   void setScaleType(int /*index*/);
   void setNthPower(double /*gamma*/);
@@ -80,6 +81,7 @@ private: // data
   Ui::Colorbar m_ui;
   FigureCanvasQt *m_canvas{nullptr};
   ScalarMappable m_mappable;
+  std::unique_ptr<FigureEventFilter> m_eventFilter;
 };
 
 } // namespace MplCpp

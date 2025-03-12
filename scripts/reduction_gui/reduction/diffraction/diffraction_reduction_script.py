@@ -6,10 +6,11 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=invalid-name,R0912
 """
-    Classes for each reduction step. Those are kept separately
-    from the interface class so that the DgsReduction class could
-    be used independently of the interface implementation
+Classes for each reduction step. Those are kept separately
+from the interface class so that the DgsReduction class could
+be used independently of the interface implementation
 """
+
 import os
 from mantid.kernel import Logger
 from mantid.api import FileFinder
@@ -50,7 +51,7 @@ class DiffractionReductionScripter(BaseReductionScripter):
         # Information output
         if self.facility_name is False:
             self.facility_name = "SNS"
-        dbmsg = "[SNS Powder Reduction]  Facility = %s,  Instrument = %s\n" "Auto-save Directory %s" % (
+        dbmsg = "[SNS Powder Reduction]  Facility = %s,  Instrument = %s\nAuto-save Directory %s" % (
             self.facility_name,
             self.instrument_name,
             mantidconfigdir,
@@ -286,6 +287,8 @@ class DiffractionReductionScripter(BaseReductionScripter):
             runsetupdict["VanadiumNumber"] = -1
         if int(runsetupdict["DisableVanadiumBackgroundCorrection"]) == 1:
             runsetupdict["VanadiumBackgroundNumber"] = -1
+        if int(runsetupdict["EnableInterpolate"]) == 0:
+            runsetupdict["InterpolateTargetTemp"] = ""
 
         # b) do resample X or binning
         if int(runsetupdict["DoReSampleX"]) == 0:
@@ -307,6 +310,7 @@ class DiffractionReductionScripter(BaseReductionScripter):
                 "DisableVanadiumCorrection",
                 "DisableVanadiumBackgroundCorrection",
                 "DoReSampleX",
+                "EnableInterpolate",
             ]:
                 continue
 

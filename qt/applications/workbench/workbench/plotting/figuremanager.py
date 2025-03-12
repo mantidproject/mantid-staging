@@ -8,6 +8,7 @@
 #
 #
 """Provides our custom figure manager to wrap the canvas, window and our custom toolbar"""
+
 import copy
 import io
 import sys
@@ -21,10 +22,10 @@ from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from qtpy.QtCore import QObject, Qt
 from qtpy.QtGui import QImage
-from qtpy.QtWidgets import QApplication, QLabel, QFileDialog
+from qtpy.QtWidgets import QApplication, QLabel, QFileDialog, QMessageBox
 
 from mantid.api import AnalysisDataService, AnalysisDataServiceObserver, ITableWorkspace, MatrixWorkspace
-from mantid.kernel import logger
+from mantid.kernel import logger, ConfigService
 from mantid.plots import datafunctions, MantidAxes, axesfunctions
 from mantidqt.io import open_a_file_dialog
 from mantidqt.utils.qt.qappthreadcall import QAppThreadCall, force_method_calls_to_qapp_thread
@@ -33,6 +34,7 @@ from mantidqt.widgets.plotconfigdialog.presenter import PlotConfigDialogPresente
 from mantidqt.widgets.superplot import Superplot
 from mantidqt.widgets.waterfallplotfillareadialog.presenter import WaterfallPlotFillAreaDialogPresenter
 from mantidqt.widgets.waterfallplotoffsetdialog.presenter import WaterfallPlotOffsetDialogPresenter
+from mantidqt.plotting.figuretype import FigureType, figure_type
 from workbench.config import get_window_config
 from workbench.plotting.globalfiguremanager import GlobalFigureManager
 from workbench.plotting.mantidfigurecanvas import (  # noqa: F401
@@ -118,7 +120,7 @@ class FigureManagerADSObserver(AnalysisDataServiceObserver):
         if all(empty_axes):
             self.window.emit_close()
         elif redraw:
-            self.canvas.draw()
+            self.canvas.draw_idle()
 
     @_catch_exceptions
     def replaceHandle(self, _, workspace):
@@ -136,7 +138,7 @@ class FigureManagerADSObserver(AnalysisDataServiceObserver):
                 continue
             redraw = redraw | redraw_this
         if redraw:
-            self.canvas.draw()
+            self.canvas.draw_idle()
 
     @_catch_exceptions
     def renameHandle(self, oldName, newName):
@@ -160,7 +162,7 @@ class FigureManagerADSObserver(AnalysisDataServiceObserver):
             self.canvas.manager.set_window_title(
                 _replace_workspace_name_in_string(oldName, newName, self.canvas.manager.get_window_title())
             )
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
 
 class FigureManagerWorkbench(FigureManagerBase, QObject):
@@ -185,7 +187,8 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         parent, flags = get_window_config()
         self.window = FigureWindow(canvas, parent=parent, window_flags=flags)
         self.window.activated.connect(self._window_activated)
-        self.window.closing.connect(canvas.close_event)
+        close_event = matplotlib.backend_bases.CloseEvent("close_event", canvas)
+        self.window.closing.connect(lambda: canvas.callbacks.process(close_event.name, close_event))
         self.window.closing.connect(self.destroy)
         self.window.visibility_changed.connect(self.fig_visibility_changed)
 
@@ -229,6 +232,7 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
             self.toolbar.sig_waterfall_conversion.connect(self.update_toolbar_waterfall_plot)
             self.toolbar.sig_change_line_collection_colour_triggered.connect(self.change_line_collection_colour)
             self.toolbar.sig_hide_plot_triggered.connect(self.hide_plot)
+            self.toolbar.sig_crosshair_toggle_triggered.connect(self.crosshair_toggle)
             self.toolbar.setFloatable(False)
             tbs_height = self.toolbar.sizeHint().height()
         else:
@@ -248,9 +252,7 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         self.window.addDockWidget(Qt.LeftDockWidgetArea, self.fit_browser)
 
         self.superplot = None
-
         self.fit_browser.hide()
-
         if matplotlib.is_interactive():
             self.window.show()
             canvas.draw_idle()
@@ -261,11 +263,9 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
                 self.toolbar.update()
 
         canvas.figure.add_axobserver(notify_axes_change)
-
         # Register canvas observers
         self._fig_interaction = FigureInteraction(self)
         self._ads_observer = FigureManagerADSObserver(self)
-
         self.window.raise_()
 
     def full_screen_toggle(self):
@@ -285,6 +285,7 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         self.window.resize(width, height + self._status_and_tool_height)
 
     def show(self):
+        self._set_up_axes_title_change_callbacks()
         self.window.show()
         self.window.activateWindow()
         self.window.raise_()
@@ -305,6 +306,28 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         if self.toolbar:
             self.toolbar.set_buttons_visibility(self.canvas.figure)
 
+    def _set_up_axes_title_change_callbacks(self):
+        # This enables us to use the plot tile as the window title
+        plot_axes = self._axes_that_are_not_colour_bars()
+        if len(plot_axes) == 1:
+            # only set this up for single plots
+            plot_axes[0].title.add_callback(self._axes_title_changed_callback)
+
+    def _axes_title_changed_callback(self, title_artist):
+        title_text = title_artist.get_text()
+        if not title_text:
+            return
+        title_text_with_number = title_text + "-" + str(self.num)
+        if self.get_window_title() not in {title_text_with_number, title_text}:
+            self.set_window_title(title_text)
+            # Title was not updating if the plot is already open so calling draw
+            # Font properties are still not updating (until you interact with the title in another way
+            # i.e double-clicking)
+            self.canvas.draw_idle()
+
+    def _axes_that_are_not_colour_bars(self):
+        return [ax for ax in self.canvas.figure.get_axes() if not hasattr(ax, "_colorbar")]
+
     def destroy(self, *args):
         # check for qApp first, as PySide deletes it in its atexit handler
         if QApplication.instance() is None:
@@ -317,7 +340,6 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         if self.toolbar:
             self.toolbar.destroy()
 
-        self._ads_observer.observeAll(False)
         self._ads_observer = None
         # disconnect window events before calling GlobalFigureManager.destroy. window.close is not guaranteed to
         # delete the object and do this for us. On macOS it was observed that closing the figure window
@@ -366,7 +388,7 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         canvas = self.canvas
         axes = canvas.figure.get_axes()
         for ax in axes:
-            if type(ax) == Axes:
+            if type(ax) is Axes:
                 # Colorbar
                 continue
             elif isinstance(ax, Axes3D):
@@ -391,7 +413,7 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         """Show the superplot"""
         self.superplot = Superplot(self.canvas, self.window)
         if not self.superplot.is_valid():
-            logger.warning("Superplot cannot be opened on data not linked " "to a workspace.")
+            logger.warning("Superplot cannot be opened on data not linked to a workspace.")
             self.superplot = None
             self.toolbar._actions["toggle_superplot"].setChecked(False)
         else:
@@ -440,6 +462,13 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         # to allow getting a handle as plt.figure('Figure Name')
         self.canvas.figure.set_label(title)
 
+    def set_axes_title(self, title):
+        plot_axes = self._axes_that_are_not_colour_bars()
+        show_title = "on" == ConfigService.getString("plots.ShowTitle").lower()
+        if len(plot_axes) == 1 and show_title:
+            plot_axes[0].set_title(title)
+            self.canvas.draw_idle()
+
     def fig_visibility_changed(self):
         """
         Make a notification in the global figure manager that
@@ -449,25 +478,43 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         GlobalFigureManager.figure_visibility_changed(self.num)
 
     def generate_plot_script_clipboard(self):
-        script = generate_script(self.canvas.figure, exclude_headers=True)
-        QApplication.clipboard().setText(script)
-        logger.notice("Plotting script copied to clipboard.")
+        try:
+            script = generate_script(self.canvas.figure, exclude_headers=True)
+        except Exception as e:
+            self._handle_script_generation_exception(e)
+        else:
+            QApplication.clipboard().setText(script)
+            logger.notice("Plotting script copied to clipboard.")
 
     def generate_plot_script_file(self):
-        script = generate_script(self.canvas.figure)
-        filepath = open_a_file_dialog(
-            parent=self.canvas,
-            default_suffix=".py",
-            file_filter="Python Files (*.py)",
-            accept_mode=QFileDialog.AcceptSave,
-            file_mode=QFileDialog.AnyFile,
+        try:
+            script = generate_script(self.canvas.figure)
+        except Exception as e:
+            self._handle_script_generation_exception(e)
+        else:
+            filepath = open_a_file_dialog(
+                parent=self.canvas,
+                default_suffix=".py",
+                file_filter="Python Files (*.py)",
+                accept_mode=QFileDialog.AcceptSave,
+                file_mode=QFileDialog.AnyFile,
+            )
+            if filepath:
+                try:
+                    with open(filepath, "w") as f:
+                        f.write(script)
+                except IOError as io_error:
+                    logger.error("Could not write file: {}\n{}".format(filepath, io_error))
+
+    # If a user creates a plot from a script using mpl features we don't support, asking for a recreated script from the
+    # plot can lead to problems. This should only really be supported for plots created by workbench.
+    def _handle_script_generation_exception(self, e: Exception):
+        msg = (
+            "Problem encountered when generating the plot script.\n"
+            "Plot script generation is only officially supported for plots created by Mantid Workbench."
         )
-        if filepath:
-            try:
-                with open(filepath, "w") as f:
-                    f.write(script)
-            except IOError as io_error:
-                logger.error("Could not write file: {}\n{}" "".format(filepath, io_error))
+        QMessageBox.critical(self.window, "Error generating plot script", msg + "\n\n" + str(e), QMessageBox.Ok, QMessageBox.NoButton)
+        logger.error(msg)
 
     def set_figure_zoom_to_display_all(self):
         axes = self.canvas.figure.get_axes()
@@ -507,12 +554,10 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         for cap in errorbar_cap_lines:
             ax.add_line(cap)
 
-        """ArtistList will become an immutable tuple in matplotlib 3.7 which will prevent iterating through line_fill"""
-        for line_fill in fills:
+        for line_fill in reversed(fills):
             if line_fill not in ax.collections:
                 ax.add_collection(line_fill)
 
-        ax.collections.reverse()
         ax.update_waterfall(x, y)
 
         if ax.get_legend():
@@ -532,11 +577,16 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         self.toolbar.set_generate_plot_script_enabled(not is_waterfall)
 
     def change_line_collection_colour(self, colour):
-        for col in self.canvas.figure.get_axes()[0].collections:
-            if isinstance(col, LineCollection):
-                col.set_color(colour.name())
+        if figure_type(self.canvas.figure) == FigureType.Contour:
+            path_col = self.canvas.figure.get_axes()[0].collections[0]
+            path_col.set_edgecolor(colour.name())
 
-        self.canvas.draw()
+        if figure_type(self.canvas.figure) == FigureType.Wireframe:
+            line_cols = self.canvas.figure.findobj(LineCollection)
+            for line in line_cols:
+                line.set_color(colour.name())
+
+        self.canvas.draw_idle()
 
     @staticmethod
     def _reverse_axis_lines(ax):
@@ -549,6 +599,41 @@ class FigureManagerWorkbench(FigureManagerBase, QObject):
         for line in lines:
             line.remove()
             ax.add_line(line)
+
+    def crosshair_toggle(self, on):
+        cid = self.canvas.mpl_connect("motion_notify_event", self.crosshair)
+        if not on:
+            self.canvas.mpl_disconnect(cid)
+
+    def crosshair(self, event):
+        axes = self.canvas.figure.gca()
+
+        # create a crosshair made from horizontal and verticle lines.
+        self.horizontal_line = axes.axhline(color="r", lw=1.0, ls="-")
+        self.vertical_line = axes.axvline(color="r", lw=1.0, ls="-")
+
+        def set_cross_hair_visible(visible):
+            need_redraw = self.horizontal_line.get_visible() != visible
+            self.horizontal_line.set_visible(visible)
+            self.vertical_line.set_visible(visible)
+            return need_redraw
+
+        # if event is out-of-bound we update
+        if not event.inaxes:
+            need_redraw = set_cross_hair_visible(False)
+            if need_redraw:
+                axes.figure.canvas.draw()
+
+        else:
+            set_cross_hair_visible(True)
+            x, y = event.xdata, event.ydata
+            self.horizontal_line.set_ydata([y])
+            self.vertical_line.set_xdata([x])
+            self.canvas.draw()
+
+        # after update we remove
+        self.horizontal_line.remove()
+        self.vertical_line.remove()
 
 
 # -----------------------------------------------------------------------------

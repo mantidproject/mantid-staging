@@ -47,7 +47,7 @@ TableWorkspace::TableWorkspace(const TableWorkspace &other)
 
 size_t TableWorkspace::getMemorySize() const {
   size_t data_size = std::accumulate(m_columns.cbegin(), m_columns.cend(), static_cast<size_t>(0),
-                                     [](size_t sum, const auto &column) { return sum = column->sizeOfData(); });
+                                     [](size_t sum, const auto &column) { return sum + column->sizeOfData(); });
   data_size += m_LogManager->getMemorySize();
   return data_size;
 }
@@ -141,7 +141,7 @@ API::Column_const_sptr TableWorkspace::getColumn(size_t index) const {
 void TableWorkspace::removeColumn(const std::string &name) {
   auto ci = std::find_if(m_columns.begin(), m_columns.end(), FindName(name));
   if (ci != m_columns.end()) {
-    if (!ci->unique()) {
+    if (ci->use_count() > 1) {
       g_log.error() << "Deleting column in use (" << name << ").\n";
     }
     m_columns.erase(ci);

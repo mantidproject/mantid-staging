@@ -16,7 +16,6 @@
 #include "MantidKernel/FacilityInfo.h"
 #include "MantidKernel/PropertyManager.h"
 #include "MantidKernel/PropertyManagerDataService.h"
-#include "MantidKernel/System.h"
 #include "Poco/Path.h"
 #include <stdexcept>
 #include <utility>
@@ -233,7 +232,7 @@ Workspace_sptr GenericDataProcessorAlgorithm<Base>::load(const std::string &inpu
       // Get facility extensions
       FacilityInfo facilityInfo = ConfigService::Instance().getFacility();
       const std::vector<std::string> facilityExts = facilityInfo.extensions();
-      foundFile = FileFinder::Instance().findRun(inputData, facilityExts);
+      foundFile = FileFinder::Instance().findRun(inputData, facilityExts).result();
     }
 
     if (!foundFile.empty()) {

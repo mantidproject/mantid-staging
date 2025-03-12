@@ -8,7 +8,7 @@ Building with CMake
   :local:
 
 CMake is the build system for the entirety of Mantid (Framework, MantidQt and MantidWorkbench). It is used to generate native build files for your platform, which can be Makefiles (for use with make, nmake or jom) for command line builds or project/solution files for an IDE (e.g. Visual Studio, Eclipse, Qt Creator, XCode).
-For a "how is it used version" of this guide, look at the scripts used on the builservers for `windows <https://github.com/mantidproject/mantid/blob/main/buildconfig/Jenkins/buildscript.bat>`_ or `linux/osx <https://github.com/mantidproject/mantid/blob/master/buildconfig/Jenkins/buildscript>`_.
+For a "how is it used version" of this guide, see the `build script <https://github.com/mantidproject/mantid/blob/main/buildconfig/Jenkins/Conda/build>`_ used on the build servers.
 
 Environment
 ###########
@@ -31,12 +31,12 @@ If you're build with ``ccache`` exhibits warnings that are not usually present t
 Network Drives
 --------------
 
-The default location for the cache directory is ``$HOME/.ccache`` on Linux/macOS, and ``$HOME/AppData/Roaming/ccache`` on Windows. If you're home directory is on a network-mounted drive then the location of this cache be moved to provide the best performance. On newer versions of ``ccache`` run ``ccache --set-config=cache_dir=PATH_TO_CACHE``. Older versions (<3.2) do not allow this and must fall back to setting the ``CCACHE_DIR`` environment variable in your shell profile.
+The default location for the cache directory is ``$HOME/.ccache`` on Linux/macOS, and ``$HOME/AppData/Roaming/ccache`` on Windows. If your home directory is on a network-mounted drive, the location of this cache can be moved to provide the best performance. On newer versions of ``ccache`` run ``ccache --set-config=cache_dir=PATH_TO_CACHE``. Older versions (<3.2) do not allow this and must fall back to setting the ``CCACHE_DIR`` environment variable in your shell profile.
 
 Configuring your build
 ######################
 
-CMake encourages the use of 'out of source' builds. This means that all generated files are placed in a separate directory structure to the source files. This separation makes a full clean easier (you just delete everything) and means that you can have different types of build (Release, Debug, different compiler versions, ....) in separate places (N.B. For Visual Studio & XCode, you can still select the type of build from within the IDE).
+CMake encourages the use of 'out of source' builds. This means that all generated files are placed in a separate directory structure to the source files. This separation makes a full clean easier (you just delete everything) and means that you can have different types of build (Release, Debug, different compiler versions, etc.) in separate places (Note that for Visual Studio & XCode, you can still select the type of build from within the IDE).
 
 CMake generators
 ----------------
@@ -49,7 +49,7 @@ Using an `extra generator <https://cmake.org/cmake/help/latest/manual/cmake-gene
 From the command line
 ---------------------
 
-* If wanting an out of source build, create the directory you want to build in and ``cd`` into it.
+* If wanting an out of source build, create the directory you want to build in and ``cd`` into it. Alternatively, you can specify the build and source directories separately by running ``cmake -B /path/to/build -S /path/to/source``.
 * On Windows, you may need to be in a Visual Studio Command Prompt.
 * Run ``cmake /path/to/Mantid``, or to ``/path/to/Mantid/Framework`` if you only want a build of the Framework (typically not recommended, but possible nonetheless). This will generate build files using the default generator for your platform (e.g. Unix Makefiles on Linux).
 * If you want to use a specific generator (run ``cmake --help`` for a list of available generators for your platform), use the ``-G`` option, e.g. ``cmake -G"NMake Makefiles" /path/to/Mantid``.

@@ -77,10 +77,10 @@ void OptimizeLatticeForCellType::exec() {
   std::string cell_type = getProperty("CellType");
   IPeaksWorkspace_sptr ws = getProperty("PeaksWorkspace");
 
-  std::vector<int> badPeaks;
   std::vector<IPeaksWorkspace_sptr> runWS;
   if (edge > 0)
     if (auto pw = std::dynamic_pointer_cast<PeaksWorkspace>(ws)) {
+      std::vector<int> badPeaks;
       Geometry::Instrument_const_sptr inst = ws->getInstrument();
       for (int i = int(pw->getNumberPeaks()) - 1; i >= 0; --i) {
         const std::vector<Peak> &peaks = pw->getPeaks();
@@ -210,16 +210,14 @@ void OptimizeLatticeForCellType::exec() {
       savePks_alg->setPropertyValue("InputWorkspace", i_run->getName());
       savePks_alg->setProperty("Filename", outputdir + "ls" + i_run->getName() + ".integrate");
       savePks_alg->executeAsChildAlg();
-      g_log.notice() << "See output file: " << outputdir + "ls" + i_run->getName() + ".integrate"
-                     << "\n";
+      g_log.notice() << "See output file: " << outputdir + "ls" + i_run->getName() + ".integrate" << "\n";
       // Save UB
       auto saveUB_alg = createChildAlgorithm("SaveIsawUB");
       saveUB_alg->setPropertyValue("InputWorkspace", i_run->getName());
       saveUB_alg->setProperty("Filename", outputdir + "ls" + i_run->getName() + ".mat");
       saveUB_alg->executeAsChildAlg();
       // Show the names of files written
-      g_log.notice() << "See output file: " << outputdir + "ls" + i_run->getName() + ".mat"
-                     << "\n";
+      g_log.notice() << "See output file: " << outputdir + "ls" + i_run->getName() + ".mat" << "\n";
     }
   }
 }

@@ -14,6 +14,7 @@
 #include "MantidKernel/Logger.h"
 #include "MantidKernel/NetworkProxy.h"
 #include "MantidKernel/ProxyInfo.h"
+#include <filesystem>
 #include <unordered_set>
 #include <utility>
 
@@ -161,7 +162,7 @@ DECLARE_SCRIPTREPOSITORY(ScriptRepositoryImpl)
  "https://repository.mantidproject.com");
  @endcode
  */
-ScriptRepositoryImpl::ScriptRepositoryImpl(const std::string &local_rep, const std::string &remote) : valid(false) {
+ScriptRepositoryImpl::ScriptRepositoryImpl(const std::string &local_rep, const std::string &remote) : m_valid(false) {
   // get the local path and the remote path
   std::string loc, rem;
   const ConfigServiceImpl &config = ConfigService::Instance();
@@ -259,7 +260,7 @@ ScriptRepositoryImpl::ScriptRepositoryImpl(const std::string &local_rep, const s
     local_repository.append("/");
 
   repo.clear();
-  valid = true;
+  m_valid = true;
 }
 
 /**
@@ -343,7 +344,7 @@ void ScriptRepositoryImpl::install(const std::string &path) {
   if (local_repository.back() != '/')
     local_repository.append("/");
 
-  valid = true;
+  m_valid = true;
 }
 
 void ScriptRepositoryImpl::ensureValidRepository() {
@@ -384,7 +385,7 @@ ScriptInfo ScriptRepositoryImpl::info(const std::string &input_path) {
   std::string path = convertPath(input_path);
   ScriptInfo info;
   try {
-    RepositoryEntry &entry = repo.at(path);
+    const RepositoryEntry &entry = repo.at(path);
     info.author = entry.author;
     info.pub_date = entry.pub_date;
     info.auto_update = entry.auto_update;
@@ -401,7 +402,7 @@ const std::string &ScriptRepositoryImpl::description(const std::string &input_pa
   ensureValidRepository();
   std::string path = convertPath(input_path);
   try {
-    RepositoryEntry &entry = repo.at(path);
+    const RepositoryEntry &entry = repo.at(path);
     return entry.description;
   } catch (const std::out_of_range &ex) {
     std::stringstream ss;
@@ -643,10 +644,10 @@ void ScriptRepositoryImpl::download_directory(const std::string &directory_path)
       entry.second.downloaded_pubdate = entry.second.pub_date;
       updateLocalJson(entry.first, entry.second);
 
-    }                                     // end downloading directory
-                                          // update the status
+    } // end downloading directory
+      // update the status
     entry.second.status = BOTH_UNCHANGED; // update this entry
-  }                                       // end interaction with all entries
+  } // end interaction with all entries
 }
 
 /**
@@ -756,7 +757,7 @@ SCRIPTSTATUS ScriptRepositoryImpl::fileStatus(const std::string &input_path) {
   // g_log.debug() << "Attempt to ask for the status of "<< file_path <<
   // '\n';
   try {
-    RepositoryEntry &entry = repo.at(file_path);
+    const RepositoryEntry &entry = repo.at(file_path);
     return entry.status;
   } catch (const std::out_of_range &ex) {
     std::stringstream ss;
@@ -839,7 +840,7 @@ void ScriptRepositoryImpl::upload(const std::string &file_path, const std::strin
     }
     g_log.debug() << "Form Output: " << answer.str() << '\n';
 
-    std::string info;
+    std::string messageInfo;
     std::string detail;
     std::string published_date;
 
@@ -848,14 +849,14 @@ void ScriptRepositoryImpl::upload(const std::string &file_path, const std::strin
     if (!Mantid::JsonHelpers::parse(answerString, &pt)) {
       throw ScriptRepoException("Bad answer from the Server");
     }
-    info = pt.get("message", "").asString();
+    messageInfo = pt.get("message", "").asString();
     detail = pt.get("detail", "").asString();
     published_date = pt.get("pub_date", "").asString();
     std::string cmd = pt.get("shell", "").asString();
     if (!cmd.empty())
       detail.append("\nFrom Command: ").append(cmd);
 
-    if (info == "success") {
+    if (messageInfo == "success") {
       g_log.notice() << "ScriptRepository:" << file_path << " uploaded!\n";
 
       // update the file
@@ -887,7 +888,7 @@ void ScriptRepositoryImpl::upload(const std::string &file_path, const std::strin
       updateRepositoryJson(file_path, remote_entry);
 
     } else
-      throw ScriptRepoException(info, detail);
+      throw ScriptRepoException(messageInfo, detail);
 
   } catch (Poco::Exception &ex) {
     throw ScriptRepoException(ex.displayText(), ex.className());
@@ -1021,7 +1022,7 @@ void ScriptRepositoryImpl::remove(const std::string &file_path, const std::strin
 
     // analyze the answer from the server, to see if the file was removed or
     // not.
-    std::string info;
+    std::string messageInfo;
     std::string detail;
     Json::Value answer_json;
     auto answerString = answer.str();
@@ -1029,17 +1030,17 @@ void ScriptRepositoryImpl::remove(const std::string &file_path, const std::strin
       throw ScriptRepoException("Bad answer from the Server");
     }
 
-    info = answer_json.get("message", "").asString();
+    messageInfo = answer_json.get("message", "").asString();
     detail = answer_json.get("detail", "").asString();
     std::string cmd = answer_json.get("shell", "").asString();
 
     if (!cmd.empty())
       detail.append("\nFrom Command: ").append(cmd);
 
-    g_log.debug() << "Checking if success info=" << info << '\n';
+    g_log.debug() << "Checking if success info=" << messageInfo << '\n';
     // check if the server removed the file from the central repository
-    if (info != "success")
-      throw ScriptRepoException(info, detail); // no
+    if (messageInfo != "success")
+      throw ScriptRepoException(messageInfo, detail); // no
 
     g_log.notice() << "ScriptRepository " << file_path << " removed from central repository\n";
 
@@ -1154,7 +1155,21 @@ std::string ScriptRepositoryImpl::doDeleteRemoteFile(const std::string &url, con
 
  An invalid repository accepts only the ::install method.
  */
-bool ScriptRepositoryImpl::isValid() { return valid; }
+bool ScriptRepositoryImpl::isValid() {
+  if (!checkLocalInstallIsPresent()) {
+    m_valid = false;
+  };
+  return m_valid;
+}
+
+bool ScriptRepositoryImpl::checkLocalInstallIsPresent() {
+  const auto local_json = std::filesystem::path(local_repository) / ".local.json";
+  const auto repository_json = std::filesystem::path(local_repository) / ".repository.json";
+  if (!std::filesystem::exists(local_json) || !std::filesystem::exists(repository_json)) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Implements ScriptRepository::check4Update. It downloads the file
@@ -1262,7 +1277,7 @@ int ScriptRepositoryImpl::setAutoUpdate(const std::string &input_path, bool opti
   for (auto it = repo.rbegin(); it != repo.rend(); ++it) {
     // for every entry, it takes the path and RepositoryEntry
     std::string entryPath = it->first;
-    RepositoryEntry &entry = it->second;
+    const RepositoryEntry &entry = it->second;
     if (entryPath.compare(0, path.size(), path) == 0 && entry.status != REMOTE_ONLY && entry.status != LOCAL_ONLY)
       filesToUpdate.emplace_back(entryPath);
   }
@@ -1332,16 +1347,16 @@ void ScriptRepositoryImpl::doDownloadFile(const std::string &url_file, const std
   try {
     Kernel::InternetHelper inetHelper;
     auto timeoutConfigVal = ConfigService::Instance().getValue<int>("network.scriptrepo.timeout");
-    int timeout = timeoutConfigVal.get_value_or(DEFAULT_TIMEOUT_SEC);
+    int timeout = timeoutConfigVal.value_or(DEFAULT_TIMEOUT_SEC);
     inetHelper.setTimeout(timeout);
 
     const auto status = inetHelper.downloadFile(url_file, local_file_path);
     g_log.debug() << "Answer from server: " << static_cast<int>(status) << '\n';
   } catch (Kernel::Exception::InternetError &ie) {
-    std::stringstream info;
-    info << "Failed to download " << given_path << " from "
-         << "<a href=\"" << url_file << "\">" << url_file << "</a>.\n";
-    throw ScriptRepoException(info.str(), ie.what());
+    std::stringstream exceptionInfo;
+    exceptionInfo << "Failed to download " << given_path << " from "
+                  << "<a href=\"" << url_file << "\">" << url_file << "</a>.\n";
+    throw ScriptRepoException(exceptionInfo.str(), ie.what());
   }
 }
 
@@ -1593,7 +1608,7 @@ bool ScriptRepositoryImpl::isEntryValid(const std::string &path) {
   if (path == ".local.json")
     return false;
   // hide everything under system folder
-  if (path == "system" || path.find("system/") == 0)
+  if (path == "system" || path.starts_with("system/"))
     return false;
 
   try {

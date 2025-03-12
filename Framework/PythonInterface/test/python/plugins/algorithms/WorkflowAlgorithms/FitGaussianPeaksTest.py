@@ -7,8 +7,8 @@
 import numpy as np
 import unittest
 
+from mantid.api import mtd
 from mantid.simpleapi import CreateEmptyTableWorkspace, CreateWorkspace, DeleteWorkspace, FitGaussianPeaks
-from mantid.api import *
 from unittest import mock
 
 import plugins.algorithms.WorkflowAlgorithms.FitGaussianPeaks as _FitGaussianPeaks
@@ -172,7 +172,7 @@ class FitGaussianPeaksTest(unittest.TestCase):
 
     def test_parse_fit_table_marks_peaks_for_refitting_if_error_larger_than_value(self):
         peaks = [(35.2, 0.4), (25.03, 0.1), (10.03, 0.05)]
-        peaks += [(20.003, 40.22), (75.15, 0.2), (5.2, np.NaN)]
+        peaks += [(20.003, 40.22), (75.15, 0.2), (5.2, np.nan)]
         fit_table = self.simulate_fit_parameter_output(peaks, 100.034)
         data_table = CreateEmptyTableWorkspace()
 
@@ -339,7 +339,7 @@ class FitGaussianPeaksTest(unittest.TestCase):
             self.assertEqual(params, "parameters")
             np.testing.assert_equal(yvals, [7, 8])
             mock_fit.assert_called_with(
-                Function="name=Gaussian,PeakCentre=1,Height=2,Sigma=3;" "name=Gaussian,PeakCentre=1,Height=2,Sigma=3;",
+                Function="name=Gaussian,PeakCentre=1,Height=2,Sigma=3;name=Gaussian,PeakCentre=1,Height=2,Sigma=3;",
                 InputWorkspace=None,
                 Output="fit_result",
                 Minimizer="Levenberg-MarquardtMD",
@@ -513,7 +513,7 @@ class FitGaussianPeaksTest(unittest.TestCase):
         table.addColumn("float", "Centre")
         table.addRow([20])
         with mock.patch(
-            "plugins.algorithms.WorkflowAlgorithms.FitGaussianPeaks.FitGaussianPeaks." "estimate_single_parameters"
+            "plugins.algorithms.WorkflowAlgorithms.FitGaussianPeaks.FitGaussianPeaks.estimate_single_parameters"
         ) as mock_estimate_params:
             mock_estimate_params.return_value = None
             FitGaussianPeaks(InputWorkspace=ws, PeakGuessTable=table, EstimateFitWindow=False, FitWindowSize=11)
@@ -536,7 +536,7 @@ class FitGaussianPeaksTest(unittest.TestCase):
         table.addColumn("float", "Centre")
         table.addRow([20])
         with mock.patch(
-            "plugins.algorithms.WorkflowAlgorithms.FitGaussianPeaks.FitGaussianPeaks." "estimate_single_parameters"
+            "plugins.algorithms.WorkflowAlgorithms.FitGaussianPeaks.FitGaussianPeaks.estimate_single_parameters"
         ) as mock_estimate_params:
             mock_estimate_params.return_value = None
             FitGaussianPeaks(InputWorkspace=ws, PeakGuessTable=table, EstimateFitWindow=True, FitWindowSize=11)

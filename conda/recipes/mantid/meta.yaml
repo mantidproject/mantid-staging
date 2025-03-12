@@ -16,69 +16,83 @@ requirements:
   build:
     - {{ compiler("c") }}
     - {{ compiler("cxx") }}
-    - llvm-openmp                            # [osx]
+    - llvm-openmp {{ llvm_openmp }}          # [osx]
     - libgomp                                # [linux]
-    - ninja                                  # [unix]
-    - cmake
+    - ninja {{ ninja }}                      # [osx or linux]
+    - cmake {{ cmake }}
     - git
     - python {{ python }}                    # [build_platform != target_platform]
     - cross-python_{{ target_platform }}     # [build_platform != target_platform]
-    - setuptools {{ setuptools }}            # [build_platform != target_platform]
+    - setuptools                             # [build_platform != target_platform]
     - numpy {{ numpy }}                      # [build_platform != target_platform]
     - {{ cdt('mesa-libgl-devel') }}          # [linux]
     - {{ cdt('mesa-dri-drivers') }}          # [linux]
     - {{ cdt('libxxf86vm') }}                # [linux]
     - {{ cdt('libx11-devel') }}              # [linux]
     - {{ cdt('xorg-x11-proto-devel') }}      # [linux]
-    - libcxx                                 # [osx]
 
   host:
-    - boost {{ boost }}
-    - eigen
+    - eigen {{ eigen }}
     - gsl {{ gsl }}
+    - hdf4 {{ hdf4 }}
     - h5py
     - hdf5 {{ hdf5 }}
-    - jemalloc  # [unix]
-    - jsoncpp
+    - jemalloc  {{ jemalloc }} # [osx or linux]
+    - jsoncpp {{ jsoncpp }}
+    - libboost-devel {{ libboost_devel }}
+    - libboost-python-devel {{ libboost_python_devel }}
+    - libopenblas {{ libopenblas }}  # [osx or linux]
     - librdkafka {{ librdkafka }}
     - lib3mf  # [win]
-    - muparser
-    - nexus
+    - mkl {{ mkl }} # [win]
+    - muparser {{ muparser }}
     - numpy {{ numpy }}
-    - occt
+    - occt {{ occt }}
     - python {{ python }}
     - poco {{ poco }}
-    - setuptools {{ setuptools }}
+    - setuptools
     - tbb-devel {{ tbb }}
-    - pip
-    - openssl
-    - versioningit
-    - libglu  # [linux]
+    - pip {{ pip }}
+    - versioningit {{ versioningit }}
+    - zlib
+    - libglu {{ libglu }}  # [linux]
   run:
-    - {{ pin_compatible("boost", max_pin="x.x") }}
     - {{ pin_compatible("gsl", max_pin="x.x") }}
+    - {{ pin_compatible("hdf4", max_pin="x.x") }}
     - h5py
     - {{ pin_compatible("hdf5", max_pin="x.x") }}
+    - jemalloc {{ jemalloc }}  # [osx or linux]
     - lib3mf  # [win]
-    - nexus
-    - {{ pin_compatible("numpy", upper_bound="1.25") }}
-    - {{ pin_compatible("occt", max_pin="x.x.x") }}
-    - pycifrw {{ pycifrw }}
+    - mkl {{ mkl }} # [win]
+    - {{ pin_compatible("numpy", upper_bound="2.2") }}
+    - occt {{ occt }}
+    - pycifrw
     - python
-    - python-dateutil
-    - pyyaml
+    - python-dateutil {{ python_dateutil }}
+    - pyyaml {{ pyyaml }}
     - scipy {{ scipy }}
-    - openssl
     - euphonic {{ euphonic }}
-    - toml
-    - libglu  # [linux]
-    - libopenblas {{ libopenblas }}  # [osx]
+    - toml {{ toml }}
+    - libglu {{ libglu }}  # [linux]
+    - joblib
+    - orsopy {{ orsopy }}
+    - quasielasticbayes
+    - zlib
+    - pydantic
+
+  run_constrained:
+    - matplotlib {{ matplotlib }}
+
+test:
+  imports:
+    - mantid
+    - mantid.kernel
 
 about:
   home: https://github.com/mantidproject/mantid
   license: GPL-3.0-or-later
   summary: Mantid provides a framework that supports high-performance computing and visualisation of materials science data.
-  description: Mantid provides a framework that supports high-performance computing and visualisation of materials science data. To use the optional plotting sub package you must conda install matplotlib 3.5.2 to ensure correct compatibility.
+  description: Mantid provides a framework that supports high-performance computing and visualisation of materials science data. To use the optional plotting sub package you must conda install matplotlib.
 
 extra:
   recipe-maintainers:

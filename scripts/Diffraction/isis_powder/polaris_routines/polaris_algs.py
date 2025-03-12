@@ -85,6 +85,7 @@ def generate_ts_pdf(
     freq_params=None,
     per_detector=False,
     debug=False,
+    pdf_output_name=None,
 ):
     if sample_details is None:
         raise RuntimeError(
@@ -103,7 +104,8 @@ def generate_ts_pdf(
 
     # convert diff cross section to S(Q) - 1
     material_builder = MaterialBuilder()
-    sample = material_builder.setFormula(sample_details.material_object.chemical_formula).build()
+    material_builder.setFormula(sample_details.material_object.chemical_formula)
+    sample = material_builder.setNumberDensity(1.0).build()  # number density not used in calculating xs (barns/atom)
     sample_total_scatter_cross_section = sample.totalScatterXSection()
     sample_coh_scatter_cross_section = sample.cohScatterXSection()
     focused_ws = focused_ws - sample_total_scatter_cross_section / (4 * math.pi)
@@ -142,18 +144,20 @@ def generate_ts_pdf(
     # Rename output ws
     if "merged_ws" in locals():
         mantid.RenameWorkspace(InputWorkspace="merged_ws", OutputWorkspace=run_number + "_merged_Q")
+
     mantid.RenameWorkspace(InputWorkspace="focused_ws", OutputWorkspace=run_number + "_focused_Q")
-    target_focus_ws_name = run_number + "_focused_Q_"
-    target_pdf_ws_name = run_number + "_pdf_R_"
     if isinstance(focused_ws, WorkspaceGroup):
+        target_focus_ws_name = run_number + "_focused_Q_"
         for i in range(len(focused_ws)):
             if str(focused_ws[i]) != (target_focus_ws_name + str(i + 1)):
                 mantid.RenameWorkspace(InputWorkspace=focused_ws[i], OutputWorkspace=target_focus_ws_name + str(i + 1))
-    mantid.RenameWorkspace(InputWorkspace="pdf_output", OutputWorkspace=run_number + "_pdf_R")
+
+    target_pdf_ws_name = f"{run_number}_pdf_{pdf_type}" if not pdf_output_name else pdf_output_name
+    mantid.RenameWorkspace(InputWorkspace="pdf_output", OutputWorkspace=target_pdf_ws_name)
     if isinstance(pdf_output, WorkspaceGroup):
         for i in range(len(pdf_output)):
             if str(pdf_output[i]) != (target_pdf_ws_name + str(i + 1)):
-                mantid.RenameWorkspace(InputWorkspace=pdf_output[i], OutputWorkspace=target_pdf_ws_name + str(i + 1))
+                mantid.RenameWorkspace(InputWorkspace=pdf_output[i], OutputWorkspace=f"{target_pdf_ws_name}_{str(i + 1)}")
     return pdf_output
 
 
@@ -215,7 +219,7 @@ def apply_placzek_correction_per_bank(
     self_scattering_correction = mantid.GroupWorkspaces(InputWorkspaces=ws_group_list)
     self_scattering_correction = mantid.RebinToWorkspace(WorkspaceToRebin=self_scattering_correction, WorkspaceToMatch=focused_ws)
     if not compare_ws_compatibility(focused_ws, self_scattering_correction):
-        raise RuntimeError("To use create_total_scattering_pdf you need to run focus with " "do_van_normalisation=true first.")
+        raise RuntimeError("To use create_total_scattering_pdf you need to run focus with do_van_normalisation=true first.")
     focused_ws = mantid.Subtract(LHSWorkspace=focused_ws, RHSWorkspace=self_scattering_correction)
     return focused_ws
 

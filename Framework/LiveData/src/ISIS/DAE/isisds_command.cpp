@@ -31,7 +31,7 @@
 
 #include "isisds_command.h"
 #include "MantidKernel/ConfigService.h"
-#include "MantidKernel/System.h"
+
 #include <cstdio>
 
 /*
@@ -156,7 +156,7 @@ SOCKET isisds_send_open(const char *host, ISISDSAccessMode access_type, uint16_t
   }
 
   auto timeoutInSecConfigVal = Mantid::Kernel::ConfigService::Instance().getValue<int>("ISISDAE.Timeout");
-  int timeoutinSec = timeoutInSecConfigVal.get_value_or(120); // Default to  120 seconds if not specified
+  int timeoutinSec = timeoutInSecConfigVal.value_or(120); // Default to  120 seconds if not specified
 
 #ifdef WIN32
   // WINDOWS
@@ -313,7 +313,6 @@ static int isisds_recv_command_helper(SOCKET s, char **command, void **data, ISI
       free(*data);
       *data = nullptr;
     }
-    len_data = 0;
     return -1;
   }
   /* only update values if changed ... allows Read only parameters to be passed

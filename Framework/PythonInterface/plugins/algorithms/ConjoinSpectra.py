@@ -5,9 +5,9 @@
 #   Institut Laue - Langevin & CSNS, Institute of High Energy Physics, CAS
 # SPDX - License - Identifier: GPL - 3.0 +
 # pylint: disable=no-init,invalid-name
-from mantid.api import *
-from mantid.kernel import *
-from mantid.simpleapi import *
+from mantid.api import mtd, AlgorithmFactory, PythonAlgorithm, TextAxis, WorkspaceGroup, WorkspaceProperty
+from mantid.kernel import logger, Direction, StringListValidator, StringMandatoryValidator
+from mantid.simpleapi import ConjoinWorkspaces, DeleteWorkspace, ExtractSingleSpectrum, RenameWorkspace
 
 
 class ConjoinSpectra(PythonAlgorithm):
@@ -92,7 +92,7 @@ class ConjoinSpectra(PythonAlgorithm):
             ta.setLabel(loopIndex, labelString)
             loopIndex += 1
             if mtd.doesExist(wsOutput):
-                ConjoinWorkspaces(InputWorkspace1=wsOutput, InputWorkspace2=wsTemp, CheckOverlapping=False)
+                ConjoinWorkspaces(InputWorkspace1=wsOutput, InputWorkspace2=wsTemp, CheckOverlapping=False, CheckMatchingBins=False)
                 if mtd.doesExist(wsTemp):
                     DeleteWorkspace(Workspace=wsTemp)
             else:

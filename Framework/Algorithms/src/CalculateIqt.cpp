@@ -124,6 +124,10 @@ void CalculateIqt::init() {
                   "The name to use for the output workspace.");
 
   declareProperty("CalculateErrors", true, "Calculate monte-carlo errors.");
+
+  // option for enforcing the "Divide" operation for SampleWorkspace and ResolutionWorkspace at the last step
+  // default is True
+  declareProperty("EnforceNormalization", true, "Normalization to enforce I(t=0)");
 }
 
 void CalculateIqt::exec() {
@@ -131,12 +135,20 @@ void CalculateIqt::exec() {
   const MatrixWorkspace_sptr sampleWorkspace = getProperty("InputWorkspace");
   MatrixWorkspace_sptr resolution = getProperty("ResolutionWorkspace");
   bool calculateErrors = getProperty("CalculateErrors");
+  bool enforceNormalization = getProperty("EnforceNormalization");
   const int nIterations = getProperty("NumberOfIterations");
   const int seed = getProperty("SeedValue");
-  resolution = normalizedFourierTransform(resolution, rebinParams);
 
-  auto outputWorkspace =
-      monteCarloErrorCalculation(sampleWorkspace, resolution, rebinParams, seed, calculateErrors, nIterations);
+  m_sampleIntegral = integration(rebin(sampleWorkspace, rebinParams));
+  m_resolutionIntegral = integration(rebin(resolution, rebinParams));
+
+  resolution = fourierTransform(resolution, rebinParams);
+  if (enforceNormalization) {
+    resolution = divide(resolution, m_resolutionIntegral);
+  }
+
+  auto outputWorkspace = monteCarloErrorCalculation(sampleWorkspace, resolution, rebinParams, seed, calculateErrors,
+                                                    nIterations, enforceNormalization);
 
   outputWorkspace = replaceSpecialValues(outputWorkspace);
   setProperty("OutputWorkspace", outputWorkspace);
@@ -152,8 +164,9 @@ std::string CalculateIqt::rebinParamsAsString() {
 MatrixWorkspace_sptr CalculateIqt::monteCarloErrorCalculation(const MatrixWorkspace_sptr &sample,
                                                               const MatrixWorkspace_sptr &resolution,
                                                               const std::string &rebinParams, const int seed,
-                                                              const bool calculateErrors, const int nIterations) {
-  auto outputWorkspace = calculateIqt(sample, resolution, rebinParams);
+                                                              const bool calculateErrors, const int nIterations,
+                                                              const bool enforceNormalization) {
+  auto outputWorkspace = calculateIqt(sample, resolution, rebinParams, enforceNormalization);
   std::vector<MatrixWorkspace_sptr> simulatedWorkspaces;
   simulatedWorkspaces.reserve(nIterations);
   simulatedWorkspaces.emplace_back(outputWorkspace);
@@ -165,7 +178,7 @@ MatrixWorkspace_sptr CalculateIqt::monteCarloErrorCalculation(const MatrixWorksp
     for (auto i = 0; i < nIterations - 1; ++i) {
       errorCalculationProg.report("Calculating Monte Carlo errors...");
       PARALLEL_START_INTERRUPT_REGION
-      auto simulated = doSimulation(sample->clone(), resolution, rebinParams, mTwister);
+      auto simulated = doSimulation(sample->clone(), resolution, rebinParams, mTwister, enforceNormalization);
       PARALLEL_CRITICAL(emplace_back)
       simulatedWorkspaces.emplace_back(simulated);
       PARALLEL_END_INTERRUPT_REGION
@@ -192,7 +205,6 @@ MatrixWorkspace_sptr CalculateIqt::rebin(const MatrixWorkspace_sptr &workspace, 
   auto rebinAlgorithm = createChildAlgorithm("Rebin");
   rebinAlgorithm->initialize();
   rebinAlgorithm->setProperty("InputWorkspace", workspace);
-  rebinAlgorithm->setProperty("OutputWorkspace", "_");
   rebinAlgorithm->setProperty("Params", params);
   rebinAlgorithm->execute();
   return rebinAlgorithm->getProperty("OutputWorkspace");
@@ -202,7 +214,6 @@ MatrixWorkspace_sptr CalculateIqt::integration(const MatrixWorkspace_sptr &works
   auto integrationAlgorithm = createChildAlgorithm("Integration");
   integrationAlgorithm->initialize();
   integrationAlgorithm->setProperty("InputWorkspace", workspace);
-  integrationAlgorithm->setProperty("OutputWorkspace", "_");
   integrationAlgorithm->execute();
   return integrationAlgorithm->getProperty("OutputWorkspace");
 }
@@ -211,7 +222,6 @@ MatrixWorkspace_sptr CalculateIqt::convertToPointData(const MatrixWorkspace_sptr
   auto pointDataAlgorithm = createChildAlgorithm("ConvertToPointData");
   pointDataAlgorithm->initialize();
   pointDataAlgorithm->setProperty("InputWorkspace", workspace);
-  pointDataAlgorithm->setProperty("OutputWorkspace", "_");
   pointDataAlgorithm->execute();
   return pointDataAlgorithm->getProperty("OutputWorkspace");
 }
@@ -220,7 +230,6 @@ MatrixWorkspace_sptr CalculateIqt::extractFFTSpectrum(const MatrixWorkspace_sptr
   auto FFTAlgorithm = createChildAlgorithm("ExtractFFTSpectrum");
   FFTAlgorithm->initialize();
   FFTAlgorithm->setProperty("InputWorkspace", workspace);
-  FFTAlgorithm->setProperty("OutputWorkspace", "_");
   FFTAlgorithm->setProperty("FFTPart", 2);
   FFTAlgorithm->execute();
   return FFTAlgorithm->getProperty("OutputWorkspace");
@@ -232,7 +241,6 @@ MatrixWorkspace_sptr CalculateIqt::divide(const MatrixWorkspace_sptr &lhsWorkspa
   divideAlgorithm->initialize();
   divideAlgorithm->setProperty("LHSWorkspace", lhsWorkspace);
   divideAlgorithm->setProperty("RHSWorkspace", rhsWorkspace);
-  divideAlgorithm->setProperty("OutputWorkspace", "_");
   divideAlgorithm->execute();
   return divideAlgorithm->getProperty("OutputWorkspace");
 }
@@ -241,7 +249,6 @@ MatrixWorkspace_sptr CalculateIqt::cropWorkspace(const MatrixWorkspace_sptr &wor
   auto cropAlgorithm = createChildAlgorithm("CropWorkspace");
   cropAlgorithm->initialize();
   cropAlgorithm->setProperty("InputWorkspace", workspace);
-  cropAlgorithm->setProperty("OutputWorkspace", "_");
   cropAlgorithm->setProperty("XMax", xMax);
   cropAlgorithm->execute();
   return cropAlgorithm->getProperty("OutputWorkspace");
@@ -251,7 +258,6 @@ MatrixWorkspace_sptr CalculateIqt::replaceSpecialValues(const MatrixWorkspace_sp
   auto specialValuesAlgorithm = createChildAlgorithm("ReplaceSpecialValues");
   specialValuesAlgorithm->initialize();
   specialValuesAlgorithm->setProperty("InputWorkspace", workspace);
-  specialValuesAlgorithm->setProperty("OutputWorkspace", "_");
   specialValuesAlgorithm->setProperty("InfinityValue", 0.0);
   specialValuesAlgorithm->setProperty("BigNumberThreshold", 1.0001);
   specialValuesAlgorithm->setProperty("NaNValue", 0.0);
@@ -259,26 +265,28 @@ MatrixWorkspace_sptr CalculateIqt::replaceSpecialValues(const MatrixWorkspace_sp
   return specialValuesAlgorithm->getProperty("OutputWorkspace");
 }
 
-MatrixWorkspace_sptr CalculateIqt::normalizedFourierTransform(MatrixWorkspace_sptr workspace,
-                                                              const std::string &rebinParams) {
+MatrixWorkspace_sptr CalculateIqt::fourierTransform(MatrixWorkspace_sptr workspace, const std::string &rebinParams) {
   workspace = rebin(workspace, rebinParams);
-  auto workspace_int = integration(workspace);
   workspace = convertToPointData(workspace);
   workspace = extractFFTSpectrum(workspace);
-  return divide(workspace, workspace_int);
+  return workspace;
 }
 
 MatrixWorkspace_sptr CalculateIqt::calculateIqt(MatrixWorkspace_sptr workspace,
                                                 const MatrixWorkspace_sptr &resolutionWorkspace,
-                                                const std::string &rebinParams) {
-  workspace = normalizedFourierTransform(workspace, rebinParams);
+                                                const std::string &rebinParams, const bool enforceNormalization) {
+  workspace = fourierTransform(workspace, rebinParams);
+  if (enforceNormalization) {
+    workspace = divide(workspace, m_sampleIntegral);
+  }
   return divide(workspace, resolutionWorkspace);
 }
 
 MatrixWorkspace_sptr CalculateIqt::doSimulation(MatrixWorkspace_sptr sample, const MatrixWorkspace_sptr &resolution,
-                                                const std::string &rebinParams, MersenneTwister &mTwister) {
+                                                const std::string &rebinParams, MersenneTwister &mTwister,
+                                                const bool enforceNormalization) {
   auto simulatedWorkspace = randomizeWorkspaceWithinError(std::move(sample), mTwister);
-  return calculateIqt(simulatedWorkspace, resolution, rebinParams);
+  return calculateIqt(simulatedWorkspace, resolution, rebinParams, enforceNormalization);
 }
 
 MatrixWorkspace_sptr

@@ -9,7 +9,6 @@
 from mantid.utils.nomad.diagnostics import CollimationLevel, InstrumentComponentLevel, _NOMADMedianDetectorTest
 
 # third-party imports
-import numpy
 import numpy as np
 from numpy.testing import assert_allclose
 
@@ -287,8 +286,9 @@ class NOMADMedianDetectorTestTest(unittest.TestCase):
           full_col: [1, 8, 16, 25, 27, 28, 29]
           half_col: [30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46]
 
-        # Indeces of eight-packs in use.
-        eight_packs: [3,7,8,9,10,11,19,20,26,28,30,34,38,39,40,41,44,45,46,47,48,49,50,54,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,89,90,93,94,95]
+        # Indices of eight-packs in use.
+        eight_packs: [3,7,8,9,10,11,19,20,26,28,30,34,38,39,40,41,44,45,46,47,48,49,50,54,57,58,59,60,
+                      61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,89,90,93,94,95]
 
         bank:
           #
@@ -337,7 +337,7 @@ class NOMADMedianDetectorTestTest(unittest.TestCase):
         # check full collimated
         for pack_index in [7, 26]:
             assert eight_pack_collimation_states[pack_index] == 2, (
-                f"Pack index {pack_index}: {eight_pack_collimation_states[pack_index]} in " f"{eight_pack_collimation_states}"
+                f"Pack index {pack_index}: {eight_pack_collimation_states[pack_index]} in {eight_pack_collimation_states}"
             )
         # check half collimated
         for pack_index in [63, 90]:
@@ -356,21 +356,21 @@ class NOMADMedianDetectorTestTest(unittest.TestCase):
             np.testing.assert_allclose(
                 pixel_collimation_states[pack_index * 8 * 128 : (pack_index + 1) * 8 * 128],
                 np.zeros(8 * 128) + 2,
-                err_msg=f"Pack index {pack_index * 8 * 128}:... : " f"{pixel_collimation_states[pack_index]}",
+                err_msg=f"Pack index {pack_index * 8 * 128}:... : {pixel_collimation_states[pack_index]}",
             )
         # check half collimated
         for pack_index in [63, 90]:
             np.testing.assert_allclose(
                 pixel_collimation_states[pack_index * 8 * 128 : (pack_index + 1) * 8 * 128],
                 np.zeros(8 * 128) + 1,
-                err_msg=f"Pack index {pack_index * 8 * 128}:... : " f"{pixel_collimation_states[pack_index]}",
+                err_msg=f"Pack index {pack_index * 8 * 128}:... : {pixel_collimation_states[pack_index]}",
             )
         # not collimated
         for pack_index in [2, 3, 4, 5, 6, 91, 92]:
             np.testing.assert_allclose(
                 pixel_collimation_states[pack_index * 8 * 128 : (pack_index + 1) * 8 * 128],
                 np.zeros(8 * 128),
-                err_msg=f"Pack index {pack_index * 8 * 128}:... : " f"{pixel_collimation_states[pack_index]}",
+                err_msg=f"Pack index {pack_index * 8 * 128}:... : {pixel_collimation_states[pack_index]}",
             )
 
     def test_determine_tubes_thresholds(self):
@@ -434,12 +434,12 @@ class NOMADMedianDetectorTestTest(unittest.TestCase):
         levels = tester.tube_collevel  # shape = (TUBE_COUNT,)
         assert len(levels) == tester.TUBE_COUNT
         first1, last1 = tester.TUBES_IN_EIGHTPACK * 77, tester.TUBES_IN_EIGHTPACK * 78
-        assert np.all(levels[:first1]) == CollimationLevel.Empty
-        assert np.all(levels[first1:last1]) == CollimationLevel.Half
+        assert np.all(levels[:first1] == CollimationLevel.Empty)
+        assert np.all(levels[first1:last1] == CollimationLevel.Half)
         first2, last2 = tester.TUBES_IN_EIGHTPACK * 95, tester.TUBES_IN_EIGHTPACK * 96
-        assert np.all(levels[last1:first2]) == CollimationLevel.Empty
-        assert np.all(levels[first2:last2]) == CollimationLevel.Full
-        assert np.all(levels[last2:]) == CollimationLevel.Empty
+        assert np.all(levels[last1:first2] == CollimationLevel.Empty)
+        assert np.all(levels[first2:last2] == CollimationLevel.Full)
+        assert np.all(levels[last2:] == CollimationLevel.Empty)
 
     def test_panel_median(self):
         tester = self.tester1

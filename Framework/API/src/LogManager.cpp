@@ -10,9 +10,7 @@
 #include "MantidKernel/PropertyNexus.h"
 #include "MantidKernel/TimeROI.h"
 #include "MantidKernel/TimeSeriesProperty.h"
-
-#include <nexus/NeXusFile.hpp>
-#include <numeric>
+#include "MantidNexusCpp/NeXusFile.hpp"
 
 namespace Mantid::API {
 
@@ -202,7 +200,7 @@ bool LogManager::hasEndTime() const {
  * @throw runtime_error if the time of the first pulse is not available.
  */
 const DateAndTime LogManager::getFirstPulseTime() const {
-  TimeSeriesProperty<double> *log =
+  const TimeSeriesProperty<double> *log =
       getTimeSeriesProperty<double>("proton_charge"); // guaranteed to be a valid pointer, if the call succeeds
   if (log->realSize() == 0)
     throw std::runtime_error("First pulse time is not available. Log \"proton_charge\" is empty.");
@@ -212,17 +210,17 @@ const DateAndTime LogManager::getFirstPulseTime() const {
   // a DAS bug at SNS around Mar 2011 where the first pulse time is Jan 1, 1990."
   // There was no explanation why 100 was picked as the maximum number of times to skip.
   // In the refactored algorithm below we keep 100 as is.
-  const size_t maxSkip{100};
   const DateAndTime reference("1991-01-01T00:00:00");
   const std::vector<DateAndTime> &times = log->timesAsVector();
+  const size_t maxSkip{100};
   size_t index;
   const size_t maxIndex = std::min(static_cast<size_t>(log->realSize()), maxSkip);
   for (index = 0; index < maxIndex; index++) {
     if (times[index] >= reference)
-      break;
+      return times[index];
   }
 
-  return times[index];
+  return times[maxIndex - 1];
 }
 
 /** Return the time of the last pulse received, by accessing the run's
@@ -232,7 +230,7 @@ const DateAndTime LogManager::getFirstPulseTime() const {
  * @throw runtime_error if the time of the last pulse is not available.
  */
 const DateAndTime LogManager::getLastPulseTime() const {
-  TimeSeriesProperty<double> *log =
+  const TimeSeriesProperty<double> *log =
       getTimeSeriesProperty<double>("proton_charge"); // guaranteed to be a valid pointer, if the call succeeds
   if (log->realSize() == 0)
     throw std::runtime_error("Last pulse time is not available. Log \"proton_charge\" is empty.");
@@ -252,7 +250,7 @@ bool LogManager::hasValidProtonChargeLog(std::string &error) const {
   }
 
   Kernel::Property *prop = getProperty(log_name);
-  TimeSeriesProperty<double> *log;
+  const TimeSeriesProperty<double> *log;
   if (!(log = dynamic_cast<Kernel::TimeSeriesProperty<double> *>(prop))) {
     error += " Log " + log_name + " is not a time series of floating-point values.";
     return false;
@@ -282,7 +280,7 @@ void LogManager::filterByTime(const Types::Core::DateAndTime start, const Types:
 /**
  * Create a partial copy of this object such that every time series property is cloned according to the input TimeROI.
  * A partially cloned time series property should include all time values enclosed by the ROI regions,
- * each defined as [roi_start,roi_end), plus the values immediately before and after an ROI region, if available.
+ * each defined as [roi_begin,roi_end], plus the values immediately before and after an ROI region, if available.
  * Properties that are not time series will be cloned with no changes.
  * @param timeROI :: a series of time regions used to determine which time series values should be included in the copy.
  */
@@ -313,7 +311,7 @@ void LogManager::copyAndFilterProperties(const LogManager &other, const Kernel::
 
 /**
  * For time series properties, remove time values outside of this object's TimeROI.
- * Each TimeROI region is defined as [roi_start,roi_stop). However, keep the values
+ * Each TimeROI region is defined as [roi_begin,roi_end]. However, keep the values
  * immediately before and after each timeROI region, if available.
  */
 void LogManager::removeDataOutsideTimeROI() {
@@ -325,12 +323,11 @@ void LogManager::removeDataOutsideTimeROI() {
 /**
  * Filter the run by the given boolean log. It replaces all time
  * series properties with filtered time series properties
- * @param filter :: A boolean time series to filter each log on
+ * @param filter :: A LogFilter instance to filter each log on
  * @param excludedFromFiltering :: A string list of logs that
  * will be excluded from filtering
  */
-void LogManager::filterByLog(const Kernel::TimeSeriesProperty<bool> &filter,
-                             const std::vector<std::string> &excludedFromFiltering) {
+void LogManager::filterByLog(Mantid::Kernel::LogFilter *filter, const std::vector<std::string> &excludedFromFiltering) {
   // This will invalidate the cache
   this->clearSingleValueCache();
   m_manager->filterByProperty(filter, excludedFromFiltering);
@@ -653,8 +650,7 @@ void LogManager::loadNexus(::NeXus::File *file, const Mantid::Kernel::NexusHDF5D
   // Only load from NXlog entries
   const auto &allEntries = fileInfo.getAllEntries();
   auto itNxLogEntries = allEntries.find("NXlog");
-  const std::set<std::string> &nxLogEntries =
-      (itNxLogEntries != allEntries.end()) ? itNxLogEntries->second : std::set<std::string>{};
+  const auto nxLogEntries = (itNxLogEntries != allEntries.end()) ? itNxLogEntries->second : std::set<std::string>{};
 
   const auto levels = std::count(prefix.begin(), prefix.end(), '/');
 

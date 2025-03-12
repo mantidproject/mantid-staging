@@ -20,6 +20,10 @@ Currently, the four direct geometry spectrometers at ISIS (LET, MAPS, MARI, and
 MERLIN) and the four direct geometry spectrometers at SNS (ARCS, CNCS, HYSPEC,
 SEQUOIA) are supported.
 
+.. note::
+  For SNS instruments the flux is given in n/cm\ :sup:`2`/s/MW whereas for
+  ISIS instruments it is n/cm\ :sup:`2`/s at a nominal proton current of 160uA.
+
 For MERLIN and LET, in addition, PyChop will also calculate the allowed Ei's in
 multi-rep mode, and plot the time-distance diagrams for the desired setting.
 
@@ -66,6 +70,8 @@ If the *Instrument scientist mode* option is selected, a similar option is
 enabled for MERLIN if the G chopper is used. In this case, the phase (time
 delay) of the thick disk chopper can be adjusted. The time delay is the time-of-
 flight at which the chopper slit first opens (sweeps across the beam profile).
+In the event that this mode is then deselected, the time delay entered previously
+will be utilised for subsequent calculations instead of the default value.
 
 The Matplotlib axes showing the calculated data have the standard toolbars.
 

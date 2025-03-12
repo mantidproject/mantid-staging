@@ -8,9 +8,10 @@
 
 #include "MantidAPI/ADSValidator.h"
 #include "MantidAPI/Axis.h"
-#include "MantidAPI/MatrixWorkspace.h"
 #include "MantidAPI/WorkspaceGroup.h"
 #include "MantidAPI/WorkspaceHistory.h"
+#include "MantidAlgorithms/PolarizationCorrections/PolarizationCorrectionsHelpers.h"
+#include "MantidAlgorithms/PolarizationCorrections/SpinStateValidator.h"
 #include "MantidDataObjects/Workspace2D.h"
 #include "MantidDataObjects/WorkspaceCreation.h"
 #include "MantidKernel/ArrayProperty.h"
@@ -24,31 +25,12 @@ namespace {
 /// Property names.
 namespace Prop {
 static const std::string FLIPPERS{"Flippers"};
+static const std::string SPIN_STATES{"SpinStates"};
 static const std::string EFFICIENCIES{"Efficiencies"};
 static const std::string INPUT_WS{"InputWorkspaces"};
 static const std::string OUTPUT_WS{"OutputWorkspace"};
+static const std::string ADD_SPIN_STATE_LOG{"AddSpinStateToLog"};
 } // namespace Prop
-
-/// Flipper configurations.
-namespace Flippers {
-static const std::string Off{"0"};
-static const std::string OffOff{"00"};
-static const std::string OffOn{"01"};
-static const std::string On{"1"};
-static const std::string OnOff{"10"};
-static const std::string OnOn{"11"};
-} // namespace Flippers
-
-/**
- * Parse a flipper configuration string.
- * @param setupString a configuration string
- * @return a vector of individual configurations
- */
-std::vector<std::string> parseFlipperSetup(const std::string &setupString) {
-  using Mantid::Kernel::StringTokenizer;
-  StringTokenizer tokens{setupString, ",", StringTokenizer::TOK_TRIM};
-  return std::vector<std::string>{tokens.begin(), tokens.end()};
-}
 
 /**
  * Throw if given ws is nullptr.
@@ -322,6 +304,11 @@ const std::string PolarizationCorrectionWildes::summary() const {
          "and analyzer efficiencies.";
 }
 
+/// Algorithm's related algorithms. @see Algorithm::seeAlso
+const std::vector<std::string> PolarizationCorrectionWildes::seeAlso() const {
+  return {"PolarizationEfficiencyCor", "PolarizationEfficienciesWildes"};
+}
+
 /**
  * Count the non-nullptr workspaces
  * @return the count on non-nullptr workspaces.
@@ -341,19 +328,22 @@ void PolarizationCorrectionWildes::init() {
   declareProperty(
       std::make_unique<API::WorkspaceProperty<API::WorkspaceGroup>>(Prop::OUTPUT_WS, "", Kernel::Direction::Output),
       "A group of polarization efficiency corrected workspaces.");
-  const std::string full = Flippers::OffOff + ", " + Flippers::OffOn + ", " + Flippers::OnOff + ", " + Flippers::OnOn;
-  const std::string missing01 = Flippers::OffOff + ", " + Flippers::OnOff + ", " + Flippers::OnOn;
-  const std::string missing10 = Flippers::OffOff + ", " + Flippers::OffOn + ", " + Flippers::OnOn;
-  const std::string missing0110 = Flippers::OffOff + ", " + Flippers::OnOn;
-  const std::string noAnalyzer = Flippers::Off + ", " + Flippers::On;
-  const std::string directBeam = Flippers::Off;
-  const std::vector<std::string> setups{{full, missing01, missing10, missing0110, noAnalyzer, directBeam}};
-  declareProperty(Prop::FLIPPERS, full, std::make_shared<Kernel::ListValidator<std::string>>(setups),
-                  "Flipper configurations of the input workspaces.");
+
+  const auto flipperConfigValidator = std::make_shared<SpinStateValidator>(std::unordered_set<int>{1, 2, 3, 4}, true);
+  declareProperty(Prop::FLIPPERS,
+                  std::string(FlipperConfigurations::OFF_OFF) + ", " + FlipperConfigurations::OFF_ON + ", " +
+                      FlipperConfigurations::ON_OFF + ", " + FlipperConfigurations::ON_ON,
+                  flipperConfigValidator, "Flipper configurations of the input workspaces.");
+  const auto spinStateValidator =
+      std::make_shared<SpinStateValidator>(std::unordered_set<int>{0, 2, 4}, false, '+', '-', true);
+  declareProperty(Prop::SPIN_STATES, "", spinStateValidator, "The order of the spin states in the output workspace.");
   declareProperty(
       std::make_unique<API::WorkspaceProperty<API::MatrixWorkspace>>(Prop::EFFICIENCIES, "", Kernel::Direction::Input),
       "A workspace containing the efficiency factors P1, P2, F1 and F2 as "
       "histograms");
+  declareProperty(
+      Prop::ADD_SPIN_STATE_LOG, false,
+      "Whether to add the final spin state into the sample log of each child workspace in the output group.");
 }
 
 //----------------------------------------------------------------------------------------------
@@ -361,8 +351,9 @@ void PolarizationCorrectionWildes::init() {
  */
 void PolarizationCorrectionWildes::exec() {
   const std::string flipperProperty = getProperty(Prop::FLIPPERS);
-  const auto flippers = parseFlipperSetup(flipperProperty);
-  const bool analyzer = flippers.front() != "0" && flippers.back() != "1";
+  const auto flippers = PolarizationCorrectionsHelpers::splitSpinStateString(flipperProperty);
+  // Check if the input flipper configuration includes an analyser
+  const bool hasAnalyser = flippers.front().size() > 1;
   const auto inputs = mapInputsToDirections(flippers);
   checkConsistentNumberHistograms(inputs);
   const EfficiencyMap efficiencies = efficiencyFactors();
@@ -373,7 +364,7 @@ void PolarizationCorrectionWildes::exec() {
     outputs = directBeamCorrections(inputs, efficiencies);
     break;
   case 2:
-    if (analyzer) {
+    if (hasAnalyser) {
       outputs = twoInputCorrections(inputs, efficiencies);
     } else {
       outputs = analyzerlessCorrections(inputs, efficiencies);
@@ -385,7 +376,7 @@ void PolarizationCorrectionWildes::exec() {
   case 4:
     outputs = fullCorrections(inputs, efficiencies);
   }
-  setProperty(Prop::OUTPUT_WS, groupOutput(outputs));
+  setProperty(Prop::OUTPUT_WS, groupOutput(outputs, hasAnalyser));
 }
 
 /**
@@ -419,11 +410,27 @@ std::map<std::string, std::string> PolarizationCorrectionWildes::validateInputs(
     }
   }
   const std::vector<std::string> inputs = getProperty(Prop::INPUT_WS);
-  const std::string flipperProperty = getProperty(Prop::FLIPPERS);
-  const auto flippers = parseFlipperSetup(flipperProperty);
-  if (inputs.size() != flippers.size()) {
-    issues[Prop::FLIPPERS] = "The number of flipper configurations (" + std::to_string(flippers.size()) +
+  const auto flipperConfig = PolarizationCorrectionsHelpers::splitSpinStateString(getPropertyValue(Prop::FLIPPERS));
+  const auto flipperCount = flipperConfig.size();
+  if (inputs.size() != flipperCount) {
+    issues[Prop::FLIPPERS] = "The number of flipper configurations (" + std::to_string(flipperCount) +
                              ") does not match the number of input workspaces (" + std::to_string(inputs.size()) + ")";
+  }
+  // SpinStates checks.
+  const auto spinStates = PolarizationCorrectionsHelpers::splitSpinStateString(getPropertyValue(Prop::SPIN_STATES));
+  if (inputs.size() == 1 && !spinStates.empty()) {
+    issues[Prop::SPIN_STATES] = "Output workspace order cannot be set for direct beam calculations.";
+  } else if (!spinStates.empty()) {
+    if (flipperConfig.front().size() == 1 && spinStates.size() != 2) {
+      issues[Prop::SPIN_STATES] =
+          "Incorrect number of workspaces in output configuration: " + std::to_string(spinStates.size()) +
+          ". Only two output workspaces are produced when an analyzer is not used.";
+    }
+    if (flipperConfig.front().size() == 2 && spinStates.size() != 4) {
+      issues[Prop::SPIN_STATES] =
+          "Incorrect number of workspaces in output configuration: " + std::to_string(spinStates.size()) +
+          ". Four output workspaces are produced by the corrections.";
+    }
   }
   return issues;
 }
@@ -447,16 +454,16 @@ void PolarizationCorrectionWildes::checkConsistentNumberHistograms(const Workspa
     }
   };
   if (inputs.mmWS) {
-    checkNHist(inputs.mmWS, Flippers::OnOn);
+    checkNHist(inputs.mmWS, FlipperConfigurations::ON_ON);
   }
   if (inputs.mpWS) {
-    checkNHist(inputs.mpWS, Flippers::OnOff);
+    checkNHist(inputs.mpWS, FlipperConfigurations::ON_OFF);
   }
   if (inputs.pmWS) {
-    checkNHist(inputs.pmWS, Flippers::OffOn);
+    checkNHist(inputs.pmWS, FlipperConfigurations::OFF_ON);
   }
   if (inputs.ppWS) {
-    checkNHist(inputs.ppWS, Flippers::OffOff);
+    checkNHist(inputs.ppWS, FlipperConfigurations::OFF_OFF);
   }
 }
 
@@ -493,16 +500,16 @@ void PolarizationCorrectionWildes::checkConsistentX(const WorkspaceMap &inputs, 
     }
   };
   if (inputs.mmWS) {
-    checkWS(inputs.mmWS, Flippers::OnOn);
+    checkWS(inputs.mmWS, FlipperConfigurations::ON_ON);
   }
   if (inputs.mpWS) {
-    checkWS(inputs.mpWS, Flippers::OnOff);
+    checkWS(inputs.mpWS, FlipperConfigurations::ON_OFF);
   }
   if (inputs.pmWS) {
-    checkWS(inputs.pmWS, Flippers::OffOn);
+    checkWS(inputs.pmWS, FlipperConfigurations::OFF_ON);
   }
   if (inputs.ppWS) {
-    checkWS(inputs.ppWS, Flippers::OffOff);
+    checkWS(inputs.ppWS, FlipperConfigurations::OFF_OFF);
   }
 }
 
@@ -511,27 +518,37 @@ void PolarizationCorrectionWildes::checkConsistentX(const WorkspaceMap &inputs, 
  * The workspaces will be published in the ADS, their names appended by
  * appropriate suffices.
  * @param outputs a set of workspaces to group
+ * @param hasAnalyser whether the flipper configuration included an analyser.
  * @return a group workspace
  */
-API::WorkspaceGroup_sptr PolarizationCorrectionWildes::groupOutput(const WorkspaceMap &outputs) {
-  const std::string outWSName = getProperty(Prop::OUTPUT_WS);
+API::WorkspaceGroup_sptr PolarizationCorrectionWildes::groupOutput(const WorkspaceMap &outputs,
+                                                                   const bool hasAnalyser) {
+  const auto &outWSName = getPropertyValue(Prop::OUTPUT_WS);
+  auto spinStateOrder = getPropertyValue(Prop::SPIN_STATES);
+  const bool addSpinStateLog = getProperty(Prop::ADD_SPIN_STATE_LOG);
+
   std::vector<std::string> names;
+  if (!spinStateOrder.empty()) {
+    names.resize(PolarizationCorrectionsHelpers::splitSpinStateString(spinStateOrder).size());
+  }
+
   if (outputs.ppWS) {
-    names.emplace_back(outWSName + "_++");
-    API::AnalysisDataService::Instance().addOrReplace(names.back(), outputs.ppWS);
+    addSpinStateOutput(names, spinStateOrder, outWSName, outputs.ppWS, SpinStateConfigurationsWildes::PLUS_PLUS,
+                       addSpinStateLog, hasAnalyser);
   }
   if (outputs.pmWS) {
-    names.emplace_back(outWSName + "_+-");
-    API::AnalysisDataService::Instance().addOrReplace(names.back(), outputs.pmWS);
+    addSpinStateOutput(names, spinStateOrder, outWSName, outputs.pmWS, SpinStateConfigurationsWildes::PLUS_MINUS,
+                       addSpinStateLog, hasAnalyser);
   }
   if (outputs.mpWS) {
-    names.emplace_back(outWSName + "_-+");
-    API::AnalysisDataService::Instance().addOrReplace(names.back(), outputs.mpWS);
+    addSpinStateOutput(names, spinStateOrder, outWSName, outputs.mpWS, SpinStateConfigurationsWildes::MINUS_PLUS,
+                       addSpinStateLog, hasAnalyser);
   }
   if (outputs.mmWS) {
-    names.emplace_back(outWSName + "_--");
-    API::AnalysisDataService::Instance().addOrReplace(names.back(), outputs.mmWS);
+    addSpinStateOutput(names, spinStateOrder, outWSName, outputs.mmWS, SpinStateConfigurationsWildes::MINUS_MINUS,
+                       addSpinStateLog, hasAnalyser);
   }
+
   auto group = createChildAlgorithm("GroupWorkspaces");
   group->initialize();
   group->setProperty("InputWorkspaces", names);
@@ -539,6 +556,65 @@ API::WorkspaceGroup_sptr PolarizationCorrectionWildes::groupOutput(const Workspa
   group->execute();
   API::WorkspaceGroup_sptr outWS = group->getProperty("OutputWorkspace");
   return outWS;
+}
+
+/**
+ * Add an output name in the correct position in the vector and to the ADS.
+ * Optionally adds a spin state log to the output workspace.
+ * @param names A list of the names of the workspaces the algorithm has generated.
+ * @param spinStateOrder The order the output should be in.
+ * @param baseName The base name for the output workspaces ("BASENAME_SPINSTATE" e.g "OUTNAME_+-")
+ * @param ws The workspace to add to the vector and ADS.
+ * @param spinState The spin state the workspace represents.
+ * @param addSpinStateLog Whether to add a sample log to the output workspace giving the spin state using the
+ * Reflectometry ORSO notation.
+ * @param hasAnalyser Whether the flipper configuration included an analyser.
+ */
+void PolarizationCorrectionWildes::addSpinStateOutput(std::vector<std::string> &names,
+                                                      const std::string &spinStateOrder, const std::string &baseName,
+                                                      const API::MatrixWorkspace_sptr &ws, const std::string &spinState,
+                                                      const bool addSpinStateLog, const bool hasAnalyser) {
+  if (addSpinStateLog) {
+    addSpinStateLogToWs(ws, spinState, hasAnalyser);
+  }
+
+  if (spinStateOrder.empty()) {
+    names.emplace_back(baseName + "_" + spinState);
+    API::AnalysisDataService::Instance().addOrReplace(names.back(), ws);
+  } else {
+    const auto &maybeIndex = PolarizationCorrectionsHelpers::indexOfWorkspaceForSpinState(
+        PolarizationCorrectionsHelpers::splitSpinStateString(spinStateOrder), spinState);
+    if (!maybeIndex.has_value()) {
+      throw std::invalid_argument("Required spin state (" + spinState + ") not found in spin state order (" +
+                                  spinStateOrder + ").");
+    }
+    const auto index = maybeIndex.value();
+    names[index] = baseName + "_" + spinState;
+    API::AnalysisDataService::Instance().addOrReplace(names[index], ws);
+  }
+}
+
+/**
+ * Adds a sample log to the workspace that gives the spin state of the data using Reflectometry ORSO notation.
+ * @param ws The workspace to add the sample log to.
+ * @param spinState The spin state the workspace represents.
+ * @param hasAnalyser Whether the flipper configuration included an analyser.
+ */
+void PolarizationCorrectionWildes::addSpinStateLogToWs(const API::MatrixWorkspace_sptr &ws,
+                                                       const std::string &spinState, const bool hasAnalyser) {
+  if (!hasAnalyser) {
+    if (spinState == SpinStateConfigurationsWildes::PLUS_PLUS) {
+      SpinStatesORSO::addORSOLogForSpinState(ws, SpinStateConfigurationsWildes::PLUS);
+      return;
+    }
+
+    if (spinState == SpinStateConfigurationsWildes::MINUS_MINUS) {
+      SpinStatesORSO::addORSOLogForSpinState(ws, SpinStateConfigurationsWildes::MINUS);
+      return;
+    }
+  }
+
+  SpinStatesORSO::addORSOLogForSpinState(ws, spinState);
 }
 
 /**
@@ -575,7 +651,7 @@ PolarizationCorrectionWildes::EfficiencyMap PolarizationCorrectionWildes::effici
 PolarizationCorrectionWildes::WorkspaceMap
 PolarizationCorrectionWildes::directBeamCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies) {
   using namespace boost::math;
-  checkInputExists(inputs.ppWS, Flippers::Off);
+  checkInputExists(inputs.ppWS, FlipperConfigurations::OFF);
   WorkspaceMap outputs;
   outputs.ppWS = createWorkspaceWithHistory(inputs.ppWS);
   const size_t nHisto = inputs.ppWS->getNumberHistograms();
@@ -612,8 +688,8 @@ PolarizationCorrectionWildes::directBeamCorrections(const WorkspaceMap &inputs, 
 PolarizationCorrectionWildes::WorkspaceMap
 PolarizationCorrectionWildes::analyzerlessCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies) {
   using namespace boost::math;
-  checkInputExists(inputs.mmWS, Flippers::On);
-  checkInputExists(inputs.ppWS, Flippers::Off);
+  checkInputExists(inputs.mmWS, FlipperConfigurations::ON);
+  checkInputExists(inputs.ppWS, FlipperConfigurations::OFF);
   WorkspaceMap outputs;
   outputs.mmWS = createWorkspaceWithHistory(inputs.mmWS);
   outputs.ppWS = createWorkspaceWithHistory(inputs.ppWS);
@@ -676,8 +752,8 @@ PolarizationCorrectionWildes::analyzerlessCorrections(const WorkspaceMap &inputs
 PolarizationCorrectionWildes::WorkspaceMap
 PolarizationCorrectionWildes::twoInputCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies) {
   using namespace boost::math;
-  checkInputExists(inputs.mmWS, Flippers::OnOn);
-  checkInputExists(inputs.ppWS, Flippers::OffOff);
+  checkInputExists(inputs.mmWS, FlipperConfigurations::ON_ON);
+  checkInputExists(inputs.ppWS, FlipperConfigurations::OFF_OFF);
   WorkspaceMap fullInputs = inputs;
   fullInputs.mpWS = createWorkspaceWithHistory(inputs.mmWS);
   fullInputs.pmWS = createWorkspaceWithHistory(inputs.ppWS);
@@ -697,13 +773,13 @@ PolarizationCorrectionWildes::twoInputCorrections(const WorkspaceMap &inputs, co
 PolarizationCorrectionWildes::WorkspaceMap
 PolarizationCorrectionWildes::threeInputCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies) {
   WorkspaceMap fullInputs = inputs;
-  checkInputExists(inputs.mmWS, Flippers::OnOn);
-  checkInputExists(inputs.ppWS, Flippers::OffOff);
+  checkInputExists(inputs.mmWS, FlipperConfigurations::ON_ON);
+  checkInputExists(inputs.ppWS, FlipperConfigurations::OFF_OFF);
   if (!inputs.mpWS) {
-    checkInputExists(inputs.pmWS, Flippers::OffOn);
+    checkInputExists(inputs.pmWS, FlipperConfigurations::OFF_ON);
     threeInputsSolve10(fullInputs, efficiencies);
   } else {
-    checkInputExists(inputs.mpWS, Flippers::OnOff);
+    checkInputExists(inputs.mpWS, FlipperConfigurations::ON_OFF);
     threeInputsSolve01(fullInputs, efficiencies);
   }
   return fullCorrections(fullInputs, efficiencies);
@@ -720,10 +796,10 @@ PolarizationCorrectionWildes::threeInputCorrections(const WorkspaceMap &inputs, 
 PolarizationCorrectionWildes::WorkspaceMap
 PolarizationCorrectionWildes::fullCorrections(const WorkspaceMap &inputs, const EfficiencyMap &efficiencies) {
   using namespace boost::math;
-  checkInputExists(inputs.mmWS, Flippers::OnOn);
-  checkInputExists(inputs.mpWS, Flippers::OnOff);
-  checkInputExists(inputs.pmWS, Flippers::OffOn);
-  checkInputExists(inputs.ppWS, Flippers::OffOff);
+  checkInputExists(inputs.mmWS, FlipperConfigurations::ON_ON);
+  checkInputExists(inputs.mpWS, FlipperConfigurations::ON_OFF);
+  checkInputExists(inputs.pmWS, FlipperConfigurations::OFF_ON);
+  checkInputExists(inputs.ppWS, FlipperConfigurations::OFF_OFF);
   WorkspaceMap outputs;
   outputs.mmWS = createWorkspaceWithHistory(inputs.mmWS);
   outputs.mpWS = createWorkspaceWithHistory(inputs.mpWS);
@@ -790,13 +866,13 @@ PolarizationCorrectionWildes::mapInputsToDirections(const std::vector<std::strin
       throw std::runtime_error("One of the input workspaces doesn't seem to be a MatrixWorkspace.");
     }
     const auto &f = flippers[i];
-    if (f == Flippers::OnOn || f == Flippers::On) {
+    if (f == FlipperConfigurations::ON_ON || f == FlipperConfigurations::ON) {
       inputs.mmWS = ws;
-    } else if (f == Flippers::OnOff) {
+    } else if (f == FlipperConfigurations::ON_OFF) {
       inputs.mpWS = ws;
-    } else if (f == Flippers::OffOn) {
+    } else if (f == FlipperConfigurations::OFF_ON) {
       inputs.pmWS = ws;
-    } else if (f == Flippers::OffOff || f == Flippers::Off) {
+    } else if (f == FlipperConfigurations::OFF_OFF || f == FlipperConfigurations::OFF) {
       inputs.ppWS = ws;
     } else {
       throw std::runtime_error(std::string{"Unknown entry in "} + Prop::FLIPPERS);

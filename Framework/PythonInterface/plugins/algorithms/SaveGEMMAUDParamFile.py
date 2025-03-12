@@ -8,10 +8,9 @@ import math
 import os
 import re
 from collections import defaultdict
-from string import Formatter
 
-from mantid.api import *
-from mantid.kernel import *
+from mantid.api import mtd, AlgorithmFactory, FileAction, FileProperty, PythonAlgorithm, WorkspaceGroupProperty
+from mantid.kernel import logger, Direction, IntArrayProperty
 import isis_powder.gem_routines
 
 _MAUD_TEMPLATE_PATH = None
@@ -25,7 +24,6 @@ def _maud_template_path():
 
 
 class SaveGEMMAUDParamFile(PythonAlgorithm):
-
     PROP_INPUT_WS = "InputWorkspace"
     PROP_TEMPLATE_FILE = "TemplateFilename"
     PROP_GROUPING_SCHEME = "GroupingScheme"
@@ -44,9 +42,7 @@ class SaveGEMMAUDParamFile(PythonAlgorithm):
         return "SaveGEMMAUDParamFile"
 
     def summary(self):
-        return (
-            "Read calibration information from focused workspace and GSAS parameter file, and save to " "MAUD-readable calibration format"
-        )
+        return "Read calibration information from focused workspace and GSAS parameter file, and save to MAUD-readable calibration format"
 
     def PyInit(self):
         self.declareProperty(
@@ -105,7 +101,7 @@ class SaveGEMMAUDParamFile(PythonAlgorithm):
 
         template_file_path = self.getProperty(self.PROP_TEMPLATE_FILE).value
         if len(template_file_path) == 0:
-            logger.error("Could not find default diffraction directory for .maud template file: " "you'll have to find it yourself")
+            logger.error("Could not find default diffraction directory for .maud template file: you'll have to find it yourself")
 
         with open(template_file_path) as template_file:
             template = template_file.read()
@@ -116,9 +112,7 @@ class SaveGEMMAUDParamFile(PythonAlgorithm):
         output_params["bank_ids"] = "\n".join("Bank{}".format(i + 1) for i in range(num_banks))
 
         with open(self.getProperty(self.PROP_OUTPUT_FILE).value, "w") as output_file:
-            # Note, once we've got rid of Python 2 support this can be simplified to
-            # template.format_map(**defaultdict(create_empty_param_list, output_params))
-            output_file.write(Formatter().vformat(template, (), defaultdict(create_empty_param_list, output_params)))
+            output_file.write(template.format_map(defaultdict(create_empty_param_list, output_params)))
 
     def validateInputs(self):
         issues = {}

@@ -9,7 +9,6 @@ from mantid.kernel import BoolTimeSeriesProperty, FloatTimeSeriesProperty, Float
 
 
 class FilteredTimeSeriesPropertyTest(unittest.TestCase):
-
     _source = None
     _filter = None
 
@@ -40,6 +39,14 @@ class FilteredTimeSeriesPropertyTest(unittest.TestCase):
         unfiltered = filtered.unfiltered()
 
         self.assertEqual(self._source.size(), unfiltered.size())
+
+    def test_time_average_value(self):
+        filter = BoolTimeSeriesProperty("filter")
+        filter.addValue("2007-11-30T16:17:20", True)
+        filter.addValue("2007-11-30T16:17:30", False)
+
+        filtered_tsp = FloatFilteredTimeSeriesProperty(self._source, filter)
+        self.assertAlmostEqual(filtered_tsp.timeAverageValue(), 3, 10)
 
 
 if __name__ == "__main__":
