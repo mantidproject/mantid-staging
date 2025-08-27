@@ -5,7 +5,7 @@ The Mantid project provides a framework that supports high-performance computing
 
 dummy text
 another dummy text 4
-commit from unknown user 2
+commit from unknown user 3
 
 
 Useful links
