@@ -18,6 +18,3 @@ Useful links
  * Developer site: https://developer.mantidproject.org
 
 [![Build Status](https://builds.mantidproject.org/buildStatus/icon?job=main_nightly_deployment)](https://builds.mantidproject.org/job/main_nightly_deployment)
-
-
-test 2
