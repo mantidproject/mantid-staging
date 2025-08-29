@@ -5,6 +5,8 @@ The Mantid project provides a framework that supports high-performance computing
 
 
 
+
+
 Useful links
 ------------
  * Homepage: https://www.mantidproject.org
