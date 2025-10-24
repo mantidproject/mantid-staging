@@ -7,6 +7,8 @@
 # SPDX - License - Identifier: GPL - 3.0 +
 """Utility for generating a class file, header, and test file"""
 
+you are hacked 
+
 import argparse
 import datetime
 import os
