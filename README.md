@@ -12,4 +12,6 @@ Useful links
  * Build server: https://builds.mantidproject.org
  * Developer site: https://developer.mantidproject.org
 
+new texts..
+
 [![Build Status](https://builds.mantidproject.org/buildStatus/icon?job=main_nightly_deployment)](https://builds.mantidproject.org/job/main_nightly_deployment)
