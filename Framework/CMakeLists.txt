@@ -10,6 +10,8 @@ include(TestTargetFunctions)
 add_dependencies(check FrameworkTests)
 add_dependencies(FrameworkTests Framework)
 
+# test
+
 add_subdirectory(Types)
 add_subdirectory(Json)
 add_subdirectory(LegacyNexus)
