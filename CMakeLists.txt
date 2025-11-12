@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 4.0)
 # Define the project name.
 project(Mantid)
 
-# test comment
+# test comment 2
 
 # Use modern >=2.8.12 INTERFACE_LINK_LIBRARIES behaviour: https://cmake.org/cmake/help/latest/policy/CMP0022.html
 if(POLICY CMP0022)
