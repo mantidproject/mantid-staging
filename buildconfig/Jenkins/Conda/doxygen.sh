@@ -23,9 +23,12 @@ fi
 WORKSPACE=$1
 shift 1
 
+CHECK_FOR_CHANGES=${1-true}
+shift 1
+
 cd $WORKSPACE
 
-if $SCRIPT_DIR/../check_for_changes doxygen; then
+if [ "$CHECK_FOR_CHANGES" = true ] && $SCRIPT_DIR/../check_for_changes doxygen; then
     echo "No C++ files or doxygen configuration have changed. Skipping check."
     exit 0
 fi
