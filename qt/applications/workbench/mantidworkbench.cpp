@@ -40,7 +40,7 @@ namespace {
 
 /**
  * Return the path to the Python executable
- * @param base Directory to serve as base for absolute paths
+ * @param base directory to serve as base for absolute paths
  */
 inline std::string pythonExecutable(const fs::path &) {
   // We assume the conda environement is activated and python will be found
