@@ -514,7 +514,7 @@ std::vector<double> MergeRuns::calculateRebinParams(const std::vector<double> &b
 }
 
 //------------------------------------------------------------------------------------------------
-/** Calculates the rebin paramters in the case where the two input workspaces do
+/** Calculates the rebin parameters in the case where the two input workspaces do
  * not overlap at all.
  *  @param X1 ::     The bin boundaries from the first workspace
  *  @param X2 ::     The bin boundaries from the second workspace
