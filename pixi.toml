@@ -49,7 +49,6 @@ jq = "*"
 sphinx = "*"
 mantid-sphinx-theme = "*"
 myst-parser = "*"
-sphinx-bootstrap-theme = "*"
 
 
 [feature.publish-gh.target.linux-64.dependencies]
