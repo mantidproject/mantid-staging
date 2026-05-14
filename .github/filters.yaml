@@ -16,3 +16,4 @@ devsite:
  - '.github/filters.yaml'
  - '.github/actions/doxygen-build/**'
  - '.github/workflows/devdocs-publish.yml'
+ - 'pixi.toml'
