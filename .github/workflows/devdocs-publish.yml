@@ -53,7 +53,7 @@ jobs:
         if: steps.changes.outputs.devsite == 'true' 
         run: |
           rm -rf developer_repo/*
-          cp -r build/devsite-html/* developer_repo/
+          cp -r build_devsite_html/* developer_repo/
 
       # publish devsite if on gh-pages branch of mantidproject/developer
       - name: Publish developer site
