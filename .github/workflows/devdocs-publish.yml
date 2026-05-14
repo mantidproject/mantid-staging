@@ -49,7 +49,6 @@ jobs:
         uses: ./.github/actions/devsite-build
 
 
-
       # # publish devsite if on gh-pages branch of mantidproject/developer
       # - name: Publish developer site
       #   if: steps.changes.outputs.devsite == 'true'
